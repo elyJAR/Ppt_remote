@@ -1,0 +1,67 @@
+name: Android Build and Pre-Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag name for prerelease (example: pre-v0.1.0)"
+        required: false
+        type: string
+  push:
+    tags:
+      - "pre-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-prerelease:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: mobile_remote_android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        run: gradle :app:assembleDebug
+
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.inputs.release_tag }}" ]; then
+            echo "value=${{ github.event.inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=pre-v0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish GitHub prerelease
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.tag.outputs.value }}
+          name: Android prerelease ${{ steps.tag.outputs.value }}
+          prerelease: true
+          generateReleaseNotes: true
+          commit: ${{ github.sha }}
+          artifacts: mobile_remote_android/app/build/outputs/apk/debug/app-debug.apk
+          artifactErrorsFailBuild: true
+          allowUpdates: true
+          replacesArtifacts: true
