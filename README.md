@@ -23,7 +23,10 @@ Prerequisites:
 Steps:
 
 ```powershell
+# If you are at the project root:
 cd desktop_bridge
+
+# If you are already inside desktop_bridge, skip the cd command:
 powershell -ExecutionPolicy Bypass -File .\start_bridge.ps1
 ```
 
