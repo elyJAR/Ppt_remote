@@ -34,8 +34,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        // Start the foreground service to keep the app running in background
-        RemoteControlService.start(this)
+        // Try to start the foreground service to keep the app running in background
+        // Wrapped in try-catch to prevent crashes if service fails to start
+        try {
+            RemoteControlService.start(this)
+        } catch (e: Exception) {
+            // Service failed to start - app will still work but won't run in background
+            android.util.Log.e("MainActivity", "Failed to start foreground service", e)
+        }
         
         setContent {
             MaterialTheme {

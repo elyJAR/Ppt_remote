@@ -7,9 +7,11 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 
 class RemoteControlService : Service() {
     
@@ -18,11 +20,29 @@ class RemoteControlService : Service() {
         private const val NOTIFICATION_ID = 1
         
         fun start(context: Context) {
-            val intent = Intent(context, RemoteControlService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            // Check if we have notification permission on Android 13+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val hasPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+                
+                if (!hasPermission) {
+                    android.util.Log.w("RemoteControlService", "POST_NOTIFICATIONS permission not granted")
+                    // Don't start service if we can't show notification
+                    return
+                }
+            }
+            
+            try {
+                val intent = Intent(context, RemoteControlService::class.java)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("RemoteControlService", "Failed to start service", e)
             }
         }
         
@@ -38,8 +58,13 @@ class RemoteControlService : Service() {
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val notification = createNotification()
-        startForeground(NOTIFICATION_ID, notification)
+        try {
+            val notification = createNotification()
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            android.util.Log.e("RemoteControlService", "Failed to start foreground", e)
+            stopSelf()
+        }
         return START_STICKY
     }
     
@@ -75,6 +100,7 @@ class RemoteControlService : Service() {
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 }
