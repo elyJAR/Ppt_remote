@@ -22,3 +22,7 @@ local.properties
 
 # Logs
 *.log
+
+# PyInstaller
+dist/
+*.spec

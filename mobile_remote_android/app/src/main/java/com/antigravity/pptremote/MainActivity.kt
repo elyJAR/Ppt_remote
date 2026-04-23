@@ -9,7 +9,6 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +41,7 @@ class MainActivity : ComponentActivity() {
                     onBridgeUrlChange = viewModel::setBridgeUrl,
                     onPresentationSelect = viewModel::selectPresentation,
                     onStartSlideshow = viewModel::startSelectedSlideshow,
+                    onStopSlideshow = viewModel::stopSelectedSlideshow,
                     onNext = viewModel::nextSlide,
                     onPrevious = viewModel::previousSlide
                 )
@@ -72,6 +72,7 @@ private fun RemoteScreen(
     onBridgeUrlChange: (String) -> Unit,
     onPresentationSelect: (String) -> Unit,
     onStartSlideshow: () -> Unit,
+    onStopSlideshow: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit
 ) {
@@ -104,6 +105,15 @@ private fun RemoteScreen(
             Button(onClick = onStartSlideshow, modifier = Modifier.weight(1f)) {
                 Text("Start Slideshow")
             }
+            Button(onClick = onStopSlideshow, modifier = Modifier.weight(1f), enabled = !state.isBusy) {
+                Text("Stop")
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Button(onClick = onPrevious, modifier = Modifier.weight(1f), enabled = !state.isBusy) {
                 Text("Previous")
             }

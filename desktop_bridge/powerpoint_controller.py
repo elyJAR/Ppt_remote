@@ -99,6 +99,16 @@ class PowerPointController:
             presentation = self._find_presentation(app, presentation_id)
             presentation.SlideShowSettings.Run()
 
+    def stop_slideshow(self, presentation_id: str) -> None:
+        with com_context():
+            app = self._get_app()
+            window = self._get_slideshow_window(app, presentation_id)
+            if window is None:
+                raise PowerPointControllerError(
+                    "Presentation is not currently in slideshow mode."
+                )
+            window.View.Exit()
+
     def next_slide(self, presentation_id: str) -> None:
         with com_context():
             app = self._get_app()

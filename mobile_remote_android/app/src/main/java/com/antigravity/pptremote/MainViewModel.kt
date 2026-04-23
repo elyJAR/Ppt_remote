@@ -32,6 +32,11 @@ class MainViewModel : ViewModel() {
         runBridgeAction("Slideshow started") { url -> client.startSlideshow(url, selected) }
     }
 
+    fun stopSelectedSlideshow() {
+        val selected = _state.value.selectedPresentationId ?: return
+        runBridgeAction("Slideshow stopped") { url -> client.stopSlideshow(url, selected) }
+    }
+
     fun nextSlide() {
         val selected = ensureSelectedPresentation() ?: return
         runBridgeAction("Next slide") { url -> client.next(url, selected) }

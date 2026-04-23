@@ -58,6 +58,10 @@ class BridgeClient {
         post(url, "/api/presentations/${encodedId(presentationId)}/start")
     }
 
+    fun stopSlideshow(url: String, presentationId: String) {
+        post(url, "/api/presentations/${encodedId(presentationId)}/stop")
+    }
+
     fun next(url: String, presentationId: String) {
         post(url, "/api/presentations/${encodedId(presentationId)}/next")
     }

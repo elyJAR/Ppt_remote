@@ -131,6 +131,15 @@ def start_slideshow(presentation_id: str):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.post("/api/presentations/{presentation_id}/stop")
+def stop_slideshow(presentation_id: str):
+    try:
+        controller.stop_slideshow(presentation_id)
+        return {"ok": True}
+    except PowerPointControllerError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.post("/api/presentations/{presentation_id}/next")
 def next_slide(presentation_id: str):
     try:
