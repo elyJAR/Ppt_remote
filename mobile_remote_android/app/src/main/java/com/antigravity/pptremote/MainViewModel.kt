@@ -1,6 +1,7 @@
 package com.antigravity.pptremote
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -10,9 +11,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-class MainViewModel : ViewModel() {
+class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val client = BridgeClient()
-    private val _state = MutableStateFlow(RemoteState())
+    private val appContext = getApplication<Application>()
+    private val _state = MutableStateFlow(
+        RemoteState(
+            bridgeUrl = RemotePrefs.getBridgeUrl(appContext)
+        )
+    )
     val state: StateFlow<RemoteState> = _state.asStateFlow()
 
     init {
@@ -20,10 +26,12 @@ class MainViewModel : ViewModel() {
     }
 
     fun setBridgeUrl(url: String) {
+        RemotePrefs.setBridgeUrl(appContext, url)
         _state.value = _state.value.copy(bridgeUrl = url)
     }
 
     fun selectPresentation(id: String) {
+        RemotePrefs.setSelectedPresentationId(appContext, id)
         _state.value = _state.value.copy(selectedPresentationId = id)
     }
 
@@ -96,6 +104,7 @@ class MainViewModel : ViewModel() {
                 return
             }
 
+            RemotePrefs.setBridgeUrl(appContext, detectedUrl)
             _state.value = current.copy(
                 bridgeUrl = detectedUrl,
                 statusMessage = "Bridge detected at $detectedUrl"
@@ -115,6 +124,7 @@ class MainViewModel : ViewModel() {
                 else -> presentations.firstOrNull { it.inSlideshow }?.id ?: presentations.firstOrNull()?.id
             }
 
+            RemotePrefs.setSelectedPresentationId(appContext, selected)
             _state.value = latestState.copy(
                 presentations = presentations,
                 selectedPresentationId = selected,
