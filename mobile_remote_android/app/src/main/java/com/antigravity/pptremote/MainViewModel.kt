@@ -80,17 +80,37 @@ class MainViewModel : ViewModel() {
     }
 
     private fun refreshPresentations() {
+        val current = _state.value
+        val effectiveUrl = if (current.bridgeUrl.isBlank()) {
+            val detectedUrl = client.discoverBridge()
+            if (detectedUrl == null) {
+                _state.value = current.copy(
+                    presentations = emptyList(),
+                    statusMessage = "Searching for desktop bridge..."
+                )
+                return
+            }
+
+            _state.value = current.copy(
+                bridgeUrl = detectedUrl,
+                statusMessage = "Bridge detected at $detectedUrl"
+            )
+            detectedUrl
+        } else {
+            current.bridgeUrl
+        }
+
         try {
-            val current = _state.value
-            val presentations = client.fetchPresentations(current.bridgeUrl)
+            val latestState = _state.value
+            val presentations = client.fetchPresentations(effectiveUrl)
             val selected = when {
-                current.selectedPresentationId != null && presentations.any { it.id == current.selectedPresentationId } -> {
-                    current.selectedPresentationId
+                latestState.selectedPresentationId != null && presentations.any { it.id == latestState.selectedPresentationId } -> {
+                    latestState.selectedPresentationId
                 }
                 else -> presentations.firstOrNull { it.inSlideshow }?.id ?: presentations.firstOrNull()?.id
             }
 
-            _state.value = _state.value.copy(
+            _state.value = latestState.copy(
                 presentations = presentations,
                 selectedPresentationId = selected,
                 statusMessage = if (presentations.isEmpty()) {

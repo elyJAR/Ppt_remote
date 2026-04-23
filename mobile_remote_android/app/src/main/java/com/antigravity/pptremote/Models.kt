@@ -10,9 +10,9 @@ data class Presentation(
 )
 
 data class RemoteState(
-    val bridgeUrl: String = "http://192.168.1.10:8787",
+    val bridgeUrl: String = "",
     val presentations: List<Presentation> = emptyList(),
     val selectedPresentationId: String? = null,
-    val statusMessage: String = "Waiting for bridge",
+    val statusMessage: String = "Searching for desktop bridge...",
     val isBusy: Boolean = false
 )
