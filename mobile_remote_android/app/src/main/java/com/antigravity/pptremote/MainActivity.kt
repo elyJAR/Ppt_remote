@@ -1,6 +1,11 @@
 package com.antigravity.pptremote
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -33,6 +38,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Request battery optimization exemption for better background performance
+        requestBatteryOptimizationExemption()
         
         // Try to start the foreground service to keep the app running in background
         // Wrapped in try-catch to prevent crashes if service fails to start
@@ -72,6 +80,25 @@ class MainActivity : ComponentActivity() {
             }
 
             else -> super.onKeyDown(keyCode, event)
+        }
+    }
+    
+    private fun requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+                val packageName = packageName
+                
+                if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                    android.util.Log.d("MainActivity", "Requesting battery optimization exemption")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Failed to request battery optimization exemption", e)
+            }
         }
     }
     

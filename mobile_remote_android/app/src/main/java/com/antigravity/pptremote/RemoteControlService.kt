@@ -10,14 +10,18 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 
 class RemoteControlService : Service() {
     
+    private var wakeLock: PowerManager.WakeLock? = null
+    
     companion object {
         private const val CHANNEL_ID = "ppt_remote_service"
         private const val NOTIFICATION_ID = 1
+        private const val WAKE_LOCK_TAG = "PptRemote::ServiceWakeLock"
         
         fun start(context: Context) {
             // Check if we have notification permission on Android 13+
@@ -55,6 +59,7 @@ class RemoteControlService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        acquireWakeLock()
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -69,6 +74,40 @@ class RemoteControlService : Service() {
     }
     
     override fun onBind(intent: Intent?): IBinder? = null
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        releaseWakeLock()
+    }
+    
+    private fun acquireWakeLock() {
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                WAKE_LOCK_TAG
+            ).apply {
+                acquire()
+                android.util.Log.d("RemoteControlService", "Wake lock acquired")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("RemoteControlService", "Failed to acquire wake lock", e)
+        }
+    }
+    
+    private fun releaseWakeLock() {
+        try {
+            wakeLock?.let {
+                if (it.isHeld) {
+                    it.release()
+                    android.util.Log.d("RemoteControlService", "Wake lock released")
+                }
+            }
+            wakeLock = null
+        } catch (e: Exception) {
+            android.util.Log.e("RemoteControlService", "Failed to release wake lock", e)
+        }
+    }
     
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -96,7 +135,7 @@ class RemoteControlService : Service() {
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("PowerPoint Remote")
-            .setContentText("Remote control is active")
+            .setContentText("Remote control is active - Screen off OK")
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
