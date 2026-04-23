@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.media.AudioManager
 import android.media.VolumeProvider
 import android.media.session.MediaSession
@@ -16,6 +17,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -79,7 +81,12 @@ class RemoteControlService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
-            startForeground(NOTIFICATION_ID, createNotification())
+            val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            } else {
+                0
+            }
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, createNotification(), serviceType)
             when (intent?.action) {
                 ACTION_NEXT -> executeBridgeAction("next")
                 ACTION_PREVIOUS -> executeBridgeAction("previous")
@@ -115,6 +122,7 @@ class RemoteControlService : Service() {
 
         mediaSession = MediaSession(this, "PptRemoteSession").apply {
             setPlaybackToRemote(volumeProvider)
+            @Suppress("DEPRECATION")
             setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
             setPlaybackState(
                 PlaybackState.Builder()
@@ -179,7 +187,7 @@ class RemoteControlService : Service() {
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG).apply {
-                acquire()
+                acquire(60 * 60 * 1000L) // 1 hour; re-acquired each time the service starts
             }
         } catch (e: Exception) {
             android.util.Log.e("RemoteControlService", "Failed to acquire wake lock", e)
