@@ -35,6 +35,7 @@ class RemoteControlService : Service() {
         private const val CHANNEL_ID = "ppt_remote_service"
         private const val NOTIFICATION_ID = 1
         private const val WAKE_LOCK_TAG = "PptRemote::ServiceWakeLock"
+        private const val WAKE_LOCK_TIMEOUT_MS = 60 * 60 * 1000L // 1 hour; re-acquired each time the service starts
 
         private const val ACTION_NEXT = "com.antigravity.pptremote.action.NEXT"
         private const val ACTION_PREVIOUS = "com.antigravity.pptremote.action.PREVIOUS"
@@ -187,7 +188,7 @@ class RemoteControlService : Service() {
         try {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG).apply {
-                acquire(60 * 60 * 1000L) // 1 hour; re-acquired each time the service starts
+                acquire(WAKE_LOCK_TIMEOUT_MS)
             }
         } catch (e: Exception) {
             android.util.Log.e("RemoteControlService", "Failed to acquire wake lock", e)
