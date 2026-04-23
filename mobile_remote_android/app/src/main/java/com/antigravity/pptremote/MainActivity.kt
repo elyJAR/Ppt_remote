@@ -33,6 +33,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Start the foreground service to keep the app running in background
+        RemoteControlService.start(this)
+        
         setContent {
             MaterialTheme {
                 val state by viewModel.state.collectAsState()
@@ -63,6 +67,12 @@ class MainActivity : ComponentActivity() {
 
             else -> super.onKeyDown(keyCode, event)
         }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        // Note: Service continues running even after activity is destroyed
+        // User can stop it from notification or by force-stopping the app
     }
 }
 

@@ -71,9 +71,40 @@ Steps:
 
 `presentation_id` is the full PowerPoint file path and is URL-encoded by the Android app automatically.
 
+## Background Execution
+
+Both the Android app and desktop bridge now support background execution:
+
+### Android App
+- **Foreground Service**: Keeps the app running even when minimized
+- **Volume buttons work in background**: Control slides even when the app is not visible
+- **Persistent notification**: Shows when the remote control is active
+- Automatically starts when you open the app
+
+### Desktop Bridge
+- **Hidden background mode**: Run without showing a console window
+- **Auto-start on login**: Optional automatic startup when Windows starts
+- **Easy management**: Simple PowerShell scripts to start/stop
+
+For detailed setup instructions, see [BACKGROUND_EXECUTION.md](BACKGROUND_EXECUTION.md)
+
+Quick start for background mode:
+```powershell
+cd desktop_bridge
+
+# Start in background (no console window)
+.\start_background.ps1
+
+# Stop background service
+.\stop_background.ps1
+
+# Install automatic startup at login
+.\install_background_startup.ps1
+```
+
 ## Notes
 
-- Android volume key capture works while the app is focused.
+- Android volume key capture now works even when the app is in the background (thanks to foreground service).
 - iOS does not allow this same behavior in a straightforward way for App Store apps.
 - If your phone cannot reach the bridge, check Windows firewall for inbound ports `8787` (HTTP API) and `8788` (UDP discovery).
 
@@ -90,6 +121,14 @@ powershell -ExecutionPolicy Bypass -File .\build_exe.ps1
 # Install startup task and run it now
 powershell -ExecutionPolicy Bypass -File .\install_startup_task.ps1
 ```
+
+If EXE build fails (for example DNS/network errors downloading PyInstaller), you can still install background startup using Python mode:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install_startup_task.ps1 -Mode Python
+```
+
+`-Mode Auto` (default) uses the EXE when available and falls back to Python when it is not.
 
 The executable path is:
 
