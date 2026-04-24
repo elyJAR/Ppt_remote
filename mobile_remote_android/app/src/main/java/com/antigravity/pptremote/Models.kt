@@ -14,5 +14,8 @@ data class RemoteState(
     val presentations: List<Presentation> = emptyList(),
     val selectedPresentationId: String? = null,
     val statusMessage: String = "Searching for desktop bridge...",
-    val isBusy: Boolean = false
+    val isBusy: Boolean = false,
+    val networkType: NetworkType = NetworkType.UNKNOWN,
+    val networkWarning: String? = null,
+    val bridgeNetworkWarning: String? = null
 )

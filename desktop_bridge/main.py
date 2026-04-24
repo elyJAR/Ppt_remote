@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from powerpoint_controller import PowerPointController, PowerPointControllerError
+from network_detector import get_network_type, NetworkType
 
 
 class PresentationDto(BaseModel):
@@ -22,6 +23,14 @@ class PresentationDto(BaseModel):
 
 class HealthDto(BaseModel):
     status: str
+    network_type: str = "unknown"
+    is_hotspot: bool = False
+
+
+class NetworkStatusDto(BaseModel):
+    network_type: str
+    is_hotspot: bool
+    warning: str | None = None
 
 
 app = FastAPI(title="PowerPoint Bridge API", version="0.1.0")
@@ -110,7 +119,30 @@ def shutdown_event() -> None:
 
 @app.get("/api/health", response_model=HealthDto)
 def health() -> HealthDto:
-    return HealthDto(status="ok")
+    network_type = get_network_type()
+    is_hotspot = network_type in (NetworkType.HOTSPOT_PROVIDING, NetworkType.HOTSPOT_USING)
+    return HealthDto(
+        status="ok",
+        network_type=network_type.value,
+        is_hotspot=is_hotspot
+    )
+
+
+@app.get("/api/network/status", response_model=NetworkStatusDto)
+def network_status() -> NetworkStatusDto:
+    network_type = get_network_type()
+    
+    warning = None
+    if network_type == NetworkType.HOTSPOT_PROVIDING:
+        warning = "Desktop is providing hotspot to phone. Connection may be less stable."
+    elif network_type == NetworkType.HOTSPOT_USING:
+        warning = "Desktop is using a hotspot connection. Connection may be less stable."
+    
+    return NetworkStatusDto(
+        network_type=network_type.value,
+        is_hotspot=(network_type in (NetworkType.HOTSPOT_PROVIDING, NetworkType.HOTSPOT_USING)),
+        warning=warning
+    )
 
 
 @app.get("/api/presentations", response_model=list[PresentationDto])

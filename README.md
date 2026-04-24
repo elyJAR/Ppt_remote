@@ -76,12 +76,14 @@ Steps:
 Both the Android app and desktop bridge now support background execution:
 
 ### Android App
+
 - **Foreground Service**: Keeps the app running even when minimized
 - **Volume buttons work in background**: Control slides even when the app is not visible
 - **Persistent notification**: Shows when the remote control is active
 - Automatically starts when you open the app
 
 ### Desktop Bridge
+
 - **Hidden background mode**: Run without showing a console window
 - **Auto-start on login**: Optional automatic startup when Windows starts
 - **Easy management**: Simple PowerShell scripts to start/stop
@@ -89,6 +91,7 @@ Both the Android app and desktop bridge now support background execution:
 For detailed setup instructions, see [BACKGROUND_EXECUTION.md](BACKGROUND_EXECUTION.md)
 
 Quick start for background mode:
+
 ```powershell
 cd desktop_bridge
 

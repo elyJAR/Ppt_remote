@@ -13,17 +13,27 @@ import java.net.NetworkInterface
 import java.net.SocketTimeoutException
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.TimeUnit
 
 class BridgeClient {
-    private val client = OkHttpClient()
     private val discoveryPort = 8788
     private val discoveryToken = "PPT_REMOTE_DISCOVER"
+    
+    // Create a client with default timeouts - will be overridden per-request if needed
+    private fun createClient(timeoutSeconds: Int = 10): OkHttpClient {
+        return OkHttpClient.Builder()
+            .connectTimeout(timeoutSeconds.toLong(), TimeUnit.SECONDS)
+            .readTimeout(timeoutSeconds.toLong(), TimeUnit.SECONDS)
+            .writeTimeout(timeoutSeconds.toLong(), TimeUnit.SECONDS)
+            .build()
+    }
 
     private fun baseUrl(url: String): String = url.trimEnd('/')
     private fun encodedId(id: String): String =
         URLEncoder.encode(id, StandardCharsets.UTF_8.toString()).replace("+", "%20")
 
     fun fetchPresentations(url: String): List<Presentation> {
+        val client = createClient(timeoutSeconds = 10)
         val request = Request.Builder()
             .url("${baseUrl(url)}/api/presentations")
             .get()
@@ -51,6 +61,33 @@ class BridgeClient {
             }
 
             return presentations
+        }
+    }
+
+    fun getNetworkStatus(url: String): NetworkStatus? {
+        return try {
+            val client = createClient(timeoutSeconds = 5)
+            val request = Request.Builder()
+                .url("${baseUrl(url)}/api/network/status")
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return null
+                }
+
+                val body = response.body?.string().orEmpty()
+                val json = JSONObject(body)
+                
+                NetworkStatus(
+                    networkType = json.optString("network_type", "unknown"),
+                    isHotspot = json.optBoolean("is_hotspot", false),
+                    warning = json.optString("warning", null)
+                )
+            }
+        } catch (ex: Exception) {
+            null
         }
     }
 
@@ -124,6 +161,7 @@ class BridgeClient {
     }
 
     private fun post(url: String, path: String) {
+        val client = createClient(timeoutSeconds = 10)
         val request = Request.Builder()
             .url("${baseUrl(url)}$path")
             .post("{}".toRequestBody("application/json".toMediaType()))
@@ -136,3 +174,9 @@ class BridgeClient {
         }
     }
 }
+
+data class NetworkStatus(
+    val networkType: String,
+    val isHotspot: Boolean,
+    val warning: String?
+)
