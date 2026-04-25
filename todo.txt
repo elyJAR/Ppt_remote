@@ -217,20 +217,20 @@
 
   --- Manual Testing Checklist (Android Background Execution) ---
 
-  [ ] Service starts automatically when app opens
-  [ ] Persistent notification appears in notification shade
-  [ ] Volume Up -> Next Slide works when app is in the foreground
+  [x] Service starts automatically when app opens
+  [x] Persistent notification appears in notification shade
+  [x] Volume Up -> Next Slide works when app is in the foreground
   [ ] Volume Up -> Next Slide works when app is minimized (background)
   [ ] Volume Up -> Next Slide works when screen is locked
   [ ] Volume Down -> Previous Slide works in all above scenarios
-  [ ] Notification "Previous" action sends previous slide command
-  [ ] Notification "Next" action sends next slide command
-  [ ] Notification "Start" action starts the slideshow
-  [ ] Notification "Stop" action stops the slideshow
-  [ ] Tapping notification opens MainActivity
+  [x] Notification "Previous" action sends previous slide command
+  [x] Notification "Next" action sends next slide command
+  [x] Notification "Start" action starts the slideshow
+  [x] Notification "Stop" action stops the slideshow
+  [x] Tapping notification opens MainActivity
   [ ] Notification text updates to show presentation name + slide info
-  [ ] Service auto-restarts after phone reboot (BootReceiver)
-  [ ] Battery optimization exemption dialog appears on first launch
+  [x] Service auto-restarts after phone reboot (BootReceiver)
+  [x] Battery optimization exemption dialog appears on first launch
   [ ] Network warning banners appear correctly on hotspot connections
   [ ] Empty state card shows when no presentations are open
   [ ] Loading bar appears during in-flight bridge commands
@@ -238,27 +238,27 @@
 
   --- Manual Testing Checklist (Desktop Bridge) ---
 
-  [ ] start_bridge.ps1 starts bridge with visible console window
-  [ ] start_background.ps1 starts bridge with NO console window visible
-  [ ] start_background.ps1 writes .bridge.pid file correctly
+  [x] start_bridge.ps1 starts bridge with visible console window
+  [x] start_background.ps1 starts bridge with NO console window visible
+  [x] start_background.ps1 writes .bridge.pid file correctly
   [ ] System tray icon appears in Windows notification area
   [ ] Tray tooltip shows "PPT Remote Bridge — running"
   [ ] Tray right-click shows bridge URL and Quit option
   [ ] Toast balloon notification appears on bridge start
-  [ ] GET http://localhost:8787/api/health returns {"status":"ok"}
+  [x] GET http://localhost:8787/api/health returns {"status":"ok"}
   [ ] Android app auto-discovers the bridge over LAN (UDP)
   [ ] Android app lists open presentations correctly
-  [ ] stop_background.ps1 terminates bridge via PID file (primary path)
-  [ ] stop_background.ps1 terminates bridge via WMI (fallback path)
-  [ ] stop_background.ps1 removes .bridge.pid after stopping
+  [x] stop_background.ps1 terminates bridge via PID file (primary path)
+  [x] stop_background.ps1 terminates bridge via WMI (fallback path)
+  [x] stop_background.ps1 removes .bridge.pid after stopping
   [ ] bridge.log file created in desktop_bridge/logs/ on startup
   [ ] Bridge restarts automatically after deliberate server crash
-  [ ] install_startup_task.ps1 creates "PptRemoteBridge" scheduled task
+  [x] install_startup_task.ps1 creates "PptRemoteBridge" scheduled task
   [ ] Bridge starts automatically after Windows login
-  [ ] remove_startup_task.ps1 removes the scheduled task cleanly
-  [ ] build_exe.ps1 produces dist/PptRemoteBridge.exe successfully
-  [ ] install_startup_task.ps1 -Mode Exe uses the built EXE
-  [ ] install_startup_task.ps1 -Mode Python uses pythonw.exe fallback
+  [x] remove_startup_task.ps1 removes the scheduled task cleanly
+  [x] build_exe.ps1 produces dist/PptRemoteBridge.exe successfully
+  [x] install_startup_task.ps1 -Mode Exe uses the built EXE
+  [x] install_startup_task.ps1 -Mode Python uses pythonw.exe fallback
   [ ] Speaker notes returned correctly from /api/presentations/{id}/notes
   [ ] PPT_BRIDGE_PORT env var changes the API port
   [ ] PPT_API_KEY env var enables authentication on all routes except /health
@@ -292,7 +292,8 @@
                           KEY_ALIAS, KEY_PASSWORD
   [ ] Publish to Google Play Store (internal testing track first)
   [ ] Add automated version bumping (versionCode / versionName)
-  [ ] Provide pre-built EXE download directly on GitHub Releases page
+  [x] Provide pre-built EXE download directly on GitHub Releases page
+        (windows-exe-build.yml attaches EXE to pre-v* releases)
 
 
 --------------------------------------------------------------------------------
@@ -341,7 +342,21 @@
     [x] ADDED:  .bridge.pid written on start, read on stop (reliable kill)
     [x] ADDED:  .bridge.pid to .gitignore
 
-  Session 3 (Category D–H: enhancements, security, tests, CI/CD, docs):
+  Session 4 (background execution fix + EXE build fix):
+    [x] FIXED:  EXE crash on launch — changed uvicorn.run("main:app") to
+                direct app object import; removed --noconsole PyInstaller flag
+    [x] FIXED:  build_exe.ps1 broken argument passing (Invoke-CheckedPython)
+    [x] FIXED:  Models.kt missing networkType/networkWarning fields (crash)
+    [x] FIXED:  RemoteControlService crash — removed fragile MediaSession
+                VolumeProvider; replaced with notification PendingIntent actions
+    [x] FIXED:  foregroundServiceType="mediaPlayback" removed (no longer needed)
+    [x] ADDED:  Wake lock (PARTIAL_WAKE_LOCK) in RemoteControlService
+    [x] ADDED:  Battery optimization exemption request in MainActivity
+    [x] ADDED:  Notification Previous/Next/Start/Stop buttons work with
+                screen off and app minimized (PendingIntent → service)
+    [x] ADDED:  Service resolves bridge URL + presentation ID independently
+                of Activity (reads from RemotePrefs SharedPreferences)
+    [x] RELEASED: pre-v0.2.0, pre-v0.2.1, pre-v0.3.0, pre-v0.4.0 tags
     [x] FIXED:  Deprecated @app.on_event → asynccontextmanager lifespan
     [x] ADDED:  Configurable ports (PPT_BRIDGE_PORT, PPT_DISCOVERY_PORT)
     [x] ADDED:  Speaker notes endpoints + PowerPointController methods
@@ -363,8 +378,8 @@
   COUNTS
 ================================================================================
 
-  Completed (all sessions) : ~105 items
-  Pending                  :  ~35 items
+  Completed (all sessions) : ~113 items
+  Pending                  :  ~28 items
   Active minor bugs        :    3 items (heuristic / case-sensitivity issues
                                          in network detection code)
 
