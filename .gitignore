@@ -29,3 +29,8 @@ local.properties
 # PyInstaller
 dist/
 *.spec
+
+# Android keystores — never commit these
+*.jks
+*.keystore
+mobile_remote_android/generate_keystore.ps1.log

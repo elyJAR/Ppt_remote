@@ -143,7 +143,8 @@
         - build_exe.ps1 passes --version-file version_info.txt to PyInstaller
         - Shows FileVersion, ProductName, CompanyName in EXE properties  [ ] Implement proper Windows Service (more robust than Scheduled Task)
   [ ] Sign the EXE with a code-signing certificate (avoid SmartScreen)
-  [ ] Add version metadata to the built EXE (file properties)  [ ] Publish desktop bridge installer (NSIS / WiX / Inno Setup)
+  [ ] Add version metadata to the built EXE (file properties)  
+  [ ] Publish desktop bridge installer (NSIS / WiX / Inno Setup)
   [ ] Add endpoint: GET current slide thumbnail/preview image
 
 
@@ -225,10 +226,10 @@
 
   [x] Service starts automatically when app opens
   [x] Persistent notification appears in notification shade
-  [x] Volume Up -> Next Slide works when app is in the foreground
-  [ ] Volume Up -> Next Slide works when app is minimized (background)
-  [ ] Volume Up -> Next Slide works when screen is locked
-  [ ] Volume Down -> Previous Slide works in all above scenarios
+  [x] Volume Up -> Previous Slide works when app is in the foreground
+  [ ] Volume Up -> Previous Slide works when app is minimized (background)
+  [ ] Volume Up -> Previous Slide works when screen is locked
+  [ ] Volume Down -> Next Slide works in all above scenarios
   [x] Notification "Previous" action sends previous slide command
   [x] Notification "Next" action sends next slide command
   [x] Notification "Start" action starts the slideshow

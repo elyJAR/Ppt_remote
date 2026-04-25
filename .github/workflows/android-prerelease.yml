@@ -62,9 +62,59 @@ jobs:
           path: mobile_remote_android/app/build/reports/tests/testDebugUnitTest/
           if-no-files-found: ignore
 
-      - name: Build release APK (unsigned)
-        run: gradle :app:assembleRelease
+      # ── Signing setup ────────────────────────────────────────────────────────
+      # If KEYSTORE_BASE64 secret is set: decode and use it.
+      # If not: generate a fresh self-signed keystore on the fly.
+      - name: Prepare keystore
+        id: keystore
+        shell: bash
+        env:
+          KEYSTORE_BASE64:   ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS:         ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD:      ${{ secrets.KEY_PASSWORD }}
+        run: |
+          KEYSTORE_PATH="${RUNNER_TEMP}/release.jks"
 
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Using keystore from secret"
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+            STORE_PASS="$KEYSTORE_PASSWORD"
+            KEY_PASS="$KEY_PASSWORD"
+            ALIAS="$KEY_ALIAS"
+          else
+            echo "No keystore secret found — generating self-signed keystore"
+            STORE_PASS="pptremote_ci"
+            KEY_PASS="pptremote_ci"
+            ALIAS="pptremote"
+            keytool -genkeypair \
+              -alias "$ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -keystore "$KEYSTORE_PATH" \
+              -storepass "$STORE_PASS" \
+              -keypass "$KEY_PASS" \
+              -dname "CN=PPT Remote, OU=AntiGravity Projects, O=AntiGravity, L=Unknown, ST=Unknown, C=US" \
+              -noprompt
+            echo "Self-signed keystore generated"
+          fi
+
+          echo "path=$KEYSTORE_PATH"       >> "$GITHUB_OUTPUT"
+          echo "store_pass=$STORE_PASS"    >> "$GITHUB_OUTPUT"
+          echo "key_pass=$KEY_PASS"        >> "$GITHUB_OUTPUT"
+          echo "alias=$ALIAS"              >> "$GITHUB_OUTPUT"
+
+      # ── Build signed release APK ─────────────────────────────────────────────
+      - name: Build signed release APK
+        run: |
+          gradle :app:assembleRelease \
+            -Pandroid.injected.signing.store.file="${{ steps.keystore.outputs.path }}" \
+            -Pandroid.injected.signing.store.password="${{ steps.keystore.outputs.store_pass }}" \
+            -Pandroid.injected.signing.key.alias="${{ steps.keystore.outputs.alias }}" \
+            -Pandroid.injected.signing.key.password="${{ steps.keystore.outputs.key_pass }}"
+
+      # ── Resolve tag ──────────────────────────────────────────────────────────
       - name: Resolve release tag
         id: tag
         shell: bash
@@ -77,6 +127,7 @@ jobs:
             echo "value=pre-v0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
           fi
 
+      # ── Find APK ─────────────────────────────────────────────────────────────
       - name: Find APK
         id: apk
         shell: bash
@@ -85,6 +136,7 @@ jobs:
           echo "path=mobile_remote_android/$APK" >> "$GITHUB_OUTPUT"
           echo "Found APK: $APK"
 
+      # ── Publish pre-release ──────────────────────────────────────────────────
       - name: Publish GitHub prerelease
         uses: ncipollo/release-action@v1
         with:
