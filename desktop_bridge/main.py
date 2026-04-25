@@ -328,3 +328,46 @@ def get_current_slide_notes(presentation_id: str) -> SlideNotesDto:
         return SlideNotesDto(slide_index=slide_index, notes=notes)
     except PowerPointControllerError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get(
+    "/api/presentations/{presentation_id}/slides/{slide_index}/thumbnail",
+    summary="Get a PNG thumbnail of a specific slide",
+    dependencies=[Depends(verify_api_key)],
+    responses={200: {"content": {"image/png": {}}}},
+)
+def get_slide_thumbnail(
+    request: Request,
+    presentation_id: str,
+    slide_index: int,
+    width: int = 960,
+):
+    from fastapi.responses import Response  # noqa: PLC0415
+    try:
+        png = controller.get_slide_thumbnail(
+            _resolve_id(presentation_id), slide_index, width
+        )
+        return Response(content=png, media_type="image/png")
+    except PowerPointControllerError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get(
+    "/api/presentations/{presentation_id}/current-thumbnail",
+    summary="Get a PNG thumbnail of the current slideshow slide",
+    dependencies=[Depends(verify_api_key)],
+    responses={200: {"content": {"image/png": {}}}},
+)
+def get_current_slide_thumbnail(
+    request: Request,
+    presentation_id: str,
+    width: int = 960,
+):
+    from fastapi.responses import Response  # noqa: PLC0415
+    try:
+        _slide_index, png = controller.get_current_slide_thumbnail(
+            _resolve_id(presentation_id), width
+        )
+        return Response(content=png, media_type="image/png")
+    except PowerPointControllerError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

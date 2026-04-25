@@ -150,9 +150,21 @@
         - sign_exe.ps1: creates self-signed cert in Windows cert store (10yr)
         - Trusts cert for current user (Trusted Publishers store)
         - Signs with SHA256 + DigiCert timestamp server, fallback no-timestamp
-  [ ] Implement proper Windows Service (more robust than Scheduled Task)
-  [ ] Publish desktop bridge installer (NSIS / WiX / Inno Setup)
-  [ ] Add endpoint: GET current slide thumbnail/preview image
+  [x] Implement proper Windows Service (more robust than Scheduled Task)
+        - windows_service.py: pywin32 ServiceFramework implementation
+        - SCM handles start/stop/restart; survives user logoff
+        - Usage: python windows_service.py install/start/stop/remove/debug
+        - Logs to logs/bridge.log; no tray icon in service mode
+  [x] Publish desktop bridge installer (NSIS / WiX / Inno Setup)
+        - installer.iss: Inno Setup 6 script
+        - build_installer.ps1: builds EXE then compiles installer
+        - Output: dist/PptRemoteBridgeSetup.exe (single distributable file)
+        - Optional: desktop shortcut, auto-start at login, launch after install
+  [x] Add endpoint: GET current slide thumbnail/preview image
+        - GET /api/presentations/{id}/slides/{n}/thumbnail?width=960
+        - GET /api/presentations/{id}/current-thumbnail?width=960
+        - Uses PowerPoint COM Export() to render slide as PNG
+        - Returns image/png response; width param controls resolution
 
 
 --------------------------------------------------------------------------------
@@ -409,8 +421,8 @@
   COUNTS
 ================================================================================
 
-  Completed (all sessions) : ~124 items
-  Pending                  :  ~20 items
+  Completed (all sessions) : ~127 items
+  Pending                  :  ~17 items
   Active minor bugs        :    3 items (heuristic / case-sensitivity issues
                                          in network detection code)
 
