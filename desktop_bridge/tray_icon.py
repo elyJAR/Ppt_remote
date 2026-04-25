@@ -24,13 +24,7 @@ except ImportError:
 
 
 def _make_icon_image(running: bool = True) -> "Image.Image":
-    """Return a 64x64 RGBA icon generated programmatically.
-
-    Layout:
-      - Dark navy circle as background
-      - White 'P' letterform (block letter, stands for PowerPoint)
-      - Small status dot: green when running, red when stopped
-    """
+    """Return a 64x64 RGBA icon generated programmatically."""
     img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
@@ -40,9 +34,9 @@ def _make_icon_image(running: bool = True) -> "Image.Image":
     # 'P' letterform — vertical stem
     draw.rectangle([15, 13, 24, 51], fill=(255, 255, 255, 245))
 
-    # 'P' letterform — top bowl (filled arc via two ellipses)
-    draw.ellipse([20, 13, 44, 37], fill=(255, 255, 255, 245))  # outer bowl
-    draw.ellipse([24, 19, 40, 33], fill=(28, 30, 50, 235))  # inner cutout
+    # 'P' letterform — top bowl
+    draw.ellipse([20, 13, 44, 37], fill=(255, 255, 255, 245))
+    draw.ellipse([24, 19, 40, 33], fill=(28, 30, 50, 235))
 
     # Status indicator dot
     dot_color = (0, 210, 90, 255) if running else (220, 55, 55, 255)
@@ -52,26 +46,23 @@ def _make_icon_image(running: bool = True) -> "Image.Image":
 
 
 class TrayIconManager:
-    """Manages the Windows system tray icon for the bridge service.
+    """Manages the Windows system tray icon for the bridge service."""
 
-    Example usage::
-
-        def on_quit():
-            sys.exit(0)
-
-        tray = TrayIconManager(
-            bridge_url="http://192.168.1.10:8787",
-            on_quit=on_quit,
-        )
-        # Show a start-up toast (call before run())
-        tray.notify("PPT Remote Bridge", "Bridge is running")
-        # Blocks the calling thread until the user clicks Quit
-        tray.run()
-    """
-
-    def __init__(self, bridge_url: str, on_quit: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        bridge_url: str,
+        on_quit: Callable[[], None],
+        on_next: Callable[[], None] | None = None,
+        on_previous: Callable[[], None] | None = None,
+        on_start_slideshow: Callable[[], None] | None = None,
+        on_stop_slideshow: Callable[[], None] | None = None,
+    ) -> None:
         self._bridge_url = bridge_url
         self._on_quit = on_quit
+        self._on_next = on_next
+        self._on_previous = on_previous
+        self._on_start_slideshow = on_start_slideshow
+        self._on_stop_slideshow = on_stop_slideshow
         self._icon: "pystray.Icon | None" = None
 
     # ------------------------------------------------------------------
@@ -79,35 +70,44 @@ class TrayIconManager:
     # ------------------------------------------------------------------
 
     def run(self) -> None:
-        """Start the tray icon event loop.  Blocks until Quit is selected."""
+        """Start the tray icon event loop. Blocks until Quit is selected."""
         if not PYSTRAY_AVAILABLE:
             logger.warning("TrayIconManager.run() called but pystray is unavailable")
             return
 
-        menu = pystray.Menu(
+        menu_items = [
             pystray.MenuItem("PPT Remote Bridge", None, enabled=False),
             pystray.MenuItem(f"  {self._bridge_url}", None, enabled=False),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Quit", self._handle_quit),
-        )
+        ]
+
+        # Quick controls — only shown when callbacks are provided
+        if any([self._on_previous, self._on_next, self._on_start_slideshow, self._on_stop_slideshow]):
+            if self._on_previous:
+                menu_items.append(pystray.MenuItem("⏮  Previous Slide", self._handle_previous))
+            if self._on_next:
+                menu_items.append(pystray.MenuItem("⏭  Next Slide", self._handle_next))
+            if self._on_start_slideshow:
+                menu_items.append(pystray.MenuItem("▶  Start Slideshow", self._handle_start_slideshow))
+            if self._on_stop_slideshow:
+                menu_items.append(pystray.MenuItem("⏹  Stop Slideshow", self._handle_stop_slideshow))
+            menu_items.append(pystray.Menu.SEPARATOR)
+
+        menu_items.append(pystray.MenuItem("Quit", self._handle_quit))
 
         img = _make_icon_image(running=True)
         self._icon = pystray.Icon(
             name="PptRemoteBridge",
             icon=img,
             title="PPT Remote Bridge — running",
-            menu=menu,
+            menu=pystray.Menu(*menu_items),
         )
 
         logger.info("Starting tray icon event loop")
         self._icon.run()
 
     def notify(self, title: str, message: str) -> None:
-        """Show a balloon / toast notification.
-
-        This is best-effort: silently ignored if the tray icon is not yet
-        running or if the OS suppresses balloon notifications.
-        """
+        """Show a balloon / toast notification."""
         if self._icon is not None and PYSTRAY_AVAILABLE:
             try:
                 self._icon.notify(message, title)
@@ -115,7 +115,7 @@ class TrayIconManager:
                 logger.debug("Tray notify failed: %s", exc)
 
     def stop(self) -> None:
-        """Stop the tray icon from an external caller (e.g. on server shutdown)."""
+        """Stop the tray icon from an external caller."""
         if self._icon is not None:
             try:
                 self._icon.stop()
@@ -137,10 +137,42 @@ class TrayIconManager:
             logger.debug("Tray icon update failed: %s", exc)
 
     # ------------------------------------------------------------------
-    # Internal
+    # Internal handlers
     # ------------------------------------------------------------------
 
     def _handle_quit(self, icon: "pystray.Icon", item: "pystray.MenuItem") -> None:
         logger.info("Quit selected from tray menu")
         icon.stop()
         self._on_quit()
+
+    def _handle_next(self, icon: "pystray.Icon", item: "pystray.MenuItem") -> None:
+        logger.info("Next slide selected from tray menu")
+        if self._on_next:
+            try:
+                self._on_next()
+            except Exception as exc:
+                logger.warning("Tray next slide failed: %s", exc)
+
+    def _handle_previous(self, icon: "pystray.Icon", item: "pystray.MenuItem") -> None:
+        logger.info("Previous slide selected from tray menu")
+        if self._on_previous:
+            try:
+                self._on_previous()
+            except Exception as exc:
+                logger.warning("Tray previous slide failed: %s", exc)
+
+    def _handle_start_slideshow(self, icon: "pystray.Icon", item: "pystray.MenuItem") -> None:
+        logger.info("Start slideshow selected from tray menu")
+        if self._on_start_slideshow:
+            try:
+                self._on_start_slideshow()
+            except Exception as exc:
+                logger.warning("Tray start slideshow failed: %s", exc)
+
+    def _handle_stop_slideshow(self, icon: "pystray.Icon", item: "pystray.MenuItem") -> None:
+        logger.info("Stop slideshow selected from tray menu")
+        if self._on_stop_slideshow:
+            try:
+                self._on_stop_slideshow()
+            except Exception as exc:
+                logger.warning("Tray stop slideshow failed: %s", exc)

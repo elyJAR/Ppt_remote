@@ -154,7 +154,42 @@ def main() -> None:
                 _logger.info("Quit requested via tray — shutting down")
                 sys.exit(0)
 
-            tray = TrayIconManager(bridge_url=bridge_url, on_quit=_on_quit)
+            # Wire up quick controls — resolve active presentation on demand
+            def _tray_action(command: str) -> None:
+                """Run a bridge command from the tray menu (fire-and-forget thread)."""
+                import threading as _threading
+                def _run() -> None:
+                    try:
+                        from main import controller  # noqa: PLC0415
+                        presentations = controller.list_presentations()
+                        target = next(
+                            (p for p in presentations if p.in_slideshow),
+                            presentations[0] if presentations else None,
+                        )
+                        if target is None:
+                            _logger.warning("Tray action '%s': no open presentations", command)
+                            return
+                        if command == "next":
+                            controller.next_slide(target.id)
+                        elif command == "previous":
+                            controller.previous_slide(target.id)
+                        elif command == "start":
+                            controller.start_slideshow(target.id)
+                        elif command == "stop":
+                            controller.stop_slideshow(target.id)
+                        _logger.info("Tray action '%s' executed on '%s'", command, target.name)
+                    except Exception as exc:
+                        _logger.warning("Tray action '%s' failed: %s", command, exc)
+                _threading.Thread(target=_run, daemon=True).start()
+
+            tray = TrayIconManager(
+                bridge_url=bridge_url,
+                on_quit=_on_quit,
+                on_next=lambda: _tray_action("next"),
+                on_previous=lambda: _tray_action("previous"),
+                on_start_slideshow=lambda: _tray_action("start"),
+                on_stop_slideshow=lambda: _tray_action("stop"),
+            )
 
             # Give uvicorn a moment to bind the port before showing the toast
             time.sleep(1.5)
@@ -164,6 +199,9 @@ def main() -> None:
             )
             _logger.info("Tray icon starting (blocks main thread until Quit)")
             tray.run()  # <-- blocks here until user clicks Quit
+
+            # Show stop toast after tray exits
+            tray.notify("PPT Remote Bridge", "Bridge has stopped")
             return
 
         _logger.info("pystray not available — skipping tray icon")

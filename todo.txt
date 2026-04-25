@@ -132,12 +132,18 @@
   [x] build_exe.ps1 produces standalone PptRemoteBridge.exe via PyInstaller
   [x] .bridge.pid added to .gitignore
 
-  [ ] Add system tray right-click quick controls (Next, Previous, Start/Stop Slideshow)
-  [ ] Show desktop toast notification when bridge is stopped (not just on start)
-  [ ] Implement proper Windows Service (more robust than Scheduled Task)
+  [x] Add system tray right-click quick controls (Next, Previous, Start/Stop Slideshow)
+        - Callbacks wired in bridge_service.py via _tray_action() helper
+        - Resolves active presentation automatically (prefers slideshow)
+        - Each action runs in a daemon thread (non-blocking)
+  [x] Show desktop toast notification when bridge is stopped (not just on start)
+        - tray.notify() called after tray.run() returns (on Quit)
+  [x] Add version metadata to the built EXE (file properties)
+        - version_info.txt added (VSVersionInfo format)
+        - build_exe.ps1 passes --version-file version_info.txt to PyInstaller
+        - Shows FileVersion, ProductName, CompanyName in EXE properties  [ ] Implement proper Windows Service (more robust than Scheduled Task)
   [ ] Sign the EXE with a code-signing certificate (avoid SmartScreen)
-  [ ] Add version metadata to the built EXE (file properties)
-  [ ] Publish desktop bridge installer (NSIS / WiX / Inno Setup)
+  [ ] Add version metadata to the built EXE (file properties)  [ ] Publish desktop bridge installer (NSIS / WiX / Inno Setup)
   [ ] Add endpoint: GET current slide thumbnail/preview image
 
 
@@ -378,8 +384,8 @@
   COUNTS
 ================================================================================
 
-  Completed (all sessions) : ~113 items
-  Pending                  :  ~28 items
+  Completed (all sessions) : ~116 items
+  Pending                  :  ~25 items
   Active minor bugs        :    3 items (heuristic / case-sensitivity issues
                                          in network detection code)
 
