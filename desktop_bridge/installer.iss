@@ -55,7 +55,7 @@ Source: "dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 [Icons]
 Name: "{group}\{#AppName}";          Filename: "{app}\{#AppExeName}"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\{#AppName}";   Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{userdesktop}\{#AppName}";     Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Registry]
 ; Auto-start at login (only when user selects the startup task)
