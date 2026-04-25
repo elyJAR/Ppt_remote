@@ -62,24 +62,8 @@ jobs:
           path: mobile_remote_android/app/build/reports/tests/testDebugUnitTest/
           if-no-files-found: ignore
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug
-
-      - name: Build signed release APK
-        if: env.KEYSTORE_BASE64 != ''
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
-          gradle :app:assembleRelease \
-            -Pandroid.injected.signing.store.file="$(pwd)/keystore.jks" \
-            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
-          rm -f keystore.jks
+      - name: Build release APK (unsigned)
+        run: gradle :app:assembleRelease
 
       - name: Resolve release tag
         id: tag
@@ -93,26 +77,23 @@ jobs:
             echo "value=pre-v0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Collect APK artifacts
-        id: apks
+      - name: Find APK
+        id: apk
         shell: bash
         run: |
-          ARTIFACTS="mobile_remote_android/app/build/outputs/apk/debug/app-debug.apk"
-          RELEASE="mobile_remote_android/app/build/outputs/apk/release/app-release.apk"
-          if [ -f "../$RELEASE" ]; then
-            ARTIFACTS="$ARTIFACTS,../$RELEASE"
-          fi
-          echo "paths=$ARTIFACTS" >> "$GITHUB_OUTPUT"
+          APK=$(find app/build/outputs/apk/release -name "PptRemote-*.apk" | head -1)
+          echo "path=mobile_remote_android/$APK" >> "$GITHUB_OUTPUT"
+          echo "Found APK: $APK"
 
       - name: Publish GitHub prerelease
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.tag.outputs.value }}
-          name: Android prerelease ${{ steps.tag.outputs.value }}
+          name: PPT Remote ${{ steps.tag.outputs.value }}
           prerelease: true
           generateReleaseNotes: true
           commit: ${{ github.sha }}
-          artifacts: mobile_remote_android/app/build/outputs/apk/debug/app-debug.apk
+          artifacts: ${{ steps.apk.outputs.path }}
           artifactErrorsFailBuild: true
           allowUpdates: true
           replacesArtifacts: true

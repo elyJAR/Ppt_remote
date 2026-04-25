@@ -210,7 +210,7 @@ class PowerPointController:
                 display_name = name
                 if read_only and not in_show:
                     display_name = (
-                        f"{name} [Read-Only — click Enable Editing in PowerPoint]"
+                        f"{name} [OneDrive — will auto-enable editing on Start]"
                     )
 
                 items.append(
@@ -247,6 +247,24 @@ class PowerPointController:
 
             return items
 
+    def _try_enable_editing(self, pres: Any) -> bool:
+        """Attempt to enable editing on a read-only / cloud presentation.
+
+        OneDrive/SharePoint files open as read-only until the user (or COM)
+        calls EnableEditing().  Returns True if the file is now editable.
+        """
+        try:
+            if not bool(pres.ReadOnly):
+                return True  # already editable
+            # PowerPoint exposes EnableEditing() on the Presentation object
+            pres.EnableEditing()
+            # Give PowerPoint a moment to sync with OneDrive
+            import time
+            time.sleep(1.0)
+            return not bool(pres.ReadOnly)
+        except Exception:
+            return False
+
     def start_slideshow(self, presentation_id: str) -> None:
         if presentation_id.startswith("__protected__"):
             raise PowerPointControllerError(
@@ -264,13 +282,15 @@ class PowerPointController:
 
             pres = self._find_presentation(app, presentation_id)
 
-            # Detect read-only (common for cloud/OneDrive files)
+            # For OneDrive/cloud files: try to enable editing automatically
             try:
-                if pres.ReadOnly:
-                    raise PowerPointControllerError(
-                        "This presentation is read-only (common with cloud/OneDrive files). "
-                        "In PowerPoint, click 'Enable Editing' on the yellow bar, then try again."
-                    )
+                if bool(pres.ReadOnly):
+                    enabled = self._try_enable_editing(pres)
+                    if not enabled:
+                        raise PowerPointControllerError(
+                            "This presentation is read-only (OneDrive/cloud file). "
+                            "In PowerPoint, click 'Enable Editing' on the yellow bar, then try again."
+                        )
             except PowerPointControllerError:
                 raise
             except Exception:
@@ -301,6 +321,12 @@ class PowerPointController:
             if window is None:
                 # Auto-start slideshow if not already running
                 pres = self._find_presentation(app, presentation_id)
+                # Enable editing for OneDrive/cloud files
+                try:
+                    if bool(pres.ReadOnly):
+                        self._try_enable_editing(pres)
+                except Exception:
+                    pass
                 try:
                     pres.SlideShowSettings.Run()
                 except Exception as exc:
@@ -322,6 +348,12 @@ class PowerPointController:
             window = self._find_slideshow_window(app, presentation_id)
             if window is None:
                 pres = self._find_presentation(app, presentation_id)
+                # Enable editing for OneDrive/cloud files
+                try:
+                    if bool(pres.ReadOnly):
+                        self._try_enable_editing(pres)
+                except Exception:
+                    pass
                 try:
                     pres.SlideShowSettings.Run()
                 except Exception as exc:

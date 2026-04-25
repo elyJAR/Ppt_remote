@@ -16,6 +16,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -23,6 +26,16 @@ android {
                 "proguard-rules.pro"
             )
         }
+    }
+
+    // Rename output APKs to use project name instead of "app"
+    applicationVariants.all {
+        val variant = this
+        variant.outputs
+            .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
+            .forEach { output ->
+                output.outputFileName = "PptRemote-${variant.versionName}-${variant.buildType.name}.apk"
+            }
     }
 
     compileOptions {
