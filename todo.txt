@@ -60,7 +60,11 @@
   [ ] Add pull-to-refresh gesture on the presentations list
   [ ] Add manual "Refresh" button to force-poll the bridge immediately
   [ ] Add connection history / saved bridge URL bookmarks
-  [ ] Improve presentation card: file type icon, slideshow state badge
+  [x] Improve presentation card: file type icon, slideshow state badge
+        - File icon (folder/play) with tinted background
+        - LIVE badge (red) shown when presentation is in slideshow
+        - Animated slide progress bar inside each card
+        - Selected card highlighted with accent border
   [ ] Add haptic feedback on volume button slide change
   [ ] Accessibility: add contentDescription to all icon-only buttons
   [ ] Accessibility: verify all touch targets are minimum 48x48 dp
@@ -141,9 +145,12 @@
   [x] Add version metadata to the built EXE (file properties)
         - version_info.txt added (VSVersionInfo format)
         - build_exe.ps1 passes --version-file version_info.txt to PyInstaller
-        - Shows FileVersion, ProductName, CompanyName in EXE properties  [ ] Implement proper Windows Service (more robust than Scheduled Task)
-  [ ] Sign the EXE with a code-signing certificate (avoid SmartScreen)
-  [ ] Add version metadata to the built EXE (file properties)  
+        - Shows FileVersion, ProductName, CompanyName in EXE properties
+  [x] Sign the EXE with a code-signing certificate (avoid SmartScreen)
+        - sign_exe.ps1: creates self-signed cert in Windows cert store (10yr)
+        - Trusts cert for current user (Trusted Publishers store)
+        - Signs with SHA256 + DigiCert timestamp server, fallback no-timestamp
+  [ ] Implement proper Windows Service (more robust than Scheduled Task)
   [ ] Publish desktop bridge installer (NSIS / WiX / Inno Setup)
   [ ] Add endpoint: GET current slide thumbnail/preview image
 
@@ -283,10 +290,13 @@
   [x] Unit test step added to Android CI (gradle :app:test)
   [x] Lint report uploaded as CI artifact (lint-results-debug.html)
   [x] Test report uploaded as CI artifact (testDebugUnitTest/ HTML)
-  [x] Signed release APK build step (conditional on KEYSTORE_BASE64 secret)
-        - Decodes base64 keystore, passes signing params to Gradle
-        - Shreds .jks file after build
-        - Step skipped entirely if secret is not configured
+  [x] Signed release APK build step — always runs, self-signs if no secret
+        - If KEYSTORE_BASE64 secret set: uses persistent keystore
+        - If not: auto-generates self-signed keystore via keytool in CI
+        - generate_keystore.ps1 added for local keystore creation
+        - *.jks added to .gitignore
+  [x] APK renamed to PptRemote-{version}-release.apk (not app-debug.apk)
+  [x] Release name changed to "PPT Remote {tag}" on GitHub
   [x] Windows EXE build workflow (windows-exe-build.yml)
         - Runs on windows-latest with Python 3.11
         - Installs requirements + PyInstaller 6.15.0
@@ -295,8 +305,8 @@
         - Optionally attaches to GitHub Release on pre-v* tag push
 
   [ ] Generate and commit keystore for signed release APK
-        Required secrets: KEYSTORE_BASE64, KEYSTORE_PASSWORD,
-                          KEY_ALIAS, KEY_PASSWORD
+        Note: CI now auto-generates if secrets not set. To use persistent
+        keystore: run generate_keystore.ps1 and add 4 GitHub secrets.
   [ ] Publish to Google Play Store (internal testing track first)
   [ ] Add automated version bumping (versionCode / versionName)
   [x] Provide pre-built EXE download directly on GitHub Releases page
@@ -349,7 +359,21 @@
     [x] ADDED:  .bridge.pid written on start, read on stop (reliable kill)
     [x] ADDED:  .bridge.pid to .gitignore
 
-  Session 4 (background execution fix + EXE build fix):
+  Session 5 (UI redesign, OneDrive fix, signing, APK naming):
+    [x] REDESIGNED: Full Android UI — dark navy theme, Material 3, GitHub palette
+                    TopAppBar + status dot, large Prev/Next buttons, tonal
+                    Start/Stop, LIVE badge, animated progress, empty state
+    [x] FIXED:  OneDrive/cloud files — call pres.EnableEditing() automatically
+                before starting slideshow instead of throwing read-only error
+    [x] FIXED:  GitHub Actions workflow syntax error (secrets in if condition)
+    [x] ADDED:  APK renamed PptRemote-{version}-release.apk
+    [x] ADDED:  Workflow always builds signed release APK (self-signs if no secret)
+    [x] ADDED:  generate_keystore.ps1 — local keystore creation + secret instructions
+    [x] ADDED:  sign_exe.ps1 — self-signs Windows EXE via PowerShell cert store
+    [x] ADDED:  Tray quick controls (Next/Prev/Start/Stop) in right-click menu
+    [x] ADDED:  Stop toast notification when bridge quits
+    [x] ADDED:  EXE version metadata (version_info.txt, --version-file flag)
+    [x] RELEASED: pre-v0.4.1, pre-v0.5.0, pre-v0.5.1 tags
     [x] FIXED:  EXE crash on launch — changed uvicorn.run("main:app") to
                 direct app object import; removed --noconsole PyInstaller flag
     [x] FIXED:  build_exe.ps1 broken argument passing (Invoke-CheckedPython)
@@ -385,8 +409,8 @@
   COUNTS
 ================================================================================
 
-  Completed (all sessions) : ~116 items
-  Pending                  :  ~25 items
+  Completed (all sessions) : ~124 items
+  Pending                  :  ~20 items
   Active minor bugs        :    3 items (heuristic / case-sensitivity issues
                                          in network detection code)
 
