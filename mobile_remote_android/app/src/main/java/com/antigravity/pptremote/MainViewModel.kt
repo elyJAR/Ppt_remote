@@ -18,7 +18,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val appContext = getApplication<Application>()
     private var lastNetworkType: NetworkType = NetworkType.UNKNOWN
     private var networkChangeCallbackRegistered = false
-    
+
     private val _state = MutableStateFlow(
         RemoteState(
             bridgeUrl = RemotePrefs.getBridgeUrl(appContext)
@@ -34,11 +34,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun updateNetworkType() {
         val currentNetworkType = NetworkDetector.getNetworkType(appContext)
-        
+
         // Only update if network type changed
         if (currentNetworkType != lastNetworkType) {
             lastNetworkType = currentNetworkType
-            
+
             val warning = when (currentNetworkType) {
                 NetworkType.HOTSPOT_USING -> {
                     "Using phone hotspot: Connection may be less stable. Using aggressive reconnection strategy."
@@ -51,7 +51,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 else -> null
             }
-            
+
             val current = _state.value
             _state.value = current.copy(
                 networkType = currentNetworkType,
@@ -62,7 +62,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun registerNetworkChangeListener() {
         if (networkChangeCallbackRegistered) return
-        
+
         try {
             val connectivityManager = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             val networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -81,7 +81,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     updateNetworkType()
                 }
             }
-            
+
             connectivityManager.registerDefaultNetworkCallback(networkCallback)
             networkChangeCallbackRegistered = true
         } catch (e: Exception) {
@@ -135,20 +135,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             val current = _state.value
             _state.value = current.copy(isBusy = true)
-            
+
             // Use smart retry logic based on network type
             val maxRetries = when (current.networkType) {
                 NetworkType.HOTSPOT_USING, NetworkType.HOTSPOT_PROVIDING -> 3  // More retries for any hotspot
                 NetworkType.CELLULAR -> 1
                 else -> 2
             }
-            
+
             var lastException: Exception? = null
-            
+
             for (attempt in 1..maxRetries) {
                 try {
                     action(current.bridgeUrl)
-                    _state.value = _state.value.copy(statusMessage = successMessage)
+                    _state.value = _state.value.copy(statusMessage = successMessage, isBusy = false)
                     refreshPresentations()
                     return@launch
                 } catch (ex: Exception) {
@@ -164,7 +164,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             }
-            
+
             _state.value = _state.value.copy(statusMessage = lastException?.message ?: "Bridge call failed")
             _state.value = _state.value.copy(isBusy = false)
         }
@@ -180,7 +180,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     NetworkType.CELLULAR -> 3000L // Less frequent for cellular
                     else -> 2000L
                 }
-                
+
                 refreshPresentations()
                 delay(delayMs)
             }
@@ -189,7 +189,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun refreshPresentations() {
         updateNetworkType()
-        
+
         val current = _state.value
         val effectiveUrl = if (current.bridgeUrl.isBlank()) {
             // Use smart discovery timeout based on network type
@@ -198,7 +198,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 NetworkType.CELLULAR -> 3000
                 else -> 1500
             }
-            
+
             val detectedUrl = client.discoverBridge(discoveryTimeoutMs)
             if (detectedUrl == null) {
                 _state.value = current.copy(
@@ -221,10 +221,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val latestState = _state.value
             val presentations = client.fetchPresentations(effectiveUrl)
-            
+
             // Also fetch bridge's network status
             val bridgeNetworkWarning = client.getNetworkStatus(effectiveUrl)?.warning
-            
+
             val selected = when {
                 latestState.selectedPresentationId != null && presentations.any { it.id == latestState.selectedPresentationId } -> {
                     latestState.selectedPresentationId

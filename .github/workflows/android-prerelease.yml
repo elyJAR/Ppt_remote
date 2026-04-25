@@ -38,8 +38,48 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Run lint
+        continue-on-error: true
+        run: gradle :app:lint
+
+      - name: Run unit tests
+        continue-on-error: true
+        run: gradle :app:test
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: mobile_remote_android/app/build/reports/lint-results*.html
+          if-no-files-found: ignore
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: mobile_remote_android/app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
+
       - name: Build debug APK
         run: gradle :app:assembleDebug
+
+      - name: Build signed release APK
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
+          gradle :app:assembleRelease \
+            -Pandroid.injected.signing.store.file="$(pwd)/keystore.jks" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+          rm -f keystore.jks
 
       - name: Resolve release tag
         id: tag
@@ -52,6 +92,17 @@ jobs:
           else
             echo "value=pre-v0.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Collect APK artifacts
+        id: apks
+        shell: bash
+        run: |
+          ARTIFACTS="mobile_remote_android/app/build/outputs/apk/debug/app-debug.apk"
+          RELEASE="mobile_remote_android/app/build/outputs/apk/release/app-release.apk"
+          if [ -f "../$RELEASE" ]; then
+            ARTIFACTS="$ARTIFACTS,../$RELEASE"
+          fi
+          echo "paths=$ARTIFACTS" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub prerelease
         uses: ncipollo/release-action@v1

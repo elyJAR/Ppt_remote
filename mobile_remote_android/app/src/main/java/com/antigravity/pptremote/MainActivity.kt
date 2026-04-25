@@ -27,13 +27,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
@@ -49,12 +54,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        
+
         // Request battery optimization exemption for better background performance
         requestBatteryOptimizationExemption()
-        
+
         ensureNotificationPermissionAndStartService()
-        
+
         setContent {
             MaterialTheme {
                 val state by viewModel.state.collectAsState()
@@ -74,19 +79,19 @@ class MainActivity : ComponentActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         return when (keyCode) {
             KeyEvent.KEYCODE_VOLUME_UP -> {
-                viewModel.nextSlide()
+                viewModel.previousSlide()
                 true
             }
 
             KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                viewModel.previousSlide()
+                viewModel.nextSlide()
                 true
             }
 
             else -> super.onKeyDown(keyCode, event)
         }
     }
-    
+
     private fun requestBatteryOptimizationExemption() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             try {
@@ -125,7 +130,7 @@ class MainActivity : ComponentActivity() {
             android.util.Log.e("MainActivity", "Failed to start foreground service", e)
         }
     }
-    
+
     override fun onDestroy() {
         super.onDestroy()
         // Note: Service continues running even after activity is destroyed
@@ -165,6 +170,14 @@ private fun RemoteScreen(
             style = MaterialTheme.typography.bodyMedium
         )
 
+        // Improvement 1 — Network Warning Banners
+        if (!state.networkWarning.isNullOrBlank()) {
+            WarningBanner(message = state.networkWarning)
+        }
+        if (!state.bridgeNetworkWarning.isNullOrBlank()) {
+            WarningBanner(message = "Desktop: ${state.bridgeNetworkWarning}")
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -189,19 +202,50 @@ private fun RemoteScreen(
             }
         }
 
+        // Improvement 2 — Loading Indicator When isBusy
+        if (state.isBusy) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
         Text(
             "Foreground: Volume Up/Down control slides. Background or screen-off: use notification actions (Previous/Next/Start/Stop).",
             style = MaterialTheme.typography.bodySmall
         )
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(state.presentations, key = { it.id }) { presentation ->
-                val selected = presentation.id == state.selectedPresentationId
-                PresentationItem(
-                    presentation = presentation,
-                    selected = selected,
-                    onClick = { onPresentationSelect(presentation.id) }
-                )
+        // Improvement 3 — Empty State Message
+        if (state.presentations.isEmpty()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("📂", style = MaterialTheme.typography.displaySmall)
+                    Text(
+                        "No open presentations found",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "Open a .pptx file in PowerPoint on your PC, then wait a moment.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(state.presentations, key = { it.id }) { presentation ->
+                    val selected = presentation.id == state.selectedPresentationId
+                    PresentationItem(
+                        presentation = presentation,
+                        selected = selected,
+                        onClick = { onPresentationSelect(presentation.id) }
+                    )
+                }
             }
         }
     }
@@ -228,7 +272,37 @@ private fun PresentationItem(presentation: Presentation, selected: Boolean, onCl
                 },
                 style = MaterialTheme.typography.bodyMedium
             )
+            // Improvement 4 — Slide Progress Bar
+            if (presentation.inSlideshow && presentation.currentSlide != null && presentation.totalSlides > 0) {
+                LinearProgressIndicator(
+                    progress = { presentation.currentSlide.toFloat() / presentation.totalSlides.toFloat() },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             Text(presentation.path, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun WarningBanner(message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFFFF3CD)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("⚠", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF856404)
+            )
         }
     }
 }

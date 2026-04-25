@@ -20,6 +20,9 @@ local.properties
 # VS Code
 .vscode/
 
+# Bridge PID file (written by start_background.ps1, read by stop_background.ps1)
+.bridge.pid
+
 # Logs
 *.log
 

@@ -1,0 +1,371 @@
+================================================================================
+  PPT REMOTE - PROJECT TODO
+  PowerPoint Presentation Remote Control via Android Phone
+================================================================================
+  Legend:
+    [x] = Completed
+    [ ] = Pending / Not yet done
+================================================================================
+
+
+--------------------------------------------------------------------------------
+  CATEGORY A — BUG FIXES
+--------------------------------------------------------------------------------
+
+  [x] isBusy never reset to false on successful bridge action
+        File: MainViewModel.kt :: runBridgeAction()
+        Fix:  Added isBusy = false to the success-path copy() call
+
+  [x] networkWarning and bridgeNetworkWarning stored in state but never shown
+        File: MainActivity.kt :: RemoteScreen()
+        Fix:  Added WarningBanner composable; rendered after status text
+
+  [x] stop_background.ps1 uses $_.CommandLine which requires admin rights
+        File: desktop_bridge/stop_background.ps1
+        Fix:  Rewrote to use 3-layer strategy:
+              1. PID file written by start_background.ps1
+              2. WMI (Get-WmiObject Win32_Process) — works without admin
+              3. Named EXE fallback (PptRemoteBridge.exe by name)
+
+  [ ] hasStandardWiFiSignal() uses link-speed heuristic to detect hotspot
+        File: NetworkDetector.kt
+        Note: Link speed < 54 Mbps is unreliable as a hotspot indicator;
+              consider using SSID patterns or DHCP lease info instead
+
+  [ ] _get_active_interface() in network_detector.py searches for "Interface"
+        (capital I) but real netsh output starts sections with
+        "Configuration for interface" (lowercase i); match is case-sensitive
+        Fix: use case-insensitive comparison
+
+  [ ] _is_using_hotspot_connection() checks for "wifi direct" but real Windows
+        adapter name is "Wi-Fi Direct" (with hyphen and mixed case)
+        Fix: normalise string before comparing (replace("-","").lower())
+
+
+--------------------------------------------------------------------------------
+  CATEGORY B — ANDROID UI / UX
+--------------------------------------------------------------------------------
+
+  [x] Display networkWarning (phone-side) as amber warning banner
+  [x] Display bridgeNetworkWarning (desktop-side) as amber warning banner
+  [x] Add LinearProgressIndicator loading bar when isBusy is true
+  [x] Show empty state card with emoji + message when no presentations found
+  [x] Show slide progress bar (LinearProgressIndicator) inside PresentationItem
+
+  [ ] Add custom app launcher icon (currently default Android icon)
+  [ ] Add custom notification small icon (currently android.R.drawable.ic_media_play)
+  [ ] Add splash screen / launch screen
+  [ ] Add onboarding flow for first-time users (explain PC setup steps)
+  [ ] Add settings screen (port config, polling interval, theme preference)
+  [ ] Add pull-to-refresh gesture on the presentations list
+  [ ] Add manual "Refresh" button to force-poll the bridge immediately
+  [ ] Add connection history / saved bridge URL bookmarks
+  [ ] Improve presentation card: file type icon, slideshow state badge
+  [ ] Add haptic feedback on volume button slide change
+  [ ] Accessibility: add contentDescription to all icon-only buttons
+  [ ] Accessibility: verify all touch targets are minimum 48x48 dp
+  [ ] Test and fix layout on tablets and landscape orientation
+  [ ] Verify WCAG 4.5:1 minimum color contrast ratio on all text
+
+
+--------------------------------------------------------------------------------
+  CATEGORY C — ANDROID CORE FEATURES
+--------------------------------------------------------------------------------
+
+  [x] Volume button capture in foreground (onKeyDown in MainActivity)
+  [x] Volume button capture in background (MediaSession + VolumeProvider)
+  [x] Foreground service with persistent notification
+  [x] Notification actions: Previous, Next, Start, Stop
+  [x] WakeLock to prevent CPU sleep during background operation
+  [x] Battery optimization exemption request on first launch
+  [x] Network-aware retry logic with exponential backoff
+  [x] Adaptive polling frequency (hotspot / WiFi / cellular)
+  [x] Dynamic notification text (shows presentation name + slide info)
+  [x] Auto-restart service after phone reboot (BootReceiver.kt)
+        Handles: BOOT_COMPLETED + QUICKBOOT_POWERON (HTC/OnePlus)
+        Guard:   Only starts if bridge URL was previously configured
+
+  [ ] Add start/stop service toggle button in the app UI
+  [ ] Show active/inactive service status indicator in the app UI
+  [ ] Update notification with live current slide number during slideshow
+  [ ] Add "Stop Service" action button directly in the notification
+  [ ] Add configurable notification text from settings screen
+  [ ] Add swipe left/right gestures as alternative to volume buttons
+  [ ] Support connecting to multiple PCs (multi-bridge)
+  [ ] Add iOS / cross-platform version (React Native or Flutter)
+  [ ] Make bridge port configurable from the app settings screen
+
+
+--------------------------------------------------------------------------------
+  CATEGORY D — DESKTOP BRIDGE ENHANCEMENTS
+--------------------------------------------------------------------------------
+
+  [x] FastAPI HTTP server with all core endpoints
+  [x] PowerPoint COM automation (list, start, stop, next, previous)
+  [x] Auto-start slideshow when next/previous called on non-slideshow file
+  [x] UDP discovery responder on port 8788
+  [x] Network type detection + /api/network/status endpoint
+  [x] CORS middleware (allow all origins)
+  [x] Fix deprecated @app.on_event → proper asynccontextmanager lifespan
+  [x] Make API port configurable via PPT_BRIDGE_PORT env var (default 8787)
+  [x] Make UDP discovery port configurable via PPT_DISCOVERY_PORT env var (default 8788)
+  [x] Add GET /api/presentations/{id}/notes endpoint (all speaker notes)
+  [x] Add GET /api/presentations/{id}/current-notes endpoint (current slide notes)
+  [x] Add get_all_speaker_notes() to PowerPointController
+  [x] Add get_current_slide_notes() to PowerPointController
+  [x] Add SlideNotesDto model
+  [x] System tray icon (tray_icon.py, pystray + Pillow)
+        - Dark navy icon with white P letterform + green/red status dot
+        - Right-click menu: bridge URL display + Quit
+        - Graceful no-op if pystray / Pillow not installed
+  [x] Rotating file logging (logs/bridge.log, 5 MB x 3 files)
+  [x] Uvicorn runs in daemon thread; main thread hosts tray icon
+  [x] Auto-restart uvicorn on unexpected crash (5-second delay)
+  [x] Toast balloon notification on bridge start
+  [x] Fallback: keep main thread alive via thread.join() if no tray
+  [x] Added pystray==0.19.5 and Pillow>=10.0.0,<12 to requirements.txt
+  [x] Background execution via pythonw.exe (run_background.py)
+  [x] start_background.ps1 writes PID to .bridge.pid for reliable stopping
+  [x] stop_background.ps1 uses PID file + WMI + named EXE (3 layers)
+  [x] install_startup_task.ps1 supports -Mode Auto / Exe / Python
+  [x] Fallback to HKCU Run registry if Task Scheduler is restricted
+  [x] build_exe.ps1 produces standalone PptRemoteBridge.exe via PyInstaller
+  [x] .bridge.pid added to .gitignore
+
+  [ ] Add system tray right-click quick controls (Next, Previous, Start/Stop Slideshow)
+  [ ] Show desktop toast notification when bridge is stopped (not just on start)
+  [ ] Implement proper Windows Service (more robust than Scheduled Task)
+  [ ] Sign the EXE with a code-signing certificate (avoid SmartScreen)
+  [ ] Add version metadata to the built EXE (file properties)
+  [ ] Publish desktop bridge installer (NSIS / WiX / Inno Setup)
+  [ ] Add endpoint: GET current slide thumbnail/preview image
+
+
+--------------------------------------------------------------------------------
+  CATEGORY E — SECURITY
+--------------------------------------------------------------------------------
+
+  [x] Optional API key authentication via PPT_API_KEY env var
+        - All routes protected except /api/health (stays open for connectivity)
+        - Uses X-Api-Key request header
+        - Backward-compatible: no key configured = open mode
+  [x] Rate limiting via slowapi (60 req/min default)
+        - Action routes (start/stop/next/previous) capped at 30 req/min
+        - slowapi==0.1.9 added to requirements.txt
+  [x] Input validation on presentation_id path parameter
+        - _resolve_id() URL-decodes and rejects empty or >512 char IDs
+        - Applied to all eight routes that accept presentation_id
+
+  [ ] Restrict CORS to known origins instead of wildcard "*"
+  [ ] Add HTTPS support (self-signed cert acceptable for LAN use)
+  [ ] Add request timeout to reject stale / hung requests on the bridge
+  [ ] Add health check heartbeat between Android app and bridge
+  [ ] Add crash reporting on Android (Firebase Crashlytics or Sentry)
+  [ ] Handle PowerPoint COM crash and reconnect gracefully on bridge
+  [ ] Document firewall port rules clearly for end users (8787 TCP, 8788 UDP)
+
+
+--------------------------------------------------------------------------------
+  CATEGORY F — TESTING
+--------------------------------------------------------------------------------
+
+  --- Desktop Python Tests (pytest) ---
+
+  [x] tests/__init__.py
+  [x] tests/conftest.py
+        - sys.path injection so bare imports resolve from desktop_bridge/
+        - autouse mock for get_network_type (prevents real netsh calls)
+        - autouse mock for discovery_responder (prevents UDP port binding)
+        - mock_controller fixture (patches main.controller with MagicMock)
+        - client fixture (FastAPI TestClient with lifespan disabled)
+        - sample_presentation and sample_slideshow_presentation fixtures
+  [x] tests/test_api.py (all FastAPI endpoint integration tests)
+        - TestHealth: health returns ok, no auth required
+        - TestNetworkStatus: correct fields returned
+        - TestListPresentations: empty list, single item, slideshow, COM error
+        - TestStartSlideshow: success, COM error, invalid ID too long
+        - TestStopSlideshow: success, not-in-slideshow error
+        - TestNextPrevious: next/previous success and error paths
+        - TestSpeakerNotes: all notes, current notes, not-in-slideshow error
+  [x] tests/test_network_detector.py (network type detection unit tests)
+        - All NetworkType paths mocked end-to-end
+        - _is_providing_hotspot with running / not-started netsh output
+        - Exception handling returns UNKNOWN
+  [x] pytest>=8.0 and httpx>=0.27 added to requirements.txt
+
+  --- Android Unit Tests (JUnit + MockK + MockWebServer) ---
+
+  [x] Test dependencies added to app/build.gradle.kts
+        - junit:junit:4.13.2
+        - kotlinx-coroutines-test:1.8.1
+        - androidx.arch.core:core-testing:2.2.0
+        - io.mockk:mockk:1.13.12
+        - com.squareup.okhttp3:mockwebserver:4.12.0
+        - androidTestImplementation: espresso-core, ext-junit
+  [x] RemotePrefsTest.kt (7 tests — SharedPreferences get/set via mockk)
+  [x] BridgeClientTest.kt (12 tests — full HTTP layer via MockWebServer)
+        - fetchPresentations: empty list, single item, null currentSlide, error
+        - startSlideshow / stopSlideshow / next / previous: path + method checks
+        - URL encoding of spaces in presentation paths
+        - getNetworkStatus: parsing, error response, network failure
+  [x] ModelsTest.kt (3 tests — Presentation data class, RemoteState defaults/copy)
+
+  [ ] Android: MainViewModel unit tests (coroutines-test, mock BridgeClient)
+  [ ] Android: NetworkDetector unit tests (mock ConnectivityManager)
+  [ ] Android: Instrumented UI tests for main screen (Espresso / Compose testing)
+  [ ] Desktop: PowerPointController unit tests (mock win32com COM objects)
+
+  --- Manual Testing Checklist (Android Background Execution) ---
+
+  [ ] Service starts automatically when app opens
+  [ ] Persistent notification appears in notification shade
+  [ ] Volume Up -> Next Slide works when app is in the foreground
+  [ ] Volume Up -> Next Slide works when app is minimized (background)
+  [ ] Volume Up -> Next Slide works when screen is locked
+  [ ] Volume Down -> Previous Slide works in all above scenarios
+  [ ] Notification "Previous" action sends previous slide command
+  [ ] Notification "Next" action sends next slide command
+  [ ] Notification "Start" action starts the slideshow
+  [ ] Notification "Stop" action stops the slideshow
+  [ ] Tapping notification opens MainActivity
+  [ ] Notification text updates to show presentation name + slide info
+  [ ] Service auto-restarts after phone reboot (BootReceiver)
+  [ ] Battery optimization exemption dialog appears on first launch
+  [ ] Network warning banners appear correctly on hotspot connections
+  [ ] Empty state card shows when no presentations are open
+  [ ] Loading bar appears during in-flight bridge commands
+  [ ] Slide progress bar shows correctly in presentation cards
+
+  --- Manual Testing Checklist (Desktop Bridge) ---
+
+  [ ] start_bridge.ps1 starts bridge with visible console window
+  [ ] start_background.ps1 starts bridge with NO console window visible
+  [ ] start_background.ps1 writes .bridge.pid file correctly
+  [ ] System tray icon appears in Windows notification area
+  [ ] Tray tooltip shows "PPT Remote Bridge — running"
+  [ ] Tray right-click shows bridge URL and Quit option
+  [ ] Toast balloon notification appears on bridge start
+  [ ] GET http://localhost:8787/api/health returns {"status":"ok"}
+  [ ] Android app auto-discovers the bridge over LAN (UDP)
+  [ ] Android app lists open presentations correctly
+  [ ] stop_background.ps1 terminates bridge via PID file (primary path)
+  [ ] stop_background.ps1 terminates bridge via WMI (fallback path)
+  [ ] stop_background.ps1 removes .bridge.pid after stopping
+  [ ] bridge.log file created in desktop_bridge/logs/ on startup
+  [ ] Bridge restarts automatically after deliberate server crash
+  [ ] install_startup_task.ps1 creates "PptRemoteBridge" scheduled task
+  [ ] Bridge starts automatically after Windows login
+  [ ] remove_startup_task.ps1 removes the scheduled task cleanly
+  [ ] build_exe.ps1 produces dist/PptRemoteBridge.exe successfully
+  [ ] install_startup_task.ps1 -Mode Exe uses the built EXE
+  [ ] install_startup_task.ps1 -Mode Python uses pythonw.exe fallback
+  [ ] Speaker notes returned correctly from /api/presentations/{id}/notes
+  [ ] PPT_BRIDGE_PORT env var changes the API port
+  [ ] PPT_API_KEY env var enables authentication on all routes except /health
+  [ ] Rate limiting returns 429 after 30 rapid POSTs to /next
+
+
+--------------------------------------------------------------------------------
+  CATEGORY G — CI/CD & RELEASE
+--------------------------------------------------------------------------------
+
+  [x] GitHub Actions workflow: build Android APK, publish as pre-release
+  [x] Trigger: manual dispatch or push of tags matching "pre-v*"
+  [x] APK artifact (app-debug.apk) attached to GitHub Release
+  [x] Lint step added to Android CI (gradle :app:lint)
+  [x] Unit test step added to Android CI (gradle :app:test)
+  [x] Lint report uploaded as CI artifact (lint-results-debug.html)
+  [x] Test report uploaded as CI artifact (testDebugUnitTest/ HTML)
+  [x] Signed release APK build step (conditional on KEYSTORE_BASE64 secret)
+        - Decodes base64 keystore, passes signing params to Gradle
+        - Shreds .jks file after build
+        - Step skipped entirely if secret is not configured
+  [x] Windows EXE build workflow (windows-exe-build.yml)
+        - Runs on windows-latest with Python 3.11
+        - Installs requirements + PyInstaller 6.15.0
+        - Builds PptRemoteBridge.exe via PyInstaller
+        - Uploads EXE as 30-day Action artifact
+        - Optionally attaches to GitHub Release on pre-v* tag push
+
+  [ ] Generate and commit keystore for signed release APK
+        Required secrets: KEYSTORE_BASE64, KEYSTORE_PASSWORD,
+                          KEY_ALIAS, KEY_PASSWORD
+  [ ] Publish to Google Play Store (internal testing track first)
+  [ ] Add automated version bumping (versionCode / versionName)
+  [ ] Provide pre-built EXE download directly on GitHub Releases page
+
+
+--------------------------------------------------------------------------------
+  CATEGORY H — DOCUMENTATION
+--------------------------------------------------------------------------------
+
+  [x] README.md — project overview, setup, API reference
+  [x] BACKGROUND_EXECUTION.md — detailed background mode guide
+  [x] CHANGES_BACKGROUND_EXECUTION.md — implementation change log
+  [x] UI_UX_Best_Practices.md — UI/UX design reference guide
+  [x] TEST_INSTRUCTIONS.md — Android crash testing and manual test checklist
+  [x] CONTRIBUTING.md — dev environment setup, test commands, env var table,
+        two-part architecture change guide, code style, PR process
+  [x] CHANGELOG.md — Keep a Changelog format, [Unreleased] + [1.0.0] sections,
+        split into desktop_bridge and android_app sub-sections per release
+  [x] ARCHITECTURE.md — Mermaid flowchart diagram, component internals,
+        data flow phases, port reference, background execution table,
+        environment variables reference, Android state management table
+
+  [ ] Add inline docstrings to all Python functions in desktop_bridge
+  [ ] Add KDoc comments to all Kotlin classes and public functions
+  [ ] Document troubleshooting for common LAN connection issues (expand existing)
+  [ ] Document how to manually build and side-load the APK
+
+
+================================================================================
+  SESSION LOG
+================================================================================
+
+  Session 1 (initial build):
+    - Built entire desktop bridge (FastAPI, COM automation, UDP discovery,
+      network type detection, background execution scripts, EXE build pipeline)
+    - Built entire Android app (Compose UI, ViewModel, BridgeClient,
+      NetworkDetector, RemoteControlService, RemotePrefs, MediaSession)
+    - Added GitHub Actions CI workflow for APK pre-release
+
+  Session 2 (bug fixes + UI/UX + service features):
+    [x] FIXED:  isBusy stuck true after successful action (MainViewModel.kt)
+    [x] FIXED:  stop_background.ps1 broken for non-admin users (WMI + PID file)
+    [x] ADDED:  Network warning banners in UI (phone-side + desktop-side)
+    [x] ADDED:  LinearProgressIndicator loading bar when isBusy
+    [x] ADDED:  Empty state card when no presentations are open
+    [x] ADDED:  Slide progress bar inside each PresentationItem card
+    [x] ADDED:  Dynamic notification text (presentation name + slide info)
+    [x] ADDED:  BootReceiver — service auto-restarts after phone reboot
+    [x] ADDED:  .bridge.pid written on start, read on stop (reliable kill)
+    [x] ADDED:  .bridge.pid to .gitignore
+
+  Session 3 (Category D–H: enhancements, security, tests, CI/CD, docs):
+    [x] FIXED:  Deprecated @app.on_event → asynccontextmanager lifespan
+    [x] ADDED:  Configurable ports (PPT_BRIDGE_PORT, PPT_DISCOVERY_PORT)
+    [x] ADDED:  Speaker notes endpoints + PowerPointController methods
+    [x] ADDED:  System tray icon (tray_icon.py, pystray + Pillow)
+    [x] ADDED:  Rotating file logging (logs/bridge.log, 5 MB x 3)
+    [x] ADDED:  Uvicorn in daemon thread + crash recovery auto-restart
+    [x] ADDED:  API key authentication (PPT_API_KEY, X-Api-Key header)
+    [x] ADDED:  Rate limiting (slowapi, 60/min global, 30/min actions)
+    [x] ADDED:  Input validation on presentation_id (_resolve_id helper)
+    [x] ADDED:  Desktop Python test suite (conftest, test_api, test_network_detector)
+    [x] ADDED:  Android test dependencies + RemotePrefsTest, BridgeClientTest, ModelsTest
+    [x] ADDED:  Lint + unit test steps in Android CI workflow
+    [x] ADDED:  Signed release APK step in Android CI (optional, secret-gated)
+    [x] ADDED:  Windows EXE build GitHub Actions workflow
+    [x] ADDED:  CONTRIBUTING.md, CHANGELOG.md, ARCHITECTURE.md
+
+
+================================================================================
+  COUNTS
+================================================================================
+
+  Completed (all sessions) : ~105 items
+  Pending                  :  ~35 items
+  Active minor bugs        :    3 items (heuristic / case-sensitivity issues
+                                         in network detection code)
+
+================================================================================

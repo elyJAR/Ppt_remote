@@ -21,6 +21,9 @@ $processInfo.CreateNoWindow = $true
 try {
     $process = [System.Diagnostics.Process]::Start($processInfo)
     Write-Host "PowerPoint Bridge started in background (PID: $($process.Id))"
+    # Save PID for stop_background.ps1
+    $pidFile = Join-Path $scriptPath ".bridge.pid"
+    $process.Id | Out-File -FilePath $pidFile -Encoding ascii
     Write-Host "The service is now running on http://localhost:8787"
     Write-Host "To stop it, use stop_background.ps1 or Task Manager"
 } catch {
