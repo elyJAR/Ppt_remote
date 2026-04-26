@@ -133,4 +133,55 @@ object RemotePrefs {
     fun getApiKey(context: Context): String =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_API_KEY, "").orEmpty()
+
+    // ── Multi-bridge support ──────────────────────────────────────────────────
+    // Bridges are stored as a JSON array: [{"name":"PC1","url":"http://..."},...]
+    // The active bridge URL is stored separately for fast access by the service.
+
+    private const val KEY_BRIDGES = "bridges"
+    private const val KEY_ACTIVE_BRIDGE_INDEX = "active_bridge_index"
+
+    fun getBridges(context: Context): List<SavedBridge> {
+        val json = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_BRIDGES, null) ?: return emptyList()
+        return try {
+            val arr = org.json.JSONArray(json)
+            (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                SavedBridge(name = obj.getString("name"), url = obj.getString("url"))
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    fun saveBridges(context: Context, bridges: List<SavedBridge>) {
+        val arr = org.json.JSONArray()
+        bridges.forEach { b ->
+            arr.put(org.json.JSONObject().apply {
+                put("name", b.name)
+                put("url", b.url)
+            })
+        }
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_BRIDGES, arr.toString()).apply()
+    }
+
+    fun getActiveBridgeIndex(context: Context): Int =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getInt(KEY_ACTIVE_BRIDGE_INDEX, 0)
+
+    fun setActiveBridgeIndex(context: Context, index: Int) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putInt(KEY_ACTIVE_BRIDGE_INDEX, index).apply()
+        // Keep legacy bridgeUrl in sync for the service
+        val bridges = getBridges(context)
+        val url = bridges.getOrNull(index)?.url ?: ""
+        setBridgeUrl(context, url)
+    }
+
+    /** Returns the URL of the currently active bridge (falls back to legacy key). */
+    fun getActiveBridgeUrl(context: Context): String {
+        val bridges = getBridges(context)
+        val idx = getActiveBridgeIndex(context)
+        return bridges.getOrNull(idx)?.url ?: getBridgeUrl(context)
+    }
 }

@@ -1,5 +1,10 @@
 package com.antigravity.pptremote
 
+data class SavedBridge(
+    val name: String,
+    val url: String
+)
+
 data class Presentation(
     val id: String,
     val name: String,
@@ -55,5 +60,8 @@ data class RemoteState(
     val currentSlideNotes: String? = null,
     val currentSlideNotesIndex: Int? = null,
     // Track last thumbnail slide to avoid re-fetching the same slide
-    val lastThumbnailSlide: Int? = null
+    val lastThumbnailSlide: Int? = null,
+    // Multi-bridge
+    val bridges: List<SavedBridge> = emptyList(),
+    val activeBridgeIndex: Int = 0
 )

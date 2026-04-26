@@ -12,8 +12,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
+import android.view.KeyEvent
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.media.session.MediaButtonReceiver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +31,7 @@ class RemoteControlService : Service() {
     private val client = BridgeClient()
     private var wakeLock: PowerManager.WakeLock? = null
     private var isStarted = false
+    private var mediaSession: MediaSessionCompat? = null
 
     companion object {
         private const val CHANNEL_ID        = "ppt_remote_service"
@@ -81,11 +86,17 @@ class RemoteControlService : Service() {
         super.onCreate()
         createNotificationChannel()
         acquireWakeLock()
+        initMediaSession()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Route media button events from the lock screen through MediaSession
+        if (intent?.action == Intent.ACTION_MEDIA_BUTTON) {
+            MediaButtonReceiver.handleIntent(mediaSession, intent)
+            return START_NOT_STICKY
+        }
+
         // Always call startForeground first — required on Android 8+ to avoid ANR.
-        // On subsequent calls (action intents) this simply updates the notification.
         if (!isStarted) {
             try {
                 startForeground(NOTIFICATION_ID, createNotification())
@@ -97,7 +108,7 @@ class RemoteControlService : Service() {
             }
         }
 
-        // Handle notification button actions — these fire even when screen is off
+        // Handle notification button actions — fire even when screen is off
         when (intent?.action) {
             ACTION_NEXT          -> executeBridgeAction("next")
             ACTION_PREVIOUS      -> executeBridgeAction("previous")
@@ -116,8 +127,83 @@ class RemoteControlService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        mediaSession?.isActive = false
+        mediaSession?.release()
+        mediaSession = null
         serviceScope.cancel()
         releaseWakeLock()
+    }
+
+    // -------------------------------------------------------------------------
+    // MediaSession — routes volume key events from lock screen / background
+    // -------------------------------------------------------------------------
+    private fun initMediaSession() {
+        mediaSession = MediaSessionCompat(this, "PptRemoteSession").apply {
+            // Accept media button events (volume keys on lock screen)
+            setFlags(
+                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
+                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+            )
+
+            // Publish a non-null playback state so the session is considered active
+            val state = PlaybackStateCompat.Builder()
+                .setActions(
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                    PlaybackStateCompat.ACTION_PLAY or
+                    PlaybackStateCompat.ACTION_PAUSE
+                )
+                .setState(
+                    PlaybackStateCompat.STATE_PLAYING,
+                    PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN,
+                    1f
+                )
+                .build()
+            setPlaybackState(state)
+
+            setCallback(object : MediaSessionCompat.Callback() {
+                // Volume Up → Previous slide
+                override fun onSkipToPrevious() {
+                    android.util.Log.d("RemoteControlService", "MediaSession: skip to previous")
+                    executeBridgeAction("previous")
+                }
+
+                // Volume Down → Next slide
+                override fun onSkipToNext() {
+                    android.util.Log.d("RemoteControlService", "MediaSession: skip to next")
+                    executeBridgeAction("next")
+                }
+
+                override fun onPlay() { executeBridgeAction("start") }
+                override fun onPause() { executeBridgeAction("stop") }
+
+                // Handle raw key events for volume buttons on lock screen
+                override fun onMediaButtonEvent(mediaButtonEvent: Intent): Boolean {
+                    val keyEvent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        mediaButtonEvent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        mediaButtonEvent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)
+                    }
+
+                    if (keyEvent?.action == KeyEvent.ACTION_DOWN) {
+                        when (keyEvent.keyCode) {
+                            KeyEvent.KEYCODE_VOLUME_UP -> {
+                                executeBridgeAction("previous")
+                                return true
+                            }
+                            KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                                executeBridgeAction("next")
+                                return true
+                            }
+                        }
+                    }
+                    return super.onMediaButtonEvent(mediaButtonEvent)
+                }
+            })
+
+            isActive = true
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -130,6 +216,9 @@ class RemoteControlService : Service() {
                     android.util.Log.w("RemoteControlService", "No bridge URL for action '$command'")
                     return@launch
                 }
+                // Sync API key from prefs into client
+                client.apiKey = RemotePrefs.getApiKey(this@RemoteControlService)
+
                 val presentationId = resolvePresentationId(bridgeUrl) ?: run {
                     android.util.Log.w("RemoteControlService", "No presentation for action '$command'")
                     return@launch
@@ -153,7 +242,8 @@ class RemoteControlService : Service() {
     }
 
     private fun resolveBridgeUrl(): String? {
-        val stored = RemotePrefs.getBridgeUrl(this).trim()
+        // Multi-bridge: use the active bridge URL
+        val stored = RemotePrefs.getActiveBridgeUrl(this).trim()
         if (stored.isNotBlank()) return stored
         val discovered = client.discoverBridge(3000, RemotePrefs.getBridgePort(this) + 1)
         if (!discovered.isNullOrBlank()) {
@@ -184,7 +274,7 @@ class RemoteControlService : Service() {
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG)
-                .apply { acquire(10 * 60 * 1000L) } // 10-minute timeout safety cap
+                .apply { acquire(10 * 60 * 1000L) }
         } catch (e: Exception) {
             android.util.Log.e("RemoteControlService", "Wake lock failed", e)
         }
@@ -210,7 +300,6 @@ class RemoteControlService : Service() {
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Background slide controls"
-                // Allow notification on lock screen
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
@@ -234,20 +323,32 @@ class RemoteControlService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        // MediaSession token lets the lock screen show media controls
+        val sessionToken = mediaSession?.sessionToken
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("PowerPoint Remote")
             .setContentText(slideInfo ?: RemotePrefs.getNotificationText(this))
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(openApp)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            // Show on lock screen
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(R.drawable.ic_previous, "⏮ Prev",  pendingServiceIntent(ACTION_PREVIOUS, 10))
             .addAction(R.drawable.ic_next,     "⏭ Next",  pendingServiceIntent(ACTION_NEXT,     11))
             .addAction(R.drawable.ic_play,     "▶ Start", pendingServiceIntent(ACTION_START,    12))
             .addAction(R.drawable.ic_stop,     "⏹ Exit",  pendingServiceIntent(ACTION_STOP_SERVICE, 13))
-            .build()
+
+        // Attach MediaSession so Android routes lock-screen volume keys to our session
+        if (sessionToken != null) {
+            builder.setStyle(
+                androidx.media.app.NotificationCompat.MediaStyle()
+                    .setMediaSession(sessionToken)
+                    .setShowActionsInCompactView(0, 1) // show Prev + Next in compact view
+            )
+        }
+
+        return builder.build()
     }
 
     private fun updateNotificationWithSlideInfo(bridgeUrl: String, presentationId: String) {

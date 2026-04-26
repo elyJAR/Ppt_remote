@@ -38,6 +38,41 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # ── Auto version bump from tag ────────────────────────────────────────────
+      # Reads the tag (e.g. pre-v1.2.1) and writes versionName + versionCode
+      # into build.gradle.kts before building so the APK always matches the tag.
+      - name: Bump version from tag
+        shell: bash
+        run: |
+          # Determine tag: push event or manual input
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="${{ github.event.inputs.release_tag }}"
+          fi
+
+          # Strip leading "pre-v" or "v" prefix → e.g. "1.2.1"
+          VERSION=$(echo "$TAG" | sed 's/^pre-v//;s/^v//')
+
+          if [ -z "$VERSION" ]; then
+            echo "No version extracted from tag '$TAG', skipping bump"
+            exit 0
+          fi
+
+          # Compute versionCode as integer: major*10000 + minor*100 + patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          MAJOR=${MAJOR:-1}; MINOR=${MINOR:-0}; PATCH=${PATCH:-0}
+          VERSION_CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+
+          echo "Tag: $TAG  →  versionName=$VERSION  versionCode=$VERSION_CODE"
+
+          # Patch build.gradle.kts in-place
+          sed -i "s/versionCode = [0-9]*/versionCode = $VERSION_CODE/" app/build.gradle.kts
+          sed -i "s/versionName = \"[^\"]*\"/versionName = \"$VERSION\"/" app/build.gradle.kts
+
+          echo "Updated build.gradle.kts:"
+          grep -E "versionCode|versionName" app/build.gradle.kts
+
       - name: Run lint
         continue-on-error: true
         run: gradle :app:lint

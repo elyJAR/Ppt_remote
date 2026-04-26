@@ -21,14 +21,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(
         RemoteState(
-            bridgeUrl = RemotePrefs.getBridgeUrl(appContext),
+            bridgeUrl = RemotePrefs.getActiveBridgeUrl(appContext),
             showOnboarding = !RemotePrefs.isOnboardingCompleted(appContext),
             bridgePort = RemotePrefs.getBridgePort(appContext),
             pollingIntervalSeconds = RemotePrefs.getPollingInterval(appContext),
             isDarkTheme = RemotePrefs.isDarkTheme(appContext),
             connectionHistory = RemotePrefs.getConnectionHistory(appContext),
             notificationText = RemotePrefs.getNotificationText(appContext),
-            apiKey = RemotePrefs.getApiKey(appContext)
+            apiKey = RemotePrefs.getApiKey(appContext),
+            bridges = RemotePrefs.getBridges(appContext),
+            activeBridgeIndex = RemotePrefs.getActiveBridgeIndex(appContext)
         )
     )
     val state: StateFlow<RemoteState> = _state.asStateFlow()
@@ -199,6 +201,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         RemotePrefs.setApiKey(appContext, key)
         client.apiKey = key
         _state.value = _state.value.copy(apiKey = key)
+    }
+
+    // ── Multi-bridge ──────────────────────────────────────────────────────────
+
+    fun addBridge(name: String, url: String) {
+        val trimmedUrl = buildBridgeUrl(url.trim(), _state.value.bridgePort)
+        val newBridge = SavedBridge(name = name.trim().ifBlank { trimmedUrl }, url = trimmedUrl)
+        val updated = _state.value.bridges.toMutableList().also { it.add(newBridge) }
+        RemotePrefs.saveBridges(appContext, updated)
+        _state.value = _state.value.copy(bridges = updated)
+    }
+
+    fun removeBridge(index: Int) {
+        val updated = _state.value.bridges.toMutableList().also { it.removeAt(index) }
+        RemotePrefs.saveBridges(appContext, updated)
+        val newActive = if (_state.value.activeBridgeIndex >= updated.size)
+            maxOf(0, updated.size - 1) else _state.value.activeBridgeIndex
+        RemotePrefs.setActiveBridgeIndex(appContext, newActive)
+        val newUrl = updated.getOrNull(newActive)?.url ?: ""
+        _state.value = _state.value.copy(
+            bridges = updated,
+            activeBridgeIndex = newActive,
+            bridgeUrl = newUrl
+        )
+    }
+
+    fun selectBridge(index: Int) {
+        val bridges = _state.value.bridges
+        if (index !in bridges.indices) return
+        RemotePrefs.setActiveBridgeIndex(appContext, index)
+        val url = bridges[index].url
+        RemotePrefs.setBridgeUrl(appContext, url)
+        _state.value = _state.value.copy(
+            activeBridgeIndex = index,
+            bridgeUrl = url,
+            // Reset connection state when switching bridges
+            presentations = emptyList(),
+            statusMessage = "Connecting...",
+            lastThumbnailSlide = null,
+            currentSlideNotes = null
+        )
     }
 
     private fun buildBridgeUrl(baseUrl: String, port: Int): String {
