@@ -76,6 +76,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -103,34 +104,62 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 
-// ─── Colour palette ──────────────────────────────────────────────────────────
-private val Navy900  = Color(0xFF0D1117)
-private val Navy800  = Color(0xFF161B22)
-private val Navy700  = Color(0xFF21262D)
-private val Navy600  = Color(0xFF30363D)
-private val Accent   = Color(0xFF2F81F7)   // GitHub-blue accent
+// ─── Colour palette — dark ───────────────────────────────────────────────────
+private val Navy900   = Color(0xFF0D1117)
+private val Navy800   = Color(0xFF161B22)
+private val Navy700   = Color(0xFF21262D)
+private val Navy600   = Color(0xFF30363D)
+private val Accent    = Color(0xFF2F81F7)
 private val AccentDim = Color(0xFF1F6FEB)
-private val Green    = Color(0xFF3FB950)
-private val Blue     = Color(0xFF2F81F7)
-private val Gray     = Color(0xFF6E7681)
-private val Amber    = Color(0xFFD29922)
-private val Red      = Color(0xFFF85149)
-private val TextPrimary   = Color(0xFFE6EDF3)
-private val TextSecondary = Color(0xFF8B949E)
-private val TextMuted     = Color(0xFF484F58)
+private val Green     = Color(0xFF3FB950)
+private val Blue      = Color(0xFF2F81F7)
+private val Gray      = Color(0xFF6E7681)
+private val Amber     = Color(0xFFD29922)
+private val Red       = Color(0xFFF85149)
 
-private val AppColorScheme = darkColorScheme(
+private val DarkTextPrimary   = Color(0xFFE6EDF3)
+private val DarkTextSecondary = Color(0xFF8B949E)
+private val DarkTextMuted     = Color(0xFF484F58)
+
+// ─── Colour palette — light ──────────────────────────────────────────────────
+private val LightTextPrimary   = Color(0xFF1F2328)
+private val LightTextSecondary = Color(0xFF656D76)
+private val LightTextMuted     = Color(0xFFAFB8C1)
+
+private val DarkColorScheme = darkColorScheme(
     primary          = Accent,
     onPrimary        = Color.White,
     primaryContainer = AccentDim,
     background       = Navy900,
     surface          = Navy800,
     surfaceVariant   = Navy700,
-    onBackground     = TextPrimary,
-    onSurface        = TextPrimary,
-    onSurfaceVariant = TextSecondary,
+    onBackground     = DarkTextPrimary,
+    onSurface        = DarkTextPrimary,
+    onSurfaceVariant = DarkTextSecondary,
     outline          = Navy600,
 )
+
+private val LightColorScheme = lightColorScheme(
+    primary          = Accent,
+    onPrimary        = Color.White,
+    primaryContainer = Color(0xFFDBEAFE),
+    background       = Color(0xFFF6F8FA),
+    surface          = Color(0xFFFFFFFF),
+    surfaceVariant   = Color(0xFFF0F2F5),
+    onBackground     = LightTextPrimary,
+    onSurface        = LightTextPrimary,
+    onSurfaceVariant = LightTextSecondary,
+    outline          = Color(0xFFD0D7DE),
+)
+
+// ─── Theme-aware color shorthand (extension properties on ColorScheme) ────────
+private val androidx.compose.material3.ColorScheme.textPrimary    inline get() = onBackground
+private val androidx.compose.material3.ColorScheme.textSecondary  inline get() = onSurfaceVariant
+private val androidx.compose.material3.ColorScheme.textMuted      inline get() = outline.copy(alpha = 0.7f)
+private val androidx.compose.material3.ColorScheme.cardBg         inline get() = surface
+private val androidx.compose.material3.ColorScheme.cardBgSelected inline get() = surfaceVariant
+private val androidx.compose.material3.ColorScheme.screenBg       inline get() = background
+private val androidx.compose.material3.ColorScheme.divider        inline get() = outline
 
 class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<MainViewModel>()
@@ -147,8 +176,10 @@ class MainActivity : ComponentActivity() {
         requestBatteryOptimizationExemption()
         ensureNotificationPermissionAndStartService()
         setContent {
-            MaterialTheme(colorScheme = AppColorScheme) {
-                val state by viewModel.state.collectAsState()
+            val state by viewModel.state.collectAsState()
+            val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
+
+            MaterialTheme(colorScheme = colorScheme) {
                 
                 when {
                     state.showOnboarding -> {
@@ -306,7 +337,7 @@ private fun RemoteScreen(
                         Text(
                             "PPT Remote",
                             fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary,
+                            color = MaterialTheme.colorScheme.textPrimary,
                             fontSize = 18.sp
                         )
                         Spacer(Modifier.width(8.dp))
@@ -327,7 +358,7 @@ private fun RemoteScreen(
                         Icon(
                             imageVector = if (state.isServiceRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
                             contentDescription = if (state.isServiceRunning) "Stop background service" else "Start background service",
-                            tint = if (state.isServiceRunning) TextPrimary else TextMuted
+                            tint = if (state.isServiceRunning) MaterialTheme.colorScheme.textPrimary else MaterialTheme.colorScheme.textMuted
                         )
                     }
                     IconButton(
@@ -341,7 +372,7 @@ private fun RemoteScreen(
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Refresh presentations",
-                            tint = if (state.isBusy) TextMuted else TextPrimary
+                            tint = if (state.isBusy) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary
                         )
                     }
                     IconButton(
@@ -354,17 +385,17 @@ private fun RemoteScreen(
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Settings",
-                            tint = TextPrimary
+                            tint = MaterialTheme.colorScheme.textPrimary
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Navy800,
-                    titleContentColor = TextPrimary,
+                    containerColor = MaterialTheme.colorScheme.cardBg,
+                    titleContentColor = MaterialTheme.colorScheme.textPrimary,
                 )
             )
         },
-        containerColor = Navy900,
+        containerColor = MaterialTheme.colorScheme.screenBg,
     ) { innerPadding ->
 
         val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = state.isBusy)
@@ -438,7 +469,7 @@ private fun RemoteScreen(
                 Text(
                     "Presentations",
                     style = MaterialTheme.typography.labelLarge,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.textSecondary,
                     modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                 )
             }
@@ -461,7 +492,7 @@ private fun RemoteScreen(
                 Text(
                     "Volume ▲ = Previous  •  Volume ▼ = Next  •  Works with screen off via notification",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextMuted,
+                    color = MaterialTheme.colorScheme.textMuted,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -494,13 +525,13 @@ private fun ConnectionCard(
                 Icon(
                     imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
                     contentDescription = null,
-                    tint = if (connected) Green else TextSecondary,
+                    tint = if (connected) Green else MaterialTheme.colorScheme.textSecondary,
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
                     text = statusMessage,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (connected) Green else TextSecondary,
+                    color = if (connected) Green else MaterialTheme.colorScheme.textSecondary,
                     fontWeight = FontWeight.Medium,
                 )
             }
@@ -512,15 +543,15 @@ private fun ConnectionCard(
                 OutlinedTextField(
                     value = bridgeUrl,
                     onValueChange = onBridgeUrlChange,
-                    label = { Text("Bridge URL", color = TextSecondary) },
-                    placeholder = { Text("Auto-detecting…", color = TextMuted) },
+                    label = { Text("Bridge URL", color = MaterialTheme.colorScheme.textSecondary) },
+                    placeholder = { Text("Auto-detecting…", color = MaterialTheme.colorScheme.textMuted) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Accent,
-                        unfocusedBorderColor = Navy600,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                        unfocusedBorderColor = MaterialTheme.colorScheme.divider,
+                        focusedTextColor = MaterialTheme.colorScheme.textPrimary,
+                        unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
                     )
                 )
                 
@@ -531,7 +562,7 @@ private fun ConnectionCard(
                         Icon(
                             imageVector = if (showHistory) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                             contentDescription = if (showHistory) "Hide history" else "Show history",
-                            tint = TextSecondary
+                            tint = MaterialTheme.colorScheme.textSecondary
                         )
                     }
                 }
@@ -543,7 +574,7 @@ private fun ConnectionCard(
                     Text(
                         "Recent Connections",
                         style = MaterialTheme.typography.labelMedium,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.textSecondary,
                         fontWeight = FontWeight.Medium
                     )
                     
@@ -559,13 +590,13 @@ private fun ConnectionCard(
                             Icon(
                                 imageVector = Icons.Default.History,
                                 contentDescription = null,
-                                tint = TextMuted,
+                                tint = MaterialTheme.colorScheme.textMuted,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 historyUrl,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = TextSecondary,
+                                color = MaterialTheme.colorScheme.textSecondary,
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -698,7 +729,7 @@ private fun SlideControlsCard(
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
                     color = Accent,
-                    trackColor = Navy700,
+                    trackColor = MaterialTheme.colorScheme.cardBgSelected,
                 )
             }
             }
@@ -721,8 +752,8 @@ private fun SlideNavButton(
         colors = ButtonDefaults.buttonColors(
             containerColor = Accent,
             contentColor = Color.White,
-            disabledContainerColor = Navy700,
-            disabledContentColor = TextMuted,
+            disabledContainerColor = MaterialTheme.colorScheme.cardBgSelected,
+            disabledContentColor = MaterialTheme.colorScheme.textMuted,
         )
     ) {
         Text(label, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
@@ -772,7 +803,7 @@ private fun PresentationCard(
             },
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) Navy700 else Navy800
+            containerColor = if (selected) MaterialTheme.colorScheme.cardBgSelected else MaterialTheme.colorScheme.cardBg
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
@@ -787,13 +818,13 @@ private fun PresentationCard(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(if (presentation.inSlideshow) Accent.copy(alpha = 0.15f) else Navy600),
+                        .background(if (presentation.inSlideshow) Accent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.divider),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = if (presentation.inSlideshow) Icons.Default.PlayArrow else Icons.Default.Folder,
                         contentDescription = null,
-                        tint = if (presentation.inSlideshow) Accent else TextSecondary,
+                        tint = if (presentation.inSlideshow) Accent else MaterialTheme.colorScheme.textSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -803,7 +834,7 @@ private fun PresentationCard(
                         text = presentation.name,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (selected) TextPrimary else TextPrimary.copy(alpha = 0.85f),
+                        color = if (selected) MaterialTheme.colorScheme.textPrimary else MaterialTheme.colorScheme.textPrimary.copy(alpha = 0.85f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -813,7 +844,7 @@ private fun PresentationCard(
                         else
                             "${presentation.totalSlides} slides",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (presentation.inSlideshow) Accent else TextSecondary,
+                        color = if (presentation.inSlideshow) Accent else MaterialTheme.colorScheme.textSecondary,
                     )
                 }
 
@@ -832,7 +863,7 @@ private fun PresentationCard(
                         .height(3.dp)
                         .clip(RoundedCornerShape(2.dp)),
                     color = Accent,
-                    trackColor = Navy600,
+                    trackColor = MaterialTheme.colorScheme.divider,
                 )
             }
         }
@@ -855,7 +886,7 @@ private fun EmptyStateCard(connected: Boolean) {
             Text(
                 if (connected) "No open presentations" else "Not connected",
                 style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.textPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
@@ -864,7 +895,7 @@ private fun EmptyStateCard(connected: Boolean) {
                 else
                     "Make sure the desktop bridge is running on your PC",
                 style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.textSecondary,
                 textAlign = TextAlign.Center,
             )
         }
@@ -903,7 +934,7 @@ private fun StatusDot(connected: Boolean, serviceRunning: Boolean) {
             modifier = Modifier
                 .size(8.dp)
                 .clip(CircleShape)
-                .background(if (connected) Green else TextMuted)
+                .background(if (connected) Green else MaterialTheme.colorScheme.textMuted)
         )
         
         // Service status dot
@@ -944,10 +975,10 @@ private fun AppCard(content: @Composable () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
-        color = Navy800,
+        color = MaterialTheme.colorScheme.cardBg,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Navy600),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.divider),
     ) {
         Box(modifier = Modifier.padding(16.dp)) {
             content()
@@ -967,16 +998,16 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
                     Text(
                         "Welcome to PPT Remote",
                         fontWeight = FontWeight.SemiBold,
-                        color = TextPrimary
+                        color = MaterialTheme.colorScheme.textPrimary
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Navy800,
-                    titleContentColor = TextPrimary,
+                    containerColor = MaterialTheme.colorScheme.cardBg,
+                    titleContentColor = MaterialTheme.colorScheme.textPrimary,
                 )
             )
         },
-        containerColor = Navy900,
+        containerColor = MaterialTheme.colorScheme.screenBg,
     ) { innerPadding ->
         
         LazyColumn(
@@ -1004,14 +1035,14 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
                             "Control PowerPoint from your phone",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary,
+                            color = MaterialTheme.colorScheme.textPrimary,
                             textAlign = TextAlign.Center
                         )
                         
                         Text(
                             "Use volume buttons or swipe gestures to navigate slides, even with your screen off.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.textSecondary,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -1025,7 +1056,7 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
                             "Setup Instructions",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary
+                            color = MaterialTheme.colorScheme.textPrimary
                         )
                         
                         OnboardingStep(
@@ -1062,7 +1093,7 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
                             "Controls",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary
+                            color = MaterialTheme.colorScheme.textPrimary
                         )
                         
                         ControlItem("Volume ▲", "Previous slide")
@@ -1124,12 +1155,12 @@ private fun OnboardingStep(
                 title,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.textPrimary
             )
             Text(
                 description,
                 style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.textSecondary
             )
         }
     }
@@ -1146,12 +1177,12 @@ private fun ControlItem(action: String, result: String) {
             action,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.textPrimary
         )
         Text(
             result,
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.textSecondary
         )
     }
 }
@@ -1175,7 +1206,7 @@ private fun SettingsScreen(
                     Text(
                         "Settings",
                         fontWeight = FontWeight.SemiBold,
-                        color = TextPrimary
+                        color = MaterialTheme.colorScheme.textPrimary
                     )
                 },
                 navigationIcon = {
@@ -1183,17 +1214,17 @@ private fun SettingsScreen(
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimary
+                            tint = MaterialTheme.colorScheme.textPrimary
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Navy800,
-                    titleContentColor = TextPrimary,
+                    containerColor = MaterialTheme.colorScheme.cardBg,
+                    titleContentColor = MaterialTheme.colorScheme.textPrimary,
                 )
             )
         },
-        containerColor = Navy900,
+        containerColor = MaterialTheme.colorScheme.screenBg,
     ) { innerPadding ->
         
         LazyColumn(
@@ -1277,7 +1308,7 @@ private fun SettingsSection(
                 title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.textPrimary
             )
             content()
         }
@@ -1306,12 +1337,12 @@ private fun SettingsNumberItem(
                     title,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
-                    color = TextPrimary
+                    color = MaterialTheme.colorScheme.textPrimary
                 )
                 Text(
                     description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.textSecondary
                 )
             }
             
@@ -1332,9 +1363,9 @@ private fun SettingsNumberItem(
                 modifier = Modifier.width(100.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Accent,
-                    unfocusedBorderColor = Navy600,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
+                    unfocusedBorderColor = MaterialTheme.colorScheme.divider,
+                    focusedTextColor = MaterialTheme.colorScheme.textPrimary,
+                    unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
                 )
             )
         }
@@ -1366,12 +1397,12 @@ private fun SettingsSwitchItem(
                 title,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.textPrimary
             )
             Text(
                 description,
                 style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.textSecondary
             )
         }
         
@@ -1381,8 +1412,8 @@ private fun SettingsSwitchItem(
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = Accent,
-                uncheckedThumbColor = TextMuted,
-                uncheckedTrackColor = Navy600
+                uncheckedThumbColor = MaterialTheme.colorScheme.textMuted,
+                uncheckedTrackColor = MaterialTheme.colorScheme.divider
             )
         )
     }
@@ -1402,12 +1433,12 @@ private fun SettingsInfoItem(
             title,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.textPrimary
         )
         Text(
             value,
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.textSecondary,
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1f)
         )
@@ -1428,12 +1459,12 @@ private fun SettingsTextItem(
             title,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = TextPrimary
+            color = MaterialTheme.colorScheme.textPrimary
         )
         Text(
             description,
             style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
+            color = MaterialTheme.colorScheme.textSecondary
         )
         
         OutlinedTextField(
@@ -1442,13 +1473,13 @@ private fun SettingsTextItem(
                 textValue = newValue
                 onValueChange(newValue)
             },
-            placeholder = { Text("Enter notification text", color = TextMuted) },
+            placeholder = { Text("Enter notification text", color = MaterialTheme.colorScheme.textMuted) },
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Accent,
-                unfocusedBorderColor = Navy600,
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
+                unfocusedBorderColor = MaterialTheme.colorScheme.divider,
+                focusedTextColor = MaterialTheme.colorScheme.textPrimary,
+                unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
             )
         )
     }
