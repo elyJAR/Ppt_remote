@@ -308,22 +308,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Also fetch bridge's network status
             val bridgeNetworkWarning = client.getNetworkStatus(effectiveUrl)?.warning
 
-            // Read current state at write-time (not the snapshot captured before the network call)
-            // This prevents overwriting showSettings / showOnboarding with stale values
+            // Fetch thumbnail for the active slideshow presentation (fire-and-forget,
+            // injected into the presentation list before updating state)
+            val presentationsWithThumbnails = presentations.map { pres ->
+                if (pres.inSlideshow) {
+                    val thumb = try {
+                        client.fetchCurrentThumbnail(effectiveUrl, pres.id)
+                    } catch (e: Exception) { null }
+                    pres.copy(currentThumbnail = thumb)
+                } else {
+                    pres.copy(currentThumbnail = null)
+                }
+            }
+
+            // Read current state at write-time to avoid clobbering showSettings/showOnboarding
             val nowState = _state.value
             val selected = when {
-                nowState.selectedPresentationId != null && presentations.any { it.id == nowState.selectedPresentationId } -> {
+                nowState.selectedPresentationId != null && presentationsWithThumbnails.any { it.id == nowState.selectedPresentationId } -> {
                     nowState.selectedPresentationId
                 }
-                else -> presentations.firstOrNull { it.inSlideshow }?.id ?: presentations.firstOrNull()?.id
+                else -> presentationsWithThumbnails.firstOrNull { it.inSlideshow }?.id
+                    ?: presentationsWithThumbnails.firstOrNull()?.id
             }
 
             RemotePrefs.setSelectedPresentationId(appContext, selected)
             _state.value = nowState.copy(
-                presentations = presentations,
+                presentations = presentationsWithThumbnails,
                 selectedPresentationId = selected,
                 bridgeNetworkWarning = bridgeNetworkWarning,
-                statusMessage = if (presentations.isEmpty()) {
+                statusMessage = if (presentationsWithThumbnails.isEmpty()) {
                     "No open PowerPoint files detected"
                 } else {
                     "Connected"

@@ -39,13 +39,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ArrowBackimport androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
@@ -865,6 +868,25 @@ private fun PresentationCard(
                     color = Accent,
                     trackColor = MaterialTheme.colorScheme.divider,
                 )
+            }
+
+            // Slide thumbnail — shown when in slideshow and thumbnail is available
+            val thumbBytes = presentation.currentThumbnail
+            if (presentation.inSlideshow && thumbBytes != null && thumbBytes.isNotEmpty()) {
+                val bitmap = remember(thumbBytes) {
+                    BitmapFactory.decodeByteArray(thumbBytes, 0, thumbBytes.size)
+                }
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Slide ${presentation.currentSlide} preview",
+                        contentScale = ContentScale.FillWidth,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(6.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.divider, RoundedCornerShape(6.dp))
+                    )
+                }
             }
         }
     }

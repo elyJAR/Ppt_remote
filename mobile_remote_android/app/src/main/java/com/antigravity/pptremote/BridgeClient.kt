@@ -106,6 +106,23 @@ class BridgeClient {
         post(url, "/api/presentations/${encodedId(presentationId)}/previous")
     }
 
+    /** Fetch the current slide thumbnail as raw PNG bytes. Returns null on any error. */
+    fun fetchCurrentThumbnail(url: String, presentationId: String, width: Int = 480): ByteArray? {
+        return try {
+            val client = createClient(timeoutSeconds = 15) // export can be slow
+            val request = Request.Builder()
+                .url("${baseUrl(url)}/api/presentations/${encodedId(presentationId)}/current-thumbnail?width=$width")
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                response.body?.bytes()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun discoverBridge(timeoutMs: Int = 1500, discoveryPort: Int = 8788): String? {
         val payload = discoveryToken.toByteArray(StandardCharsets.UTF_8)
         val receiveBuffer = ByteArray(1024)
