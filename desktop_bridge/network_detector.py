@@ -99,7 +99,7 @@ def _get_active_interface() -> str | None:
         sock.connect(("8.8.8.8", 80))
         ip = sock.getsockname()[0]
         sock.close()
-        
+
         # Get interface info using netsh
         result = subprocess.run(
             ["netsh", "interface", "ip", "show", "address"],
@@ -107,15 +107,21 @@ def _get_active_interface() -> str | None:
             text=True,
             timeout=5
         )
-        
+
         if result.returncode == 0:
             lines = result.stdout.split("\n")
             for i, line in enumerate(lines):
                 if ip in line:
-                    # Find the interface name (usually a few lines before)
+                    # Search backwards for the interface name header.
+                    # Real netsh output uses "Configuration for interface" (lowercase i)
+                    # so we match case-insensitively.
                     for j in range(max(0, i - 5), i):
-                        if "Interface" in lines[j]:
-                            return lines[j].split(":")[-1].strip()
+                        if "interface" in lines[j].lower():
+                            # Extract the name from: 'Configuration for interface "Wi-Fi"'
+                            # or the older: 'Interface Name: Wi-Fi'
+                            part = lines[j].split(":")[-1].strip().strip('"')
+                            if part:
+                                return part
         return None
     except Exception as e:
         logging.warning(f"Error getting active interface: {e}")
@@ -131,21 +137,24 @@ def _is_using_hotspot_connection(interface_name: str) -> bool:
             "tether",
             "adapter for",
             "virtual",
-            "wifi direct",
+            "wifidirect",   # normalised: no hyphen/space — matches "Wi-Fi Direct", "WiFi Direct", etc.
             "miracast",
             "moto hotspot",
             "verizon",
             "at&t",
             "t-mobile"
         ]
-        
-        interface_lower = interface_name.lower()
-        
-        # Check common patterns
+
+        # Normalise: lowercase, strip hyphens and spaces for robust matching
+        def _norm(s: str) -> str:
+            return s.lower().replace("-", "").replace(" ", "")
+
+        interface_norm = _norm(interface_name)
+
         for indicator in hotspot_indicators:
-            if indicator in interface_lower:
+            if _norm(indicator) in interface_norm:
                 return True
-        
+
         # Check interface description for hotspot patterns
         try:
             result = subprocess.run(
@@ -154,16 +163,20 @@ def _is_using_hotspot_connection(interface_name: str) -> bool:
                 text=True,
                 timeout=5
             )
-            
+
             if result.returncode == 0:
-                lines = result.stdout.lower()
-                if "hotspot" in lines or "tether" in lines or "mobile" in lines:
-                    # Verify it matches this interface
-                    if interface_lower in lines.lower():
-                        return True
+                output_norm = _norm(result.stdout)
+                if interface_norm in output_norm:
+                    # Find the line(s) that mention this interface and check for hotspot keywords
+                    for line in result.stdout.splitlines():
+                        if interface_name.lower() in line.lower():
+                            line_norm = _norm(line)
+                            for indicator in hotspot_indicators:
+                                if _norm(indicator) in line_norm:
+                                    return True
         except Exception:
             pass
-        
+
         return False
     except Exception as e:
         logging.warning(f"Error checking hotspot connection: {e}")

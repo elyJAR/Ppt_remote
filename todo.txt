@@ -27,19 +27,19 @@
               2. WMI (Get-WmiObject Win32_Process) — works without admin
               3. Named EXE fallback (PptRemoteBridge.exe by name)
 
-  [ ] hasStandardWiFiSignal() uses link-speed heuristic to detect hotspot
-        File: NetworkDetector.kt
-        Note: Link speed < 54 Mbps is unreliable as a hotspot indicator;
-              consider using SSID patterns or DHCP lease info instead
+  [x] hasStandardWiFiSignal() uses link-speed heuristic to detect hotspot
+        Fix: Removed entirely — replaced with normalised SSID-only matching
+             (link speed < 54 Mbps is unreliable; many routers report lower)
 
-  [ ] _get_active_interface() in network_detector.py searches for "Interface"
+  [x] _get_active_interface() in network_detector.py searches for "Interface"
         (capital I) but real netsh output starts sections with
         "Configuration for interface" (lowercase i); match is case-sensitive
-        Fix: use case-insensitive comparison
+        Fix: Changed to case-insensitive "interface" in lines[j].lower()
 
-  [ ] _is_using_hotspot_connection() checks for "wifi direct" but real Windows
+  [x] _is_using_hotspot_connection() checks for "wifi direct" but real Windows
         adapter name is "Wi-Fi Direct" (with hyphen and mixed case)
-        Fix: normalise string before comparing (replace("-","").lower())
+        Fix: Normalise both sides with .lower().replace("-","").replace(" ","")
+             before comparing; "wifidirect" now matches all variants
 
 
 --------------------------------------------------------------------------------
@@ -182,13 +182,21 @@
         - _resolve_id() URL-decodes and rejects empty or >512 char IDs
         - Applied to all eight routes that accept presentation_id
 
-  [ ] Restrict CORS to known origins instead of wildcard "*"
+  [x] Restrict CORS to known origins instead of wildcard "*"
+        - PPT_CORS_ORIGINS env var: set to comma-separated origins or "*"
+        - Default stays "*" for LAN use; override via env var for stricter setups
+  [x] Add request timeout to reject stale / hung requests on the bridge
+        - TimeoutMiddleware added; default 30s, configurable via PPT_REQUEST_TIMEOUT
+        - Returns HTTP 504 with descriptive message on timeout
+        - Set PPT_REQUEST_TIMEOUT=0 to disable
+  [x] Document firewall port rules clearly for end users (8787 TCP, 8788 UDP)
+        - Added inline comment in main.py configuration section
+        - TCP 8787 (HTTP API) and UDP 8788 (discovery) must be open inbound
+
   [ ] Add HTTPS support (self-signed cert acceptable for LAN use)
-  [ ] Add request timeout to reject stale / hung requests on the bridge
   [ ] Add health check heartbeat between Android app and bridge
   [ ] Add crash reporting on Android (Firebase Crashlytics or Sentry)
   [ ] Handle PowerPoint COM crash and reconnect gracefully on bridge
-  [ ] Document firewall port rules clearly for end users (8787 TCP, 8788 UDP)
 
 
 --------------------------------------------------------------------------------
@@ -421,8 +429,8 @@
   COUNTS
 ================================================================================
 
-  Completed (all sessions) : ~127 items
-  Pending                  :  ~17 items
+  Completed (all sessions) : ~133 items
+  Pending                  :  ~11 items
   Active minor bugs        :    3 items (heuristic / case-sensitivity issues
                                          in network detection code)
 

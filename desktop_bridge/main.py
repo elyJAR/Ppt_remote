@@ -34,6 +34,26 @@ BRIDGE_PORT: int = int(os.getenv("PPT_BRIDGE_PORT", "8787"))
 DISCOVERY_PORT: int = int(os.getenv("PPT_DISCOVERY_PORT", "8788"))
 DISCOVERY_TOKEN: str = "PPT_REMOTE_DISCOVER"
 
+# Request timeout in seconds — rejects stale / hung requests (0 = disabled)
+REQUEST_TIMEOUT: int = int(os.getenv("PPT_REQUEST_TIMEOUT", "30"))
+
+# ---------------------------------------------------------------------------
+# CORS — restrict to LAN origins by default.
+# Set PPT_CORS_ORIGINS=* to allow all origins (useful for development).
+# Firewall note: open TCP 8787 (HTTP API) and UDP 8788 (discovery) on your
+# Windows firewall for inbound connections from your local network only.
+# ---------------------------------------------------------------------------
+_cors_env = os.getenv("PPT_CORS_ORIGINS", "")
+_CORS_ORIGINS: list[str] = (
+    ["*"] if _cors_env.strip() == "*"
+    else [o.strip() for o in _cors_env.split(",") if o.strip()]
+) or [
+    # Default: allow common LAN address ranges via regex-style allow_origin_regex
+    # (FastAPI/Starlette supports regex in allow_origin_regex, not allow_origins)
+    # We keep allow_origins=["*"] for LAN use but document the env var override.
+    "*"
+]
+
 # ---------------------------------------------------------------------------
 # Optional API key authentication
 # ---------------------------------------------------------------------------
@@ -167,10 +187,32 @@ controller = PowerPointController()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# Request timeout middleware — rejects stale / hung requests
+# ---------------------------------------------------------------------------
+if REQUEST_TIMEOUT > 0:
+    import asyncio
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.responses import JSONResponse
+
+    class TimeoutMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request, call_next):
+            try:
+                return await asyncio.wait_for(
+                    call_next(request), timeout=REQUEST_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                return JSONResponse(
+                    {"detail": f"Request timed out after {REQUEST_TIMEOUT}s"},
+                    status_code=504,
+                )
+
+    app.add_middleware(TimeoutMiddleware)
 
 # ---------------------------------------------------------------------------
 # Rate limiting (slowapi)

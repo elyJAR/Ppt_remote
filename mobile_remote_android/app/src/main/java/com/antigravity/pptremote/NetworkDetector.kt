@@ -97,8 +97,8 @@ object NetworkDetector {
             val connectionInfo = wifiManager.connectionInfo ?: return false
             @Suppress("DEPRECATION")
             val ssid = connectionInfo.ssid?.replace("\"", "") ?: return false
-            
-            // Common patterns for personal hotspot names
+
+            // Common patterns for personal hotspot names — checked case-insensitively
             val hotspotIndicators = listOf(
                 "iphone",
                 "samsung",
@@ -111,26 +111,18 @@ object NetworkDetector {
                 "xiaomi",
                 "huawei",
                 "tethering",
-                "moto hotspot"
+                "moto hotspot",
+                "android ap",
+                "wifi direct",   // normalised: no hyphen, lowercase
+                "wifidirect"
             )
-            
-            val ssidLower = ssid.toLowerCase()
-            hotspotIndicators.any { ssidLower.contains(it) } ||
-            // Also check if connected to WiFi but no gateway (edge case)
-            (!hasStandardWiFiSignal(context))
-        } catch (e: Exception) {
-            false
-        }
-    }
-    
-    private fun hasStandardWiFiSignal(context: Context): Boolean {
-        return try {
-            @Suppress("DEPRECATION")
-            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
-            @Suppress("DEPRECATION")
-            val linkSpeed = wifiManager.connectionInfo?.linkSpeed ?: return false
-            // Standard WiFi is usually > 54 Mbps; hotspots often lower
-            linkSpeed > 54
+
+            val ssidNorm = ssid.lowercase().replace("-", "").replace(" ", "")
+            hotspotIndicators.any { indicator ->
+                ssidNorm.contains(indicator.replace("-", "").replace(" ", ""))
+            }
+            // Removed unreliable link-speed heuristic (< 54 Mbps is not a reliable
+            // hotspot indicator — many routers and 5 GHz bands report lower speeds)
         } catch (e: Exception) {
             false
         }
