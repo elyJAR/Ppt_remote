@@ -134,15 +134,17 @@ jobs:
 
           # Write a keystore.properties file that build.gradle.kts reads
           # This avoids passing passwords on the command line entirely
-          cat > "${GITHUB_WORKSPACE}/mobile_remote_android/keystore.properties" << EOF
-          storeFile=${KEYSTORE_PATH}
-          storePassword=${STORE_PASS}
-          keyAlias=${ALIAS}
-          keyPassword=${KEY_PASS}
-          EOF
+          {
+            echo "storeFile=${KEYSTORE_PATH}"
+            echo "storePassword=${STORE_PASS}"
+            echo "keyAlias=${ALIAS}"
+            echo "keyPassword=${KEY_PASS}"
+          } > "${GITHUB_WORKSPACE}/mobile_remote_android/keystore.properties"
 
           echo "path=$KEYSTORE_PATH" >> "$GITHUB_OUTPUT"
           echo "Keystore ready at $KEYSTORE_PATH"
+          echo "keystore.properties written:"
+          cat "${GITHUB_WORKSPACE}/mobile_remote_android/keystore.properties"
 
       # ── Build signed release APK ─────────────────────────────────────────────
       - name: Build signed release APK
