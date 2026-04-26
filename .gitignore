@@ -34,3 +34,4 @@ dist/
 *.jks
 *.keystore
 mobile_remote_android/generate_keystore.ps1.log
+mobile_remote_android/keystore.properties

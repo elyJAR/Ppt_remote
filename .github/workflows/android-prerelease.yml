@@ -98,10 +98,6 @@ jobs:
           if-no-files-found: ignore
 
       # ── Signing setup ────────────────────────────────────────────────────────
-      # If KEYSTORE_BASE64 secret is set: decode and use it (persistent key).
-      # If not: generate a stable keystore derived from a repo-level secret
-      # KEYSTORE_SEED so the same key is reused across builds (no more
-      # "app not installed" errors when updating without uninstalling).
       - name: Prepare keystore
         id: keystore
         shell: bash
@@ -110,7 +106,6 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS:         ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD:      ${{ secrets.KEY_PASSWORD }}
-          KEYSTORE_SEED:     ${{ secrets.KEYSTORE_SEED }}
         run: |
           KEYSTORE_PATH="${RUNNER_TEMP}/release.jks"
 
@@ -121,13 +116,10 @@ jobs:
             KEY_PASS="$KEY_PASSWORD"
             ALIAS="$KEY_ALIAS"
           else
-            # Use a fixed stable password so the keystore is identical every run.
-            # Add KEYSTORE_BASE64 secret for a real persistent key.
             STORE_PASS="pptremote-ci-store-2024"
             KEY_PASS="pptremote-ci-key-2024"
             ALIAS="pptremote"
-
-            echo "Generating stable self-signed keystore (seed-derived password)"
+            echo "Generating self-signed keystore"
             keytool -genkeypair \
               -alias "$ALIAS" \
               -keyalg RSA \
@@ -136,24 +128,26 @@ jobs:
               -keystore "$KEYSTORE_PATH" \
               -storepass "$STORE_PASS" \
               -keypass "$KEY_PASS" \
-              -dname "CN=PPT Remote, OU=AntiGravity Projects, O=AntiGravity, L=Unknown, ST=Unknown, C=US" \
+              -dname "CN=PPT Remote, OU=AntiGravity, O=AntiGravity, L=Unknown, ST=Unknown, C=US" \
               -noprompt
-            echo "Stable keystore generated (add KEYSTORE_SEED secret to lock this key permanently)"
           fi
 
-          echo "path=$KEYSTORE_PATH"       >> "$GITHUB_OUTPUT"
-          echo "store_pass=$STORE_PASS"    >> "$GITHUB_OUTPUT"
-          echo "key_pass=$KEY_PASS"        >> "$GITHUB_OUTPUT"
-          echo "alias=$ALIAS"              >> "$GITHUB_OUTPUT"
+          # Write a keystore.properties file that build.gradle.kts reads
+          # This avoids passing passwords on the command line entirely
+          cat > "${GITHUB_WORKSPACE}/mobile_remote_android/keystore.properties" << EOF
+          storeFile=${KEYSTORE_PATH}
+          storePassword=${STORE_PASS}
+          keyAlias=${ALIAS}
+          keyPassword=${KEY_PASS}
+          EOF
+
+          echo "path=$KEYSTORE_PATH" >> "$GITHUB_OUTPUT"
+          echo "Keystore ready at $KEYSTORE_PATH"
 
       # ── Build signed release APK ─────────────────────────────────────────────
       - name: Build signed release APK
-        run: |
-          gradle :app:assembleRelease \
-            -Pandroid.injected.signing.store.file="${{ steps.keystore.outputs.path }}" \
-            -Pandroid.injected.signing.store.password="${{ steps.keystore.outputs.store_pass }}" \
-            -Pandroid.injected.signing.key.alias="${{ steps.keystore.outputs.alias }}" \
-            -Pandroid.injected.signing.key.password="${{ steps.keystore.outputs.key_pass }}"
+        shell: bash
+        run: gradle :app:assembleRelease
 
       # ── Resolve tag ──────────────────────────────────────────────────────────
       - name: Resolve release tag

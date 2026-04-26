@@ -3,6 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// ── Signing config from keystore.properties (written by CI or local dev) ──────
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = java.util.Properties().also { props ->
+    if (keystorePropsFile.exists()) props.load(keystorePropsFile.inputStream())
+}
+
 android {
     namespace = "com.antigravity.pptremote"
     compileSdk = 34
@@ -25,6 +31,15 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Sign with keystore.properties if present (CI and local release builds)
+            if (keystorePropsFile.exists()) {
+                signingConfig = signingConfigs.create("release") {
+                    storeFile     = file(keystoreProps["storeFile"] as String)
+                    storePassword = keystoreProps["storePassword"] as String
+                    keyAlias      = keystoreProps["keyAlias"] as String
+                    keyPassword   = keystoreProps["keyPassword"] as String
+                }
+            }
         }
     }
 
