@@ -253,17 +253,33 @@ class PowerPointController:
         OneDrive/SharePoint files open as read-only until the user (or COM)
         calls EnableEditing().  Returns True if the file is now editable.
         """
+        import time
         try:
             if not bool(pres.ReadOnly):
                 return True  # already editable
-            # PowerPoint exposes EnableEditing() on the Presentation object
             pres.EnableEditing()
-            # Give PowerPoint a moment to sync with OneDrive
-            import time
-            time.sleep(1.0)
+            # Poll until editable or timeout (OneDrive sync can take several seconds)
+            for _ in range(10):
+                time.sleep(0.5)
+                try:
+                    if not bool(pres.ReadOnly):
+                        return True
+                except Exception:
+                    pass
             return not bool(pres.ReadOnly)
         except Exception:
             return False
+
+    def _wait_for_slideshow_window(self, app: Any, presentation_id: str, timeout: float = 5.0) -> Any | None:
+        """Poll until the slideshow window appears or timeout expires."""
+        import time
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            window = self._find_slideshow_window(app, presentation_id)
+            if window is not None:
+                return window
+            time.sleep(0.2)
+        return None
 
     def start_slideshow(self, presentation_id: str) -> None:
         if presentation_id.startswith("__protected__"):
@@ -303,6 +319,8 @@ class PowerPointController:
                     f"Could not start slideshow: {exc}. "
                     f"If the file was downloaded from cloud, click 'Enable Editing' in PowerPoint first."
                 ) from exc
+            # Wait for the slideshow window to actually open (important for OneDrive files)
+            self._wait_for_slideshow_window(app, presentation_id, timeout=6.0)
 
     def stop_slideshow(self, presentation_id: str) -> None:
         with com_context():
@@ -324,7 +342,14 @@ class PowerPointController:
                 # Enable editing for OneDrive/cloud files
                 try:
                     if bool(pres.ReadOnly):
-                        self._try_enable_editing(pres)
+                        enabled = self._try_enable_editing(pres)
+                        if not enabled:
+                            raise PowerPointControllerError(
+                                "This presentation is read-only (OneDrive/cloud file). "
+                                "Click 'Enable Editing' in PowerPoint, then try again."
+                            )
+                except PowerPointControllerError:
+                    raise
                 except Exception:
                     pass
                 try:
@@ -333,7 +358,7 @@ class PowerPointController:
                     raise PowerPointControllerError(
                         f"Could not auto-start slideshow: {exc}"
                     ) from exc
-                window = self._find_slideshow_window(app, presentation_id)
+                window = self._wait_for_slideshow_window(app, presentation_id)
 
             if window is None:
                 raise PowerPointControllerError(
@@ -351,7 +376,14 @@ class PowerPointController:
                 # Enable editing for OneDrive/cloud files
                 try:
                     if bool(pres.ReadOnly):
-                        self._try_enable_editing(pres)
+                        enabled = self._try_enable_editing(pres)
+                        if not enabled:
+                            raise PowerPointControllerError(
+                                "This presentation is read-only (OneDrive/cloud file). "
+                                "Click 'Enable Editing' in PowerPoint, then try again."
+                            )
+                except PowerPointControllerError:
+                    raise
                 except Exception:
                     pass
                 try:
@@ -360,7 +392,7 @@ class PowerPointController:
                     raise PowerPointControllerError(
                         f"Could not auto-start slideshow: {exc}"
                     ) from exc
-                window = self._find_slideshow_window(app, presentation_id)
+                window = self._wait_for_slideshow_window(app, presentation_id)
 
             if window is None:
                 raise PowerPointControllerError(

@@ -274,8 +274,11 @@ private fun RemoteScreen(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val useWideLayout = isTablet || isLandscape
 
-    // Helper function for haptic feedback in gestures
+    // Helper function for haptic feedback in gestures — fires only once per swipe
+    var swipeHapticFired = false
     fun performGestureHapticFeedback() {
+        if (swipeHapticFired) return
+        swipeHapticFired = true
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
@@ -378,22 +381,19 @@ private fun RemoteScreen(
                     .fillMaxSize()
                     .pointerInput(Unit) {
                         detectHorizontalDragGestures(
-                            onDragEnd = { 
-                                // Haptic feedback is handled in the drag detection
+                            onDragStart = { swipeHapticFired = false },
+                            onDragEnd = { swipeHapticFired = false }
+                        ) { _, dragAmount ->
+                            val threshold = 100f
+                            if (dragAmount > threshold) {
+                                performGestureHapticFeedback()
+                                onPrevious()
+                            } else if (dragAmount < -threshold) {
+                                performGestureHapticFeedback()
+                                onNext()
                             }
-                    ) { _, dragAmount ->
-                        val threshold = 100f // Minimum drag distance in pixels
-                        if (dragAmount > threshold) {
-                            // Swipe right - Previous slide
-                            performGestureHapticFeedback()
-                            onPrevious()
-                        } else if (dragAmount < -threshold) {
-                            // Swipe left - Next slide  
-                            performGestureHapticFeedback()
-                            onNext()
                         }
-                    }
-                },
+                    },
             contentPadding = PaddingValues(
                 horizontal = if (useWideLayout) 32.dp else 16.dp, 
                 vertical = 12.dp
