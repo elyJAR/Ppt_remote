@@ -125,8 +125,9 @@ jobs:
             # Using a fixed seed means the same keystore is regenerated identically
             # on every CI run, so APK signatures stay consistent across releases.
             SEED="${KEYSTORE_SEED:-pptremote-stable-ci-key-2024}"
-            STORE_PASS=$(echo -n "$SEED-store" | sha256sum | cut -c1-32)
-            KEY_PASS=$(echo -n "$SEED-key" | sha256sum | cut -c1-32)
+            # Use printf to avoid trailing newline issues; tr removes non-hex chars
+            STORE_PASS=$(printf '%s-store' "$SEED" | sha256sum | tr -dc 'a-f0-9' | head -c 32)
+            KEY_PASS=$(printf '%s-key' "$SEED" | sha256sum | tr -dc 'a-f0-9' | head -c 32)
             ALIAS="pptremote"
 
             echo "Generating stable self-signed keystore (seed-derived password)"
