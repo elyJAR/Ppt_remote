@@ -278,14 +278,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val effectiveUrl = if (current.bridgeUrl.isBlank()) {
             // Use smart discovery timeout based on network type
             val discoveryTimeoutMs = when (current.networkType) {
-                NetworkType.HOTSPOT_USING, NetworkType.HOTSPOT_PROVIDING -> 2500  // Longer timeout for any hotspot
+                NetworkType.HOTSPOT_USING, NetworkType.HOTSPOT_PROVIDING -> 2500
                 NetworkType.CELLULAR -> 3000
                 else -> 1500
             }
 
-            val detectedUrl = client.discoverBridge(discoveryTimeoutMs, current.bridgePort + 1) // Discovery port is typically bridge port + 1
+            val detectedUrl = client.discoverBridge(discoveryTimeoutMs, current.bridgePort + 1)
             if (detectedUrl == null) {
-                _state.value = current.copy(
+                _state.value = _state.value.copy(
                     presentations = emptyList(),
                     statusMessage = "Searching for desktop bridge..."
                 )
@@ -293,7 +293,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             RemotePrefs.setBridgeUrl(appContext, detectedUrl)
-            _state.value = current.copy(
+            _state.value = _state.value.copy(
                 bridgeUrl = detectedUrl,
                 statusMessage = "Bridge detected at $detectedUrl"
             )
@@ -303,21 +303,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         try {
-            val latestState = _state.value
             val presentations = client.fetchPresentations(effectiveUrl)
 
             // Also fetch bridge's network status
             val bridgeNetworkWarning = client.getNetworkStatus(effectiveUrl)?.warning
 
+            // Read current state at write-time (not the snapshot captured before the network call)
+            // This prevents overwriting showSettings / showOnboarding with stale values
+            val nowState = _state.value
             val selected = when {
-                latestState.selectedPresentationId != null && presentations.any { it.id == latestState.selectedPresentationId } -> {
-                    latestState.selectedPresentationId
+                nowState.selectedPresentationId != null && presentations.any { it.id == nowState.selectedPresentationId } -> {
+                    nowState.selectedPresentationId
                 }
                 else -> presentations.firstOrNull { it.inSlideshow }?.id ?: presentations.firstOrNull()?.id
             }
 
             RemotePrefs.setSelectedPresentationId(appContext, selected)
-            _state.value = latestState.copy(
+            _state.value = nowState.copy(
                 presentations = presentations,
                 selectedPresentationId = selected,
                 bridgeNetworkWarning = bridgeNetworkWarning,
