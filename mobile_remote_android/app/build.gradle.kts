@@ -5,8 +5,9 @@ plugins {
 
 // ── Signing config from keystore.properties (written by CI or local dev) ──────
 val keystorePropsFile = rootProject.file("keystore.properties")
-val keystoreProps = java.util.Properties().also { props ->
-    if (keystorePropsFile.exists()) props.load(keystorePropsFile.inputStream())
+val keystoreProps = java.util.Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.inputStream().use { keystoreProps.load(it) }
 }
 
 android {
