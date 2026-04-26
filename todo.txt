@@ -52,23 +52,77 @@
   [x] Show empty state card with emoji + message when no presentations found
   [x] Show slide progress bar (LinearProgressIndicator) inside PresentationItem
 
-  [ ] Add custom app launcher icon (currently default Android icon)
-  [ ] Add custom notification small icon (currently android.R.drawable.ic_media_play)
-  [ ] Add splash screen / launch screen
-  [ ] Add onboarding flow for first-time users (explain PC setup steps)
-  [ ] Add settings screen (port config, polling interval, theme preference)
-  [ ] Add pull-to-refresh gesture on the presentations list
-  [ ] Add manual "Refresh" button to force-poll the bridge immediately
-  [ ] Add connection history / saved bridge URL bookmarks
+  [x] Add custom app launcher icon (currently default Android icon)
+        - Created adaptive icon with foreground/background XML drawables
+        - Generated PNG fallbacks for all densities (48px to 192px)
+        - Updated AndroidManifest.xml to reference new icons
+        - Icon design: dark blue background with presentation screen + remote control
+  [x] Add custom notification small icon (currently android.R.drawable.ic_media_play)
+        - Created custom notification icon (ic_notification.xml)
+        - Created custom action icons (ic_previous, ic_next, ic_play, ic_stop)
+        - Updated RemoteControlService to use new icons
+        - Icons follow Material Design guidelines with proper tinting
+  [x] Add splash screen / launch screen
+        - Created splash screen theme with app icon and brand colors
+        - Added androidx.core:core-splashscreen dependency
+        - Updated MainActivity to install splash screen
+        - Configured 1-second animation duration with smooth transition
+  [x] Add onboarding flow for first-time users (explain PC setup steps)
+        - Added showOnboarding field to RemoteState and onboarding preference storage
+        - Created comprehensive OnboardingScreen with setup instructions
+        - Includes 4-step setup guide: Download bridge, Run bridge, Connect network, Open PowerPoint
+        - Shows control instructions (volume buttons, swipes, notifications)
+        - Appears on first launch, can be completed with "Get Started" button
+  [x] Add settings screen (port config, polling interval, theme preference)
+        - Created comprehensive SettingsScreen with Material 3 design
+        - Added bridge port configuration (1024-65535 range validation)
+        - Added polling interval setting (1-30 seconds range)
+        - Added dark theme toggle switch
+        - Integrated with RemotePrefs for persistent storage
+        - Added settings button to TopAppBar for easy access
+  [x] Add pull-to-refresh gesture on the presentations list
+        - Added SwipeRefresh dependency (accompanist-swiperefresh:0.32.0)
+        - Wrapped LazyColumn with SwipeRefresh component
+        - Integrated with existing refresh functionality and isBusy state
+        - Provides intuitive pull-down gesture to refresh presentations
+  [x] Add manual "Refresh" button to force-poll the bridge immediately
+        - Added refresh IconButton to TopAppBar with refresh icon
+        - Button is disabled when isBusy to prevent multiple simultaneous requests
+        - Calls existing refreshPresentations() method in MainViewModel
+        - Icon tint changes based on busy state for visual feedback
+  [x] Add connection history / saved bridge URL bookmarks
+        - Added connection history storage in RemotePrefs (last 10 connections)
+        - Enhanced ConnectionCard with expandable history section
+        - Clickable history items for quick connection switching
+        - Automatic history tracking when bridge URLs are entered
+        - Clean UI with expand/collapse functionality and history icons
   [x] Improve presentation card: file type icon, slideshow state badge
         - File icon (folder/play) with tinted background
         - LIVE badge (red) shown when presentation is in slideshow
         - Animated slide progress bar inside each card
         - Selected card highlighted with accent border
-  [ ] Add haptic feedback on volume button slide change
-  [ ] Accessibility: add contentDescription to all icon-only buttons
-  [ ] Accessibility: verify all touch targets are minimum 48x48 dp
-  [ ] Test and fix layout on tablets and landscape orientation
+  [x] Add haptic feedback on volume button slide change
+        - Added VIBRATE permission to AndroidManifest.xml
+        - Created performHapticFeedback() method with Android version compatibility
+        - Integrated haptic feedback into volume button press handlers
+        - Added haptic feedback to swipe gestures as well
+  [x] Accessibility: add contentDescription to all icon-only buttons
+        - Added semantic roles and contentDescription to all IconButtons
+        - Enhanced PresentationCard with detailed accessibility descriptions
+        - Added semantic properties for screen reader compatibility
+        - Improved button descriptions with dynamic state information
+        - Ensured proper role assignments for interactive elements
+  [x] Accessibility: verify all touch targets are minimum 48x48 dp
+        - Verified IconButtons use Material 3 default 48dp minimum touch targets
+        - Added semantic modifiers to improve accessibility navigation
+        - Ensured clickable areas meet WCAG guidelines for touch accessibility
+        - All interactive elements properly sized for accessibility compliance
+  [x] Test and fix layout on tablets and landscape orientation
+        - Added responsive layout detection using LocalConfiguration
+        - Implemented wide layout mode for tablets (≥600dp) and landscape
+        - Enhanced SlideControlsCard with single-row layout for wide screens
+        - Increased padding and spacing for better tablet experience
+        - Adaptive content padding and button sizing based on screen size
   [ ] Verify WCAG 4.5:1 minimum color contrast ratio on all text
 
 
@@ -89,15 +143,45 @@
         Handles: BOOT_COMPLETED + QUICKBOOT_POWERON (HTC/OnePlus)
         Guard:   Only starts if bridge URL was previously configured
 
-  [ ] Add start/stop service toggle button in the app UI
-  [ ] Show active/inactive service status indicator in the app UI
-  [ ] Update notification with live current slide number during slideshow
-  [ ] Add "Stop Service" action button directly in the notification
-  [ ] Add configurable notification text from settings screen
-  [ ] Add swipe left/right gestures as alternative to volume buttons
+  [x] Add start/stop service toggle button in the app UI
+        - Added isServiceRunning field to RemoteState
+        - Created toggleService() method in MainViewModel
+        - Added service status checking with RemoteControlService.isRunning()
+        - Added toggle IconButton to TopAppBar with play/stop icons
+  [x] Show active/inactive service status indicator in the app UI
+        - Enhanced StatusDot component to show both connection and service status
+        - Green dot = Bridge connection, Blue dot = Background service running
+        - Gray dot when service is stopped, visual feedback in TopAppBar
+        - Dual-dot design provides clear status at a glance
+  [x] Update notification with live current slide number during slideshow
+        - Enhanced createNotification() to accept dynamic slide info text
+        - Added updateNotificationWithSlideInfo() method to fetch current slide data
+        - Notification shows "PresentationName • Slide X/Y" format
+        - Updates automatically after each slide navigation action
+  [x] Add "Stop Service" action button directly in the notification
+        - Added ACTION_STOP_SERVICE constant for new notification action
+        - Replaced "Stop Slideshow" with "Exit Service" button in notification
+        - Service stops completely when Exit button is pressed
+        - Provides easy way to stop background service from notification
+  [x] Add configurable notification text from settings screen
+        - Added notification text preference storage in RemotePrefs
+        - Created SettingsTextItem composable for text input
+        - Added notification text field to RemoteState and MainViewModel
+        - Updated RemoteControlService to use custom notification text
+        - Settings screen includes dedicated "Notifications" section
+  [x] Add swipe left/right gestures as alternative to volume buttons
+        - Added horizontal drag gesture detection to LazyColumn
+        - Swipe right = Previous slide, Swipe left = Next slide
+        - Integrated haptic feedback for gesture completion
+        - Set 100px threshold for gesture activation
   [ ] Support connecting to multiple PCs (multi-bridge)
   [ ] Add iOS / cross-platform version (React Native or Flutter)
-  [ ] Make bridge port configurable from the app settings screen
+  [x] Make bridge port configurable from the app settings screen
+        - Added buildBridgeUrl() helper to construct URLs with configured port
+        - Updated setBridgeUrl() to automatically add port when not specified
+        - Enhanced settings screen with port configuration (1024-65535 range)
+        - Updated discovery to use configured port + 1 for UDP discovery
+        - Port changes affect new connections while preserving existing URLs
 
 
 --------------------------------------------------------------------------------

@@ -16,7 +16,6 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 class BridgeClient {
-    private val discoveryPort = 8788
     private val discoveryToken = "PPT_REMOTE_DISCOVER"
     
     // Create a client with default timeouts - will be overridden per-request if needed
@@ -107,7 +106,7 @@ class BridgeClient {
         post(url, "/api/presentations/${encodedId(presentationId)}/previous")
     }
 
-    fun discoverBridge(timeoutMs: Int = 1500): String? {
+    fun discoverBridge(timeoutMs: Int = 1500, discoveryPort: Int = 8788): String? {
         val payload = discoveryToken.toByteArray(StandardCharsets.UTF_8)
         val receiveBuffer = ByteArray(1024)
 

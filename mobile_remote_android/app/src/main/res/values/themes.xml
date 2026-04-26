@@ -4,4 +4,12 @@
         <item name="android:navigationBarColor">@android:color/black</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
     </style>
+    
+    <!-- Splash Screen Theme -->
+    <style name="Theme.PptRemote.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenAnimationDuration">1000</item>
+        <item name="postSplashScreenTheme">@style/Theme.PptRemote</item>
+    </style>
 </resources>

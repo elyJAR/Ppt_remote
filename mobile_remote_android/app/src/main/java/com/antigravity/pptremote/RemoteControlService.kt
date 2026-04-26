@@ -1,5 +1,6 @@
 package com.antigravity.pptremote
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -17,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class RemoteControlService : Service() {
@@ -34,6 +36,7 @@ class RemoteControlService : Service() {
         const val ACTION_PREVIOUS = "com.antigravity.pptremote.action.PREVIOUS"
         const val ACTION_START    = "com.antigravity.pptremote.action.START"
         const val ACTION_STOP_SHOW = "com.antigravity.pptremote.action.STOP_SHOW"
+        const val ACTION_STOP_SERVICE = "com.antigravity.pptremote.action.STOP_SERVICE"
 
         fun start(context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -60,6 +63,17 @@ class RemoteControlService : Service() {
         fun stop(context: Context) {
             context.stopService(Intent(context, RemoteControlService::class.java))
         }
+
+        fun isRunning(context: Context): Boolean {
+            val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            @Suppress("DEPRECATION")
+            for (service in manager.getRunningServices(Integer.MAX_VALUE)) {
+                if (RemoteControlService::class.java.name == service.service.className) {
+                    return true
+                }
+            }
+            return false
+        }
     }
 
     override fun onCreate() {
@@ -75,6 +89,10 @@ class RemoteControlService : Service() {
             ACTION_PREVIOUS  -> executeBridgeAction("previous")
             ACTION_START     -> executeBridgeAction("start")
             ACTION_STOP_SHOW -> executeBridgeAction("stop")
+            ACTION_STOP_SERVICE -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
         }
 
         try {
@@ -108,6 +126,11 @@ class RemoteControlService : Service() {
                     "start"    -> client.startSlideshow(bridgeUrl, presentationId)
                     "stop"     -> client.stopSlideshow(bridgeUrl, presentationId)
                 }
+                
+                // Update notification with current slide info after action
+                delay(500) // Brief delay to let PowerPoint update
+                updateNotificationWithSlideInfo()
+                
             } catch (e: Exception) {
                 android.util.Log.e("RemoteControlService", "Bridge action '$command' failed", e)
             }
@@ -117,7 +140,7 @@ class RemoteControlService : Service() {
     private fun resolveBridgeUrl(): String? {
         val stored = RemotePrefs.getBridgeUrl(this).trim()
         if (stored.isNotBlank()) return stored
-        val discovered = client.discoverBridge()
+        val discovered = client.discoverBridge(3000, RemotePrefs.getBridgePort(this) + 1)
         if (!discovered.isNullOrBlank()) {
             RemotePrefs.setBridgeUrl(this, discovered)
             return discovered
@@ -165,7 +188,7 @@ class RemoteControlService : Service() {
         }
     }
 
-    private fun createNotification(): Notification {
+    private fun createNotification(slideInfo: String? = null): Notification {
         fun serviceIntent(action: String, requestCode: Int) = PendingIntent.getService(
             this, requestCode,
             Intent(this, RemoteControlService::class.java).setAction(action),
@@ -179,15 +202,44 @@ class RemoteControlService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("PowerPoint Remote")
-            .setContentText("Tap ⏮ ⏭ to change slides — works with screen off")
-            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentText(slideInfo ?: RemotePrefs.getNotificationText(this))
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(openApp)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .addAction(android.R.drawable.ic_media_previous, "⏮ Prev",  serviceIntent(ACTION_PREVIOUS, 10))
-            .addAction(android.R.drawable.ic_media_next,     "⏭ Next",  serviceIntent(ACTION_NEXT, 11))
-            .addAction(android.R.drawable.ic_media_play,     "▶ Start", serviceIntent(ACTION_START, 12))
-            .addAction(android.R.drawable.ic_media_pause,    "⏹ Stop",  serviceIntent(ACTION_STOP_SHOW, 13))
+            .addAction(R.drawable.ic_previous, "⏮ Prev",  serviceIntent(ACTION_PREVIOUS, 10))
+            .addAction(R.drawable.ic_next,     "⏭ Next",  serviceIntent(ACTION_NEXT, 11))
+            .addAction(R.drawable.ic_play,     "▶ Start", serviceIntent(ACTION_START, 12))
+            .addAction(R.drawable.ic_stop,    "⏹ Exit",  serviceIntent(ACTION_STOP_SERVICE, 13))
             .build()
+    }
+
+    private fun updateNotificationWithSlideInfo() {
+        try {
+            val bridgeUrl = resolveBridgeUrl() ?: return
+            val presentationId = resolvePresentationId(bridgeUrl) ?: return
+            
+            val presentations = client.fetchPresentations(bridgeUrl)
+            val currentPresentation = presentations.find { it.id == presentationId }
+            
+            val slideInfo = if (currentPresentation != null) {
+                val slidePart = if (currentPresentation.currentSlide != null) {
+                    "Slide ${currentPresentation.currentSlide}/${currentPresentation.totalSlides}"
+                } else {
+                    "${currentPresentation.totalSlides} slides"
+                }
+                "${currentPresentation.name} • $slidePart"
+            } else {
+                "Tap ⏮ ⏭ to change slides — works with screen off"
+            }
+            
+            val notification = createNotification(slideInfo)
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.notify(1, notification)
+            
+        } catch (e: Exception) {
+            // If slide info update fails, keep the existing notification
+            android.util.Log.w("RemoteControlService", "Failed to update notification with slide info", e)
+        }
     }
 }

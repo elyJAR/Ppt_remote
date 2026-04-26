@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorOnPrimary">
+    
+    <!-- Previous/Skip back icon -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M6,6 L6,18 L8,18 L8,6 Z"/>
+    
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M9.5,12 L18,6 L18,18 Z"/>
+</vector>

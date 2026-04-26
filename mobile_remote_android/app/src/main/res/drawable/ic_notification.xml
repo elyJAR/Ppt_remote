@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorOnPrimary">
+    
+    <!-- Simple remote control icon for notifications -->
+    <!-- Presentation screen -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M4,6 L20,6 Q21,6 21,7 L21,13 Q21,14 20,14 L4,14 Q3,14 3,13 L3,7 Q3,6 4,6 Z"
+        android:strokeColor="@android:color/white"
+        android:strokeWidth="0.5"/>
+    
+    <!-- Remote control -->
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M8,16 L16,16 Q17,16 17,17 L17,21 Q17,22 16,22 L8,22 Q7,22 7,21 L7,17 Q7,16 8,16 Z"
+        android:strokeColor="@android:color/white"
+        android:strokeWidth="0.5"/>
+    
+    <!-- Remote buttons -->
+    <circle
+        android:cx="10"
+        android:cy="19"
+        android:r="0.8"
+        android:fillColor="@android:color/white"/>
+    
+    <circle
+        android:cx="12"
+        android:cy="19"
+        android:r="0.8"
+        android:fillColor="@android:color/white"/>
+    
+    <circle
+        android:cx="14"
+        android:cy="19"
+        android:r="0.8"
+        android:fillColor="@android:color/white"/>
+</vector>

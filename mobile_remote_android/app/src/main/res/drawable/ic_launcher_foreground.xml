@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Presentation screen -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M27,32 L81,32 Q83,32 83,34 L83,50 Q83,52 81,52 L27,52 Q25,52 25,50 L25,34 Q25,32 27,32 Z"
+        android:strokeColor="#1A237E"
+        android:strokeWidth="1"/>
+    
+    <!-- Screen content lines -->
+    <path
+        android:fillColor="#1A237E"
+        android:fillAlpha="0.7"
+        android:pathData="M30,37 L46,37 Q47,37 47,38 Q47,39 46,39 L30,39 Q29,39 29,38 Q29,37 30,37 Z"/>
+    
+    <path
+        android:fillColor="#1A237E"
+        android:fillAlpha="0.7"
+        android:pathData="M30,42 L54,42 Q55,42 55,43 Q55,44 54,44 L30,44 Q29,44 29,43 Q29,42 30,42 Z"/>
+    
+    <path
+        android:fillColor="#1A237E"
+        android:fillAlpha="0.7"
+        android:pathData="M30,47 L42,47 Q43,47 43,48 Q43,49 42,49 L30,49 Q29,49 29,48 Q29,47 30,47 Z"/>
+    
+    <!-- Remote control device -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,66 L68,66 Q72,66 72,70 L72,82 Q72,86 68,86 L40,86 Q36,86 36,82 L36,70 Q36,66 40,66 Z"
+        android:strokeColor="#1A237E"
+        android:strokeWidth="1"/>
+    
+    <!-- Remote control buttons -->
+    <circle
+        android:cx="44"
+        android:cy="74"
+        android:r="2"
+        android:fillColor="#1A237E"/>
+    
+    <circle
+        android:cx="54"
+        android:cy="74"
+        android:r="2"
+        android:fillColor="#1A237E"/>
+    
+    <circle
+        android:cx="64"
+        android:cy="74"
+        android:r="2"
+        android:fillColor="#1A237E"/>
+    
+    <!-- Navigation arrows -->
+    <path
+        android:fillColor="#1A237E"
+        android:pathData="M44,78 L46,80 L44,82 Z"/>
+    
+    <path
+        android:fillColor="#1A237E"
+        android:pathData="M64,78 L62,80 L64,82 Z"/>
+    
+    <!-- Connection indicator -->
+    <circle
+        android:cx="54"
+        android:cy="62"
+        android:r="2"
+        android:fillColor="#4CAF50"/>
+</vector>

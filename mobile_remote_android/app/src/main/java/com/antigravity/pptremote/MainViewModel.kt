@@ -21,13 +21,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(
         RemoteState(
-            bridgeUrl = RemotePrefs.getBridgeUrl(appContext)
+            bridgeUrl = RemotePrefs.getBridgeUrl(appContext),
+            showOnboarding = !RemotePrefs.isOnboardingCompleted(appContext),
+            bridgePort = RemotePrefs.getBridgePort(appContext),
+            pollingIntervalSeconds = RemotePrefs.getPollingInterval(appContext),
+            isDarkTheme = RemotePrefs.isDarkTheme(appContext),
+            connectionHistory = RemotePrefs.getConnectionHistory(appContext),
+            notificationText = RemotePrefs.getNotificationText(appContext)
         )
     )
     val state: StateFlow<RemoteState> = _state.asStateFlow()
 
     init {
         updateNetworkType()
+        updateServiceStatus()
         registerNetworkChangeListener()
         startPolling()
     }
@@ -90,8 +97,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setBridgeUrl(url: String) {
-        RemotePrefs.setBridgeUrl(appContext, url)
-        _state.value = _state.value.copy(bridgeUrl = url)
+        val trimmedUrl = url.trim()
+        val urlWithPort = if (trimmedUrl.isNotBlank()) {
+            buildBridgeUrl(trimmedUrl, _state.value.bridgePort)
+        } else {
+            trimmedUrl
+        }
+        
+        RemotePrefs.setBridgeUrl(appContext, urlWithPort)
+        if (urlWithPort.isNotBlank()) {
+            RemotePrefs.addToConnectionHistory(appContext, urlWithPort)
+        }
+        _state.value = _state.value.copy(
+            bridgeUrl = urlWithPort,
+            connectionHistory = RemotePrefs.getConnectionHistory(appContext)
+        )
     }
 
     fun selectPresentation(id: String) {
@@ -117,6 +137,70 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun previousSlide() {
         val selected = ensureSelectedPresentation() ?: return
         runBridgeAction("Previous slide") { url -> client.previous(url, selected) }
+    }
+
+    fun toggleService() {
+        if (_state.value.isServiceRunning) {
+            RemoteControlService.stop(appContext)
+        } else {
+            RemoteControlService.start(appContext)
+        }
+        updateServiceStatus()
+    }
+
+    private fun updateServiceStatus() {
+        val isRunning = RemoteControlService.isRunning(appContext)
+        _state.value = _state.value.copy(isServiceRunning = isRunning)
+    }
+
+    fun completeOnboarding() {
+        RemotePrefs.setOnboardingCompleted(appContext, true)
+        _state.value = _state.value.copy(showOnboarding = false)
+    }
+
+    fun showSettings() {
+        _state.value = _state.value.copy(showSettings = true)
+    }
+
+    fun hideSettings() {
+        _state.value = _state.value.copy(showSettings = false)
+    }
+
+    fun updateBridgePort(port: Int) {
+        if (port in 1024..65535) {
+            RemotePrefs.setBridgePort(appContext, port)
+            _state.value = _state.value.copy(bridgePort = port)
+        }
+    }
+
+    fun updatePollingInterval(seconds: Int) {
+        if (seconds in 1..30) {
+            RemotePrefs.setPollingInterval(appContext, seconds)
+            _state.value = _state.value.copy(pollingIntervalSeconds = seconds)
+        }
+    }
+
+    fun updateTheme(isDark: Boolean) {
+        RemotePrefs.setDarkTheme(appContext, isDark)
+        _state.value = _state.value.copy(isDarkTheme = isDark)
+    }
+
+    fun updateNotificationText(text: String) {
+        RemotePrefs.setNotificationText(appContext, text)
+        _state.value = _state.value.copy(notificationText = text)
+    }
+
+    private fun buildBridgeUrl(baseUrl: String, port: Int): String {
+        if (baseUrl.isBlank()) return ""
+        
+        // If URL already contains a port, use it as-is
+        if (baseUrl.contains("://") && baseUrl.substringAfter("://").contains(":")) {
+            return baseUrl
+        }
+        
+        // If it's just an IP or hostname, add the configured port
+        val cleanUrl = baseUrl.removePrefix("http://").removePrefix("https://")
+        return "http://$cleanUrl:$port"
     }
 
     private fun ensureSelectedPresentation(): String? {
@@ -187,7 +271,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun refreshPresentations() {
+    fun refreshPresentations() {
         updateNetworkType()
 
         val current = _state.value
@@ -199,7 +283,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 else -> 1500
             }
 
-            val detectedUrl = client.discoverBridge(discoveryTimeoutMs)
+            val detectedUrl = client.discoverBridge(discoveryTimeoutMs, current.bridgePort + 1) // Discovery port is typically bridge port + 1
             if (detectedUrl == null) {
                 _state.value = current.copy(
                     presentations = emptyList(),
