@@ -82,13 +82,14 @@ object RemotePrefs {
 
     fun addToConnectionHistory(context: Context, url: String) {
         if (url.isBlank()) return
-        
-        val history = getConnectionHistory(context).toMutableSet()
-        history.add(url)
-        
+
+        val history = getConnectionHistory(context).toMutableList()
+        history.remove(url)          // remove duplicate if already present
+        history.add(url)             // add to end (most recent)
+
         // Keep only the last 10 connections
-        val limitedHistory = history.takeLast(10)
-        
+        val limitedHistory = if (history.size > 10) history.takeLast(10) else history
+
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putStringSet(KEY_CONNECTION_HISTORY, limitedHistory.toSet())
@@ -122,5 +123,4 @@ object RemotePrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_NOTIFICATION_TEXT, "Tap ⏮ ⏭ to change slides — works with screen off")
             .orEmpty()
-}
 }
