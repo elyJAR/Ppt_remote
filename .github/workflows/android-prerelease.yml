@@ -121,13 +121,10 @@ jobs:
             KEY_PASS="$KEY_PASSWORD"
             ALIAS="$KEY_ALIAS"
           else
-            # Derive a stable password from KEYSTORE_SEED (or a fixed fallback).
-            # Using a fixed seed means the same keystore is regenerated identically
-            # on every CI run, so APK signatures stay consistent across releases.
-            SEED="${KEYSTORE_SEED:-pptremote-stable-ci-key-2024}"
-            # Use printf to avoid trailing newline issues; tr removes non-hex chars
-            STORE_PASS=$(printf '%s-store' "$SEED" | sha256sum | tr -dc 'a-f0-9' | head -c 32)
-            KEY_PASS=$(printf '%s-key' "$SEED" | sha256sum | tr -dc 'a-f0-9' | head -c 32)
+            # Use a fixed stable password so the keystore is identical every run.
+            # Add KEYSTORE_BASE64 secret for a real persistent key.
+            STORE_PASS="pptremote-ci-store-2024"
+            KEY_PASS="pptremote-ci-key-2024"
             ALIAS="pptremote"
 
             echo "Generating stable self-signed keystore (seed-derived password)"
