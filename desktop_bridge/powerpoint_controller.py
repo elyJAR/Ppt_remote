@@ -1,16 +1,43 @@
 from __future__ import annotations
 
+import logging
 import os
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import wraps
 from typing import Any
 
 import pythoncom
 import win32com.client
 
+_logger = logging.getLogger(__name__)
+
 
 class PowerPointControllerError(Exception):
     """Raised when PowerPoint automation fails."""
+
+
+def _com_retry(fn):
+    """Decorator: retry once on COMError in case PowerPoint briefly hiccupped."""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except PowerPointControllerError:
+            raise  # our own errors — don't retry
+        except Exception as exc:
+            _logger.warning("COM call failed (%s), retrying once: %s", fn.__name__, exc)
+            try:
+                return fn(*args, **kwargs)
+            except PowerPointControllerError:
+                raise
+            except Exception as exc2:
+                raise PowerPointControllerError(
+                    f"PowerPoint COM error in {fn.__name__}: {exc2}. "
+                    "PowerPoint may have crashed — please reopen it."
+                ) from exc2
+    return wrapper
 
 
 @dataclass
@@ -65,8 +92,12 @@ class PowerPointController:
     # ------------------------------------------------------------------
 
     def _get_app(self) -> Any:
+        """Get the running PowerPoint COM object, reconnecting if it crashed."""
         try:
-            return win32com.client.GetActiveObject("PowerPoint.Application")
+            app = win32com.client.GetActiveObject("PowerPoint.Application")
+            # Probe the app to confirm it's still responsive
+            _ = app.Presentations.Count
+            return app
         except Exception as exc:
             raise PowerPointControllerError(
                 "PowerPoint is not running. Open at least one presentation first."
@@ -162,7 +193,7 @@ class PowerPointController:
     # Public API
     # ------------------------------------------------------------------
 
-    def list_presentations(self) -> list[PresentationInfo]:
+    @_com_retry`n    def list_presentations(self) -> list[PresentationInfo]:
         with com_context():
             app = self._get_app()
 
@@ -281,7 +312,7 @@ class PowerPointController:
             time.sleep(0.2)
         return None
 
-    def start_slideshow(self, presentation_id: str) -> None:
+    @_com_retry`n    def start_slideshow(self, presentation_id: str) -> None:
         if presentation_id.startswith("__protected__"):
             raise PowerPointControllerError(
                 "This file is in Protected View. Click 'Enable Editing' in PowerPoint first."
@@ -322,7 +353,7 @@ class PowerPointController:
             # Wait for the slideshow window to actually open (important for OneDrive files)
             self._wait_for_slideshow_window(app, presentation_id, timeout=6.0)
 
-    def stop_slideshow(self, presentation_id: str) -> None:
+    @_com_retry`n    def stop_slideshow(self, presentation_id: str) -> None:
         with com_context():
             app = self._get_app()
             window = self._find_slideshow_window(app, presentation_id)
@@ -332,7 +363,7 @@ class PowerPointController:
                 )
             window.View.Exit()
 
-    def next_slide(self, presentation_id: str) -> None:
+    @_com_retry`n    def next_slide(self, presentation_id: str) -> None:
         with com_context():
             app = self._get_app()
             window = self._find_slideshow_window(app, presentation_id)
@@ -367,7 +398,7 @@ class PowerPointController:
                 )
             window.View.Next()
 
-    def previous_slide(self, presentation_id: str) -> None:
+    @_com_retry`n    def previous_slide(self, presentation_id: str) -> None:
         with com_context():
             app = self._get_app()
             window = self._find_slideshow_window(app, presentation_id)
@@ -401,7 +432,7 @@ class PowerPointController:
                 )
             window.View.Previous()
 
-    def get_all_speaker_notes(self, presentation_id: str) -> list[str]:
+    @_com_retry`n    def get_all_speaker_notes(self, presentation_id: str) -> list[str]:
         """Return speaker-notes text for every slide (empty string if none)."""
         with com_context():
             app = self._get_app()
@@ -418,7 +449,7 @@ class PowerPointController:
                     notes.append("")
             return notes
 
-    def get_current_slide_notes(self, presentation_id: str) -> tuple[int, str]:
+    @_com_retry`n    def get_current_slide_notes(self, presentation_id: str) -> tuple[int, str]:
         """Return (1-based slide index, notes text) for the active slideshow slide."""
         with com_context():
             app = self._get_app()
@@ -438,7 +469,7 @@ class PowerPointController:
                 text = ""
             return slide_index, text.strip()
 
-    def get_slide_thumbnail(self, presentation_id: str, slide_index: int, width: int = 960) -> bytes:
+    @_com_retry`n    def get_slide_thumbnail(self, presentation_id: str, slide_index: int, width: int = 960) -> bytes:
         """Export a single slide as a PNG and return the raw bytes.
 
         Uses PowerPoint's Export() COM method to render the slide at the
@@ -499,7 +530,7 @@ class PowerPointController:
                 except OSError:
                     pass
 
-    def get_current_slide_thumbnail(self, presentation_id: str, width: int = 960) -> tuple[int, bytes]:
+    @_com_retry`n    def get_current_slide_thumbnail(self, presentation_id: str, width: int = 960) -> tuple[int, bytes]:
         """Export the currently displayed slideshow slide as PNG bytes.
 
         Returns:

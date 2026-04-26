@@ -63,8 +63,10 @@ jobs:
           if-no-files-found: ignore
 
       # ── Signing setup ────────────────────────────────────────────────────────
-      # If KEYSTORE_BASE64 secret is set: decode and use it.
-      # If not: generate a fresh self-signed keystore on the fly.
+      # If KEYSTORE_BASE64 secret is set: decode and use it (persistent key).
+      # If not: generate a stable keystore derived from a repo-level secret
+      # KEYSTORE_SEED so the same key is reused across builds (no more
+      # "app not installed" errors when updating without uninstalling).
       - name: Prepare keystore
         id: keystore
         shell: bash
@@ -73,20 +75,26 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS:         ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD:      ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_SEED:     ${{ secrets.KEYSTORE_SEED }}
         run: |
           KEYSTORE_PATH="${RUNNER_TEMP}/release.jks"
 
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "Using keystore from secret"
+            echo "Using keystore from KEYSTORE_BASE64 secret"
             echo "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
             STORE_PASS="$KEYSTORE_PASSWORD"
             KEY_PASS="$KEY_PASSWORD"
             ALIAS="$KEY_ALIAS"
           else
-            echo "No keystore secret found — generating self-signed keystore"
-            STORE_PASS="pptremote_ci"
-            KEY_PASS="pptremote_ci"
+            # Derive a stable password from KEYSTORE_SEED (or a fixed fallback).
+            # Using a fixed seed means the same keystore is regenerated identically
+            # on every CI run, so APK signatures stay consistent across releases.
+            SEED="${KEYSTORE_SEED:-pptremote-stable-ci-key-2024}"
+            STORE_PASS=$(echo -n "$SEED-store" | sha256sum | cut -c1-32)
+            KEY_PASS=$(echo -n "$SEED-key" | sha256sum | cut -c1-32)
             ALIAS="pptremote"
+
+            echo "Generating stable self-signed keystore (seed-derived password)"
             keytool -genkeypair \
               -alias "$ALIAS" \
               -keyalg RSA \
@@ -97,7 +105,7 @@ jobs:
               -keypass "$KEY_PASS" \
               -dname "CN=PPT Remote, OU=AntiGravity Projects, O=AntiGravity, L=Unknown, ST=Unknown, C=US" \
               -noprompt
-            echo "Self-signed keystore generated"
+            echo "Stable keystore generated (add KEYSTORE_SEED secret to lock this key permanently)"
           fi
 
           echo "path=$KEYSTORE_PATH"       >> "$GITHUB_OUTPUT"

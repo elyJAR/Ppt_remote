@@ -47,6 +47,10 @@ data class RemoteState(
     val isDarkTheme: Boolean = true,
     val connectionHistory: List<String> = emptyList(),
     val notificationText: String = "Tap ⏮ ⏭ to change slides — works with screen off",
+    // API key for bridge authentication (empty = open mode)
+    val apiKey: String = "",
+    // Whether the bridge is currently reachable (health check)
+    val bridgeReachable: Boolean = false,
     // Speaker notes for the current slide
     val currentSlideNotes: String? = null,
     val currentSlideNotesIndex: Int? = null,

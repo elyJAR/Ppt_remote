@@ -60,6 +60,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -196,7 +198,8 @@ class MainActivity : ComponentActivity() {
                             onUpdateBridgePort = viewModel::updateBridgePort,
                             onUpdatePollingInterval = viewModel::updatePollingInterval,
                             onUpdateTheme = viewModel::updateTheme,
-                            onUpdateNotificationText = viewModel::updateNotificationText
+                            onUpdateNotificationText = viewModel::updateNotificationText,
+                            onUpdateApiKey = viewModel::updateApiKey,
                         )
                     }
                     state.showNotes -> {
@@ -1243,7 +1246,8 @@ private fun SettingsScreen(
     onUpdateBridgePort: (Int) -> Unit,
     onUpdatePollingInterval: (Int) -> Unit,
     onUpdateTheme: (Boolean) -> Unit,
-    onUpdateNotificationText: (String) -> Unit
+    onUpdateNotificationText: (String) -> Unit,
+    onUpdateApiKey: (String) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -1290,6 +1294,14 @@ private fun SettingsScreen(
                         range = 1024..65535,
                         onValueChange = onUpdateBridgePort
                     )
+                    Spacer(Modifier.height(8.dp))
+                    SettingsTextItem(
+                        title = "API Key",
+                        description = "Leave blank if the bridge has no PPT_API_KEY set",
+                        value = state.apiKey,
+                        onValueChange = onUpdateApiKey,
+                        isPassword = true
+                    )
                 }
             }
             
@@ -1331,7 +1343,11 @@ private fun SettingsScreen(
                 SettingsSection(title = "About") {
                     SettingsInfoItem(
                         title = "Version",
-                        value = "1.0.0"
+                        value = "1.1.0"
+                    )
+                    SettingsInfoItem(
+                        title = "Bridge Status",
+                        value = if (state.bridgeReachable) "✓ Connected" else "✗ Unreachable"
                     )
                     SettingsInfoItem(
                         title = "Current Bridge URL",
@@ -1496,10 +1512,12 @@ private fun SettingsTextItem(
     title: String,
     description: String,
     value: String,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    isPassword: Boolean = false,
 ) {
     var textValue by remember(value) { mutableStateOf(value) }
-    
+    var showPassword by remember { mutableStateOf(false) }
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             title,
@@ -1512,14 +1530,36 @@ private fun SettingsTextItem(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.textSecondary
         )
-        
+
         OutlinedTextField(
             value = textValue,
             onValueChange = { newValue ->
                 textValue = newValue
                 onValueChange(newValue)
             },
-            placeholder = { Text("Enter notification text", color = MaterialTheme.colorScheme.textMuted) },
+            placeholder = {
+                Text(
+                    if (isPassword) "Enter API key (optional)" else "Enter text",
+                    color = MaterialTheme.colorScheme.textMuted
+                )
+            },
+            visualTransformation = if (isPassword && !showPassword)
+                androidx.compose.ui.text.input.PasswordVisualTransformation()
+            else
+                androidx.compose.ui.text.input.VisualTransformation.None,
+            trailingIcon = if (isPassword) {
+                {
+                    IconButton(onClick = { showPassword = !showPassword }) {
+                        Icon(
+                            imageVector = if (showPassword) Icons.Default.VisibilityOff
+                                          else Icons.Default.Visibility,
+                            contentDescription = if (showPassword) "Hide key" else "Show key",
+                            tint = MaterialTheme.colorScheme.textSecondary
+                        )
+                    }
+                }
+            } else null,
+            singleLine = isPassword,
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Accent,

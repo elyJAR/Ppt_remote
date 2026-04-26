@@ -17,8 +17,8 @@ import java.util.concurrent.TimeUnit
 
 class BridgeClient {
     private val discoveryToken = "PPT_REMOTE_DISCOVER"
-    
-    // Create a client with default timeouts - will be overridden per-request if needed
+    var apiKey: String = ""   // set by ViewModel from RemotePrefs
+
     private fun createClient(timeoutSeconds: Int = 10): OkHttpClient {
         return OkHttpClient.Builder()
             .connectTimeout(timeoutSeconds.toLong(), TimeUnit.SECONDS)
@@ -31,10 +31,15 @@ class BridgeClient {
     private fun encodedId(id: String): String =
         URLEncoder.encode(id, StandardCharsets.UTF_8.toString()).replace("+", "%20")
 
+    /** Add X-Api-Key header when a key is configured. */
+    private fun Request.Builder.withApiKey(): Request.Builder =
+        if (apiKey.isNotBlank()) header("X-Api-Key", apiKey) else this
+
     fun fetchPresentations(url: String): List<Presentation> {
         val client = createClient(timeoutSeconds = 10)
         val request = Request.Builder()
             .url("${baseUrl(url)}/api/presentations")
+            .withApiKey()
             .get()
             .build()
 
@@ -68,6 +73,7 @@ class BridgeClient {
             val client = createClient(timeoutSeconds = 5)
             val request = Request.Builder()
                 .url("${baseUrl(url)}/api/network/status")
+                .withApiKey()
                 .get()
                 .build()
 
@@ -112,6 +118,7 @@ class BridgeClient {
             val client = createClient(timeoutSeconds = 15) // export can be slow
             val request = Request.Builder()
                 .url("${baseUrl(url)}/api/presentations/${encodedId(presentationId)}/current-thumbnail?width=$width")
+                .withApiKey()
                 .get()
                 .build()
             client.newCall(request).execute().use { response ->
@@ -129,6 +136,7 @@ class BridgeClient {
             val client = createClient(timeoutSeconds = 15)
             val request = Request.Builder()
                 .url("${baseUrl(url)}/api/presentations/${encodedId(presentationId)}/slides/$slideIndex/thumbnail?width=$width")
+                .withApiKey()
                 .get()
                 .build()
             client.newCall(request).execute().use { response ->
@@ -146,6 +154,7 @@ class BridgeClient {
             val client = createClient(timeoutSeconds = 10)
             val request = Request.Builder()
                 .url("${baseUrl(url)}/api/presentations/${encodedId(presentationId)}/notes")
+                .withApiKey()
                 .get()
                 .build()
             client.newCall(request).execute().use { response ->
@@ -170,6 +179,7 @@ class BridgeClient {
             val client = createClient(timeoutSeconds = 10)
             val request = Request.Builder()
                 .url("${baseUrl(url)}/api/presentations/${encodedId(presentationId)}/current-notes")
+                .withApiKey()
                 .get()
                 .build()
             client.newCall(request).execute().use { response ->
@@ -191,6 +201,7 @@ class BridgeClient {
             val client = createClient(timeoutSeconds = 5)
             val request = Request.Builder()
                 .url("${baseUrl(url)}/api/health")
+                .withApiKey()
                 .get()
                 .build()
             client.newCall(request).execute().use { response ->
@@ -258,6 +269,7 @@ class BridgeClient {
         val client = createClient(timeoutSeconds = 10)
         val request = Request.Builder()
             .url("${baseUrl(url)}$path")
+            .withApiKey()
             .post("{}".toRequestBody("application/json".toMediaType()))
             .build()
 

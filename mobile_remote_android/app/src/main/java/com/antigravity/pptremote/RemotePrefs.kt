@@ -12,6 +12,7 @@ object RemotePrefs {
     private const val KEY_IS_DARK_THEME = "is_dark_theme"
     private const val KEY_CONNECTION_HISTORY = "connection_history"
     private const val KEY_NOTIFICATION_TEXT = "notification_text"
+    private const val KEY_API_KEY = "api_key"
 
     fun setBridgeUrl(context: Context, url: String) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -123,4 +124,13 @@ object RemotePrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_NOTIFICATION_TEXT, "Tap ⏮ ⏭ to change slides — works with screen off")
             .orEmpty()
+
+    fun setApiKey(context: Context, key: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_API_KEY, key).apply()
+    }
+
+    fun getApiKey(context: Context): String =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_API_KEY, "").orEmpty()
 }

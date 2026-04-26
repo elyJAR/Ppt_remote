@@ -27,7 +27,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             pollingIntervalSeconds = RemotePrefs.getPollingInterval(appContext),
             isDarkTheme = RemotePrefs.isDarkTheme(appContext),
             connectionHistory = RemotePrefs.getConnectionHistory(appContext),
-            notificationText = RemotePrefs.getNotificationText(appContext)
+            notificationText = RemotePrefs.getNotificationText(appContext),
+            apiKey = RemotePrefs.getApiKey(appContext)
         )
     )
     val state: StateFlow<RemoteState> = _state.asStateFlow()
@@ -36,6 +37,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateNetworkType()
         updateServiceStatus()
         registerNetworkChangeListener()
+        // Sync API key into client on startup
+        client.apiKey = RemotePrefs.getApiKey(appContext)
         startPolling()
     }
 
@@ -192,6 +195,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(notificationText = text)
     }
 
+    fun updateApiKey(key: String) {
+        RemotePrefs.setApiKey(appContext, key)
+        client.apiKey = key
+        _state.value = _state.value.copy(apiKey = key)
+    }
+
     private fun buildBridgeUrl(baseUrl: String, port: Int): String {
         if (baseUrl.isBlank()) return ""
         
@@ -259,14 +268,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun startPolling() {
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                // Adjust polling frequency based on network type
-                // Hotspots benefit from more frequent checks for stability
+                // Use the user-configured polling interval, adjusted by network type
+                val configuredMs = (_state.value.pollingIntervalSeconds * 1000L)
+                    .coerceIn(1000L, 30_000L)
                 val delayMs = when (_state.value.networkType) {
-                    NetworkType.HOTSPOT_USING, NetworkType.HOTSPOT_PROVIDING -> 1500L  // More aggressive for any hotspot
-                    NetworkType.CELLULAR -> 3000L // Less frequent for cellular
-                    else -> 2000L
+                    NetworkType.HOTSPOT_USING, NetworkType.HOTSPOT_PROVIDING ->
+                        minOf(configuredMs, 2000L)   // cap at 2s on hotspot
+                    NetworkType.CELLULAR ->
+                        maxOf(configuredMs, 5000L)   // floor at 5s on cellular
+                    else -> configuredMs
                 }
-
                 refreshPresentations()
                 delay(delayMs)
             }
@@ -307,8 +318,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val presentations = client.fetchPresentations(effectiveUrl)
 
-            // Also fetch bridge's network status
+            // Health check + network status in parallel with presentation fetch
             val bridgeNetworkWarning = client.getNetworkStatus(effectiveUrl)?.warning
+            val bridgeReachable = true  // if fetchPresentations succeeded, bridge is reachable
 
             // Find the active slideshow presentation
             val activePres = presentations.firstOrNull { it.inSlideshow }
@@ -357,6 +369,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 presentations = presentationsWithThumbnails,
                 selectedPresentationId = selected,
                 bridgeNetworkWarning = bridgeNetworkWarning,
+                bridgeReachable = bridgeReachable,
                 currentSlideNotes = newNotes,
                 currentSlideNotesIndex = newNotesIndex,
                 lastThumbnailSlide = if (activePres != null) activeSlide else null,
@@ -369,6 +382,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } catch (ex: Exception) {
             _state.value = _state.value.copy(
                 presentations = emptyList(),
+                bridgeReachable = false,
                 statusMessage = ex.message ?: "Unable to reach bridge"
             )
         }
