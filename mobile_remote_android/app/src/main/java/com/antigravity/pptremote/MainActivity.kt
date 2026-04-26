@@ -59,6 +59,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -186,9 +187,7 @@ class MainActivity : ComponentActivity() {
                 
                 when {
                     state.showOnboarding -> {
-                        OnboardingScreen(
-                            onComplete = viewModel::completeOnboarding
-                        )
+                        OnboardingScreen(onComplete = viewModel::completeOnboarding)
                     }
                     state.showSettings -> {
                         SettingsScreen(
@@ -198,6 +197,12 @@ class MainActivity : ComponentActivity() {
                             onUpdatePollingInterval = viewModel::updatePollingInterval,
                             onUpdateTheme = viewModel::updateTheme,
                             onUpdateNotificationText = viewModel::updateNotificationText
+                        )
+                    }
+                    state.showNotes -> {
+                        NotesScreen(
+                            state = state,
+                            onBack = viewModel::hideNotes
                         )
                     }
                     else -> {
@@ -211,7 +216,8 @@ class MainActivity : ComponentActivity() {
                             onPrevious = viewModel::previousSlide,
                             onRefresh = viewModel::refreshPresentations,
                             onToggleService = viewModel::toggleService,
-                            onShowSettings = viewModel::showSettings
+                            onShowSettings = viewModel::showSettings,
+                            onShowNotes = viewModel::showNotes
                         )
                     }
                 }
@@ -298,6 +304,7 @@ private fun RemoteScreen(
     onRefresh: () -> Unit,
     onToggleService: () -> Unit,
     onShowSettings: () -> Unit,
+    onShowNotes: () -> Unit,
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -377,6 +384,23 @@ private fun RemoteScreen(
                             contentDescription = "Refresh presentations",
                             tint = if (state.isBusy) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary
                         )
+                    }
+                    // Notes button — only shown when a slideshow is active
+                    if (state.presentations.any { it.inSlideshow }) {
+                        IconButton(
+                            onClick = onShowNotes,
+                            modifier = Modifier.semantics {
+                                role = Role.Button
+                                contentDescription = "Speaker notes"
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Article,
+                                contentDescription = "Speaker notes",
+                                tint = if (!state.currentSlideNotes.isNullOrBlank()) Accent
+                                       else MaterialTheme.colorScheme.textPrimary
+                            )
+                        }
                     }
                     IconButton(
                         onClick = onShowSettings,
@@ -1504,5 +1528,112 @@ private fun SettingsTextItem(
                 unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
             )
         )
+    }
+}
+
+// ─── Notes Screen ─────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NotesScreen(
+    state: RemoteState,
+    onBack: () -> Unit,
+) {
+    val activePres = state.presentations.firstOrNull { it.inSlideshow }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            "Speaker Notes",
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.textPrimary
+                        )
+                        if (activePres != null && state.currentSlideNotesIndex != null) {
+                            Text(
+                                "${activePres.name} • Slide ${state.currentSlideNotesIndex}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.textSecondary
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.textPrimary
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.cardBg,
+                    titleContentColor = MaterialTheme.colorScheme.textPrimary,
+                )
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.screenBg,
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Thumbnail of current slide
+            val thumbBytes = activePres?.currentThumbnail
+            if (thumbBytes != null && thumbBytes.isNotEmpty()) {
+                val bitmap = remember(thumbBytes) {
+                    BitmapFactory.decodeByteArray(thumbBytes, 0, thumbBytes.size)
+                }
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Current slide preview",
+                        contentScale = ContentScale.FillWidth,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.divider, RoundedCornerShape(8.dp))
+                    )
+                }
+            }
+
+            // Notes content
+            AppCard {
+                if (activePres == null) {
+                    Text(
+                        "No active slideshow. Start a presentation to see speaker notes.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.textSecondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp)
+                    )
+                } else if (state.currentSlideNotes.isNullOrBlank()) {
+                    Text(
+                        "No notes for this slide.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.textSecondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp)
+                    )
+                } else {
+                    Text(
+                        text = state.currentSlideNotes,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.textPrimary,
+                        lineHeight = 26.sp
+                    )
+                }
+            }
+        }
     }
 }

@@ -123,6 +123,84 @@ class BridgeClient {
         }
     }
 
+    /** Fetch a specific slide thumbnail by 1-based index. Returns null on any error. */
+    fun fetchSlideThumbnail(url: String, presentationId: String, slideIndex: Int, width: Int = 480): ByteArray? {
+        return try {
+            val client = createClient(timeoutSeconds = 15)
+            val request = Request.Builder()
+                .url("${baseUrl(url)}/api/presentations/${encodedId(presentationId)}/slides/$slideIndex/thumbnail?width=$width")
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                response.body?.bytes()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** Fetch speaker notes for all slides. Returns empty list on error. */
+    fun fetchAllNotes(url: String, presentationId: String): List<SlideNote> {
+        return try {
+            val client = createClient(timeoutSeconds = 10)
+            val request = Request.Builder()
+                .url("${baseUrl(url)}/api/presentations/${encodedId(presentationId)}/notes")
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return emptyList()
+                val arr = JSONArray(response.body?.string().orEmpty())
+                (0 until arr.length()).map { i ->
+                    val obj = arr.getJSONObject(i)
+                    SlideNote(
+                        slideIndex = obj.getInt("slide_index"),
+                        notes = obj.getString("notes")
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /** Fetch speaker notes for the current slideshow slide. Returns null if not in slideshow or on error. */
+    fun fetchCurrentNotes(url: String, presentationId: String): SlideNote? {
+        return try {
+            val client = createClient(timeoutSeconds = 10)
+            val request = Request.Builder()
+                .url("${baseUrl(url)}/api/presentations/${encodedId(presentationId)}/current-notes")
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                val obj = JSONObject(response.body?.string().orEmpty())
+                SlideNote(
+                    slideIndex = obj.getInt("slide_index"),
+                    notes = obj.getString("notes")
+                )
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** Check bridge health. Returns true if reachable. */
+    fun checkHealth(url: String): Boolean {
+        return try {
+            val client = createClient(timeoutSeconds = 5)
+            val request = Request.Builder()
+                .url("${baseUrl(url)}/api/health")
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                response.isSuccessful
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     fun discoverBridge(timeoutMs: Int = 1500, discoveryPort: Int = 8788): String? {
         val payload = discoveryToken.toByteArray(StandardCharsets.UTF_8)
         val receiveBuffer = ByteArray(1024)
@@ -195,4 +273,9 @@ data class NetworkStatus(
     val networkType: String,
     val isHotspot: Boolean,
     val warning: String?
+)
+
+data class SlideNote(
+    val slideIndex: Int,
+    val notes: String
 )

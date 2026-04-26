@@ -41,9 +41,15 @@ data class RemoteState(
     val isServiceRunning: Boolean = false,
     val showOnboarding: Boolean = false,
     val showSettings: Boolean = false,
+    val showNotes: Boolean = false,
     val bridgePort: Int = 8787,
     val pollingIntervalSeconds: Int = 3,
     val isDarkTheme: Boolean = true,
     val connectionHistory: List<String> = emptyList(),
-    val notificationText: String = "Tap ⏮ ⏭ to change slides — works with screen off"
+    val notificationText: String = "Tap ⏮ ⏭ to change slides — works with screen off",
+    // Speaker notes for the current slide
+    val currentSlideNotes: String? = null,
+    val currentSlideNotesIndex: Int? = null,
+    // Track last thumbnail slide to avoid re-fetching the same slide
+    val lastThumbnailSlide: Int? = null
 )

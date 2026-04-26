@@ -139,6 +139,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         runBridgeAction("Previous slide") { url -> client.previous(url, selected) }
     }
 
+    fun showNotes() { _state.value = _state.value.copy(showNotes = true) }
+    fun hideNotes() { _state.value = _state.value.copy(showNotes = false) }
     fun toggleService() {
         if (_state.value.isServiceRunning) {
             RemoteControlService.stop(appContext)
@@ -308,25 +310,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Also fetch bridge's network status
             val bridgeNetworkWarning = client.getNetworkStatus(effectiveUrl)?.warning
 
-            // Fetch thumbnail for the active slideshow presentation (fire-and-forget,
-            // injected into the presentation list before updating state)
-            val presentationsWithThumbnails = presentations.map { pres ->
-                if (pres.inSlideshow) {
-                    val thumb = try {
-                        client.fetchCurrentThumbnail(effectiveUrl, pres.id)
-                    } catch (e: Exception) { null }
-                    pres.copy(currentThumbnail = thumb)
-                } else {
-                    pres.copy(currentThumbnail = null)
+            // Find the active slideshow presentation
+            val activePres = presentations.firstOrNull { it.inSlideshow }
+            val activeSlide = activePres?.currentSlide
+            val prevSlide = _state.value.lastThumbnailSlide
+
+            // Only re-fetch thumbnail when the slide number actually changes (avoids
+            // a 1-3s PowerPoint export on every 2s poll tick)
+            val presentationsWithThumbnails = if (activePres != null && activeSlide != prevSlide) {
+                val thumb = try { client.fetchCurrentThumbnail(effectiveUrl, activePres.id) } catch (e: Exception) { null }
+                presentations.map { pres ->
+                    if (pres.id == activePres.id) pres.copy(currentThumbnail = thumb)
+                    else pres.copy(currentThumbnail = null)
                 }
+            } else {
+                // Preserve existing thumbnails from state for the active pres, clear others
+                val existingThumb = _state.value.presentations
+                    .firstOrNull { it.id == activePres?.id }?.currentThumbnail
+                presentations.map { pres ->
+                    if (pres.id == activePres?.id) pres.copy(currentThumbnail = existingThumb)
+                    else pres.copy(currentThumbnail = null)
+                }
+            }
+
+            // Fetch current slide notes when slide changes (or first time in slideshow)
+            val (newNotes, newNotesIndex) = if (activePres != null && activeSlide != null && activeSlide != prevSlide) {
+                try {
+                    val note = client.fetchCurrentNotes(effectiveUrl, activePres.id)
+                    Pair(note?.notes, note?.slideIndex)
+                } catch (e: Exception) { Pair(null, null) }
+            } else {
+                Pair(_state.value.currentSlideNotes, _state.value.currentSlideNotesIndex)
             }
 
             // Read current state at write-time to avoid clobbering showSettings/showOnboarding
             val nowState = _state.value
             val selected = when {
-                nowState.selectedPresentationId != null && presentationsWithThumbnails.any { it.id == nowState.selectedPresentationId } -> {
+                nowState.selectedPresentationId != null && presentationsWithThumbnails.any { it.id == nowState.selectedPresentationId } ->
                     nowState.selectedPresentationId
-                }
                 else -> presentationsWithThumbnails.firstOrNull { it.inSlideshow }?.id
                     ?: presentationsWithThumbnails.firstOrNull()?.id
             }
@@ -336,6 +357,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 presentations = presentationsWithThumbnails,
                 selectedPresentationId = selected,
                 bridgeNetworkWarning = bridgeNetworkWarning,
+                currentSlideNotes = newNotes,
+                currentSlideNotesIndex = newNotesIndex,
+                lastThumbnailSlide = if (activePres != null) activeSlide else null,
                 statusMessage = if (presentationsWithThumbnails.isEmpty()) {
                     "No open PowerPoint files detected"
                 } else {
