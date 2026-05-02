@@ -20,8 +20,17 @@ import os
 import sys
 import threading
 import time
+
+# Ensure the directory of the script is in sys.path for PyInstaller / frozen mode
+script_dir = os.path.dirname(os.path.abspath(__file__))
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
+# Move these to top level so PyInstaller's static analysis catches them reliably
+from main import BRIDGE_PORT, app  # noqa: E402
+from network_detector import get_lan_ip  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -124,11 +133,8 @@ def main() -> None:
     _logger.info("PPT Remote Bridge starting up")
 
     # ------------------------------------------------------------------
-    # 3. Import app + resolved port (env vars already read inside main.py)
+    # 3. Import app + resolved port (already moved to top level)
     # ------------------------------------------------------------------
-    from main import BRIDGE_PORT, app  # noqa: PLC0415
-    from network_detector import get_lan_ip  # noqa: PLC0415
-
     lan_ip = get_lan_ip()
     bridge_url = f"http://{lan_ip}:{BRIDGE_PORT}"
 
