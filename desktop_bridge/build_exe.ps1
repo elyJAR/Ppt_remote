@@ -14,8 +14,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Building executable with PyInstaller..."
-# Build with console enabled - we'll hide it using start_background.ps1 instead
-python -m PyInstaller --noconfirm --onefile --console --name PptRemoteBridge --version-file version_info.txt bridge_service.py
+# Build using the spec file to ensure hiddenimports and other configs are applied
+python -m PyInstaller --noconfirm PptRemoteBridge.spec
 if ($LASTEXITCODE -ne 0) {
 	throw "PyInstaller build failed"
 }
