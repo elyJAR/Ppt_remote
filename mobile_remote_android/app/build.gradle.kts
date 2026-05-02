@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 // ── Signing config from keystore.properties (written by CI or local dev) ──────
@@ -14,12 +15,12 @@ if (keystorePropsFile.exists()) {
 
 android {
     namespace = "com.antigravity.pptremote"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.antigravity.pptremote"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 3
         versionName = "1.2.0"
     }
@@ -69,9 +70,8 @@ android {
         compose = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
+    // composeOptions block removed — with kotlin.plugin.compose, the compiler
+    // version tracks the Kotlin version automatically (no manual pin required)
 
     packaging {
         resources {
@@ -87,7 +87,7 @@ android {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
+    val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
