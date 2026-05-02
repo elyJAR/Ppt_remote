@@ -1,10 +1,22 @@
 package com.antigravity.pptremote
 
+/** A saved bridge entry with a user-friendly display name and connection URL. */
 data class SavedBridge(
     val name: String,
     val url: String
 )
 
+/**
+ * Represents a single open PowerPoint presentation on the desktop.
+ *
+ * @property id         Full file path or cloud URL — used as the unique identifier in all API calls.
+ * @property name       Display name (filename, possibly annotated with status hints).
+ * @property path       Same as [id]; kept for API symmetry.
+ * @property inSlideshow Whether the presentation is currently running as a slideshow.
+ * @property currentSlide 1-based current slide index, or null if not in slideshow.
+ * @property totalSlides Total number of slides in the presentation.
+ * @property currentThumbnail PNG bytes of the current slide, fetched on slide change. Null when not in slideshow.
+ */
 data class Presentation(
     val id: String,
     val name: String,
@@ -34,6 +46,11 @@ data class Presentation(
     }
 }
 
+/**
+ * Immutable UI state for the entire app, held in [MainViewModel] as a [kotlinx.coroutines.flow.StateFlow].
+ *
+ * All fields have sensible defaults so the initial state is valid without any prefs loaded.
+ */
 data class RemoteState(
     val bridgeUrl: String = "",
     val presentations: List<Presentation> = emptyList(),
@@ -63,5 +80,7 @@ data class RemoteState(
     val lastThumbnailSlide: Int? = null,
     // Multi-bridge
     val bridges: List<SavedBridge> = emptyList(),
-    val activeBridgeIndex: Int = 0
+    val activeBridgeIndex: Int = 0,
+    // Connection tracking
+    val failureCount: Int = 0
 )

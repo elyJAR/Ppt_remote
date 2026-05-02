@@ -13,7 +13,16 @@ enum class NetworkType {
     UNKNOWN
 }
 
+/**
+ * Detects the current network type of the Android device.
+ *
+ * Used to adjust polling frequency and retry behaviour:
+ * - [NetworkType.WIFI] — standard polling
+ * - [NetworkType.HOTSPOT_USING] / [NetworkType.HOTSPOT_PROVIDING] — more aggressive polling
+ * - [NetworkType.CELLULAR] — reduced polling to save data
+ */
 object NetworkDetector {
+    /** Returns the current [NetworkType] based on active network capabilities and SSID heuristics. */
     fun getNetworkType(context: Context): NetworkType {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         

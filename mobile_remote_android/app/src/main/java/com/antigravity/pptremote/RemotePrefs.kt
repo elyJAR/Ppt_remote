@@ -2,6 +2,12 @@ package com.antigravity.pptremote
 
 import android.content.Context
 
+/**
+ * Persistent key-value storage for all user preferences and app state.
+ *
+ * Uses a single [android.content.SharedPreferences] file (`ppt_remote_prefs`).
+ * All methods are synchronous and safe to call from any thread.
+ */
 object RemotePrefs {
     private const val PREFS_NAME = "ppt_remote_prefs"
     private const val KEY_BRIDGE_URL = "bridge_url"

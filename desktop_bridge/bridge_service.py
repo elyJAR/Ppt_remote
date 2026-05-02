@@ -127,8 +127,10 @@ def main() -> None:
     # 3. Import app + resolved port (env vars already read inside main.py)
     # ------------------------------------------------------------------
     from main import BRIDGE_PORT, app  # noqa: PLC0415
+    from network_detector import get_lan_ip  # noqa: PLC0415
 
-    bridge_url = f"http://localhost:{BRIDGE_PORT}"
+    lan_ip = get_lan_ip()
+    bridge_url = f"http://{lan_ip}:{BRIDGE_PORT}"
 
     # ------------------------------------------------------------------
     # 4. HTTP server thread
@@ -190,6 +192,20 @@ def main() -> None:
                 on_start_slideshow=lambda: _tray_action("start"),
                 on_stop_slideshow=lambda: _tray_action("stop"),
             )
+
+            # Start IP monitoring thread
+            def _monitor_ip() -> None:
+                current_ip = lan_ip
+                while True:
+                    time.sleep(10)
+                    new_ip = get_lan_ip()
+                    if new_ip != current_ip:
+                        _logger.info("LAN IP changed from %s to %s — updating tray", current_ip, new_ip)
+                        current_ip = new_ip
+                        new_url = f"http://{new_ip}:{BRIDGE_PORT}"
+                        tray.set_bridge_url(new_url)
+
+            threading.Thread(target=_monitor_ip, daemon=True, name="IpMonitor").start()
 
             # Give uvicorn a moment to bind the port before showing the toast
             time.sleep(1.5)

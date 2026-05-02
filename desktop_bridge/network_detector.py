@@ -7,6 +7,26 @@ import logging
 from enum import Enum
 
 
+def get_lan_ip() -> str:
+    """
+    Get the primary local network IP address of this machine.
+    
+    Returns:
+        str: The IP address (e.g. "192.168.1.5") or "127.0.0.1" as fallback.
+    """
+    try:
+        # Standard trick to get primary interface IP
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Doesn't actually send a packet, just picks the local IP that WOULD 
+        # be used to route to this global address.
+        sock.connect(("8.8.8.8", 80))
+        ip = sock.getsockname()[0]
+        sock.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
 class NetworkType(Enum):
     """Enum for network types."""
     WIFI = "wifi"

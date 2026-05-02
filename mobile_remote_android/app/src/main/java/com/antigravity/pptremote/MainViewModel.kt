@@ -413,6 +413,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 selectedPresentationId = selected,
                 bridgeNetworkWarning = bridgeNetworkWarning,
                 bridgeReachable = bridgeReachable,
+                failureCount = 0, // Reset failures on success
                 currentSlideNotes = newNotes,
                 currentSlideNotesIndex = newNotesIndex,
                 lastThumbnailSlide = if (activePres != null) activeSlide else null,
@@ -423,11 +424,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             )
         } catch (ex: Exception) {
-            _state.value = _state.value.copy(
-                presentations = emptyList(),
-                bridgeReachable = false,
-                statusMessage = ex.message ?: "Unable to reach bridge"
-            )
+            val nowState = _state.value
+            val newFailCount = nowState.failureCount + 1
+            
+            if (newFailCount >= 2) {
+                // If we fail twice in a row, clear the URL to trigger auto-discovery on next tick
+                _state.value = nowState.copy(
+                    bridgeUrl = "",
+                    failureCount = 0,
+                    bridgeReachable = false,
+                    statusMessage = "Connection lost. Searching for bridge..."
+                )
+            } else {
+                _state.value = nowState.copy(
+                    failureCount = newFailCount,
+                    bridgeReachable = false,
+                    statusMessage = ex.message ?: "Unable to reach bridge"
+                )
+            }
         }
     }
 }

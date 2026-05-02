@@ -108,6 +108,9 @@ jobs:
           KEY_PASSWORD:      ${{ secrets.KEY_PASSWORD }}
         run: |
           KEYSTORE_PATH="${RUNNER_TEMP}/release.jks"
+          STORE_PASS="pptremote-ci-store-2024"
+          KEY_PASS="pptremote-ci-key-2024"
+          ALIAS="pptremote"
 
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "Using keystore from KEYSTORE_BASE64 secret"
@@ -116,10 +119,7 @@ jobs:
             KEY_PASS="$KEY_PASSWORD"
             ALIAS="$KEY_ALIAS"
           else
-            STORE_PASS="pptremote-ci-store-2024"
-            KEY_PASS="pptremote-ci-key-2024"
-            ALIAS="pptremote"
-            echo "Generating self-signed keystore"
+            echo "Generating self-signed keystore with fixed password"
             keytool -genkeypair \
               -alias "$ALIAS" \
               -keyalg RSA \
@@ -130,21 +130,17 @@ jobs:
               -keypass "$KEY_PASS" \
               -dname "CN=PPT Remote, OU=AntiGravity, O=AntiGravity, L=Unknown, ST=Unknown, C=US" \
               -noprompt
+            echo "Keystore generated. Verifying..."
+            keytool -list -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASS" -alias "$ALIAS"
           fi
 
-          # Write a keystore.properties file that build.gradle.kts reads
-          # This avoids passing passwords on the command line entirely
-          {
-            echo "storeFile=${KEYSTORE_PATH}"
-            echo "storePassword=${STORE_PASS}"
-            echo "keyAlias=${ALIAS}"
-            echo "keyPassword=${KEY_PASS}"
-          } > "${GITHUB_WORKSPACE}/mobile_remote_android/keystore.properties"
+          # Write properties file — use printf to avoid any newline/expansion issues
+          PROPS_FILE="${GITHUB_WORKSPACE}/mobile_remote_android/keystore.properties"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$KEYSTORE_PATH" "$STORE_PASS" "$ALIAS" "$KEY_PASS" > "$PROPS_FILE"
 
-          echo "path=$KEYSTORE_PATH" >> "$GITHUB_OUTPUT"
-          echo "Keystore ready at $KEYSTORE_PATH"
-          echo "keystore.properties written:"
-          cat "${GITHUB_WORKSPACE}/mobile_remote_android/keystore.properties"
+          echo "keystore.properties contents:"
+          cat "$PROPS_FILE"
 
       # ── Build signed release APK ─────────────────────────────────────────────
       - name: Build signed release APK

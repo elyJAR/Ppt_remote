@@ -75,26 +75,7 @@ class TrayIconManager:
             logger.warning("TrayIconManager.run() called but pystray is unavailable")
             return
 
-        menu_items = [
-            pystray.MenuItem("PPT Remote Bridge", None, enabled=False),
-            pystray.MenuItem(f"  {self._bridge_url}", None, enabled=False),
-            pystray.Menu.SEPARATOR,
-        ]
-
-        # Quick controls — only shown when callbacks are provided
-        if any([self._on_previous, self._on_next, self._on_start_slideshow, self._on_stop_slideshow]):
-            if self._on_previous:
-                menu_items.append(pystray.MenuItem("⏮  Previous Slide", self._handle_previous))
-            if self._on_next:
-                menu_items.append(pystray.MenuItem("⏭  Next Slide", self._handle_next))
-            if self._on_start_slideshow:
-                menu_items.append(pystray.MenuItem("▶  Start Slideshow", self._handle_start_slideshow))
-            if self._on_stop_slideshow:
-                menu_items.append(pystray.MenuItem("⏹  Stop Slideshow", self._handle_stop_slideshow))
-            menu_items.append(pystray.Menu.SEPARATOR)
-
-        menu_items.append(pystray.MenuItem("Quit", self._handle_quit))
-
+        menu_items = self._build_menu_items()
         img = _make_icon_image(running=True)
         self._icon = pystray.Icon(
             name="PptRemoteBridge",
@@ -135,6 +116,50 @@ class TrayIconManager:
             )
         except Exception as exc:
             logger.debug("Tray icon update failed: %s", exc)
+
+    def set_bridge_url(self, bridge_url: str) -> None:
+        """Update the bridge URL displayed in the tray menu."""
+        if self._icon is None or not PYSTRAY_AVAILABLE:
+            self._bridge_url = bridge_url
+            return
+        
+        if self._bridge_url == bridge_url:
+            return
+
+        self._bridge_url = bridge_url
+        logger.info("Updating tray menu with new bridge URL: %s", bridge_url)
+        
+        try:
+            # Reconstruct the menu with the new URL
+            menu_items = self._build_menu_items()
+            self._icon.menu = pystray.Menu(*menu_items)
+        except Exception as exc:
+            logger.debug("Tray menu update failed: %s", exc)
+
+    def _build_menu_items(self) -> list["pystray.MenuItem"]:
+        """Construct the list of menu items based on current state."""
+        menu_items = [
+            pystray.MenuItem("PPT Remote Bridge", None, enabled=False),
+            pystray.MenuItem(f"  {self._bridge_url}", None, enabled=False),
+            pystray.Menu.SEPARATOR,
+        ]
+
+        # Quick controls — only shown when callbacks are provided
+        if any([self._on_previous, self._on_next, self._on_start_slideshow, self._on_stop_slideshow]):
+            if self._on_previous:
+                menu_items.append(pystray.MenuItem("⏮  Previous Slide", self._handle_previous))
+            if self._on_next:
+                menu_items.append(pystray.MenuItem("⏭  Next Slide", self._handle_next))
+            if self._on_start_slideshow:
+                menu_items.append(pystray.MenuItem("▶  Start Slideshow", self._handle_start_slideshow))
+            if self._on_stop_slideshow:
+                menu_items.append(pystray.MenuItem("⏹  Stop Slideshow", self._handle_stop_slideshow))
+            menu_items.append(pystray.Menu.SEPARATOR)
+
+        menu_items.append(pystray.MenuItem("Quit", self._handle_quit))
+        return menu_items
+
+    # ------------------------------------------------------------------
 
     # ------------------------------------------------------------------
     # Internal handlers

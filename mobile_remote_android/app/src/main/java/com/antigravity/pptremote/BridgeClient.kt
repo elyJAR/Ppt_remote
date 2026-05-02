@@ -15,9 +15,18 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
+/**
+ * HTTP client for communicating with the PPT Remote desktop bridge.
+ *
+ * All methods are blocking and must be called from a background thread (e.g. via
+ * [kotlinx.coroutines.Dispatchers.IO]). Every request automatically includes the
+ * [apiKey] header when one is configured.
+ */
 class BridgeClient {
     private val discoveryToken = "PPT_REMOTE_DISCOVER"
-    var apiKey: String = ""   // set by ViewModel from RemotePrefs
+
+    /** Optional API key sent as `X-Api-Key` on every request. Set from [RemotePrefs.getApiKey]. */
+    var apiKey: String = ""
 
     private fun createClient(timeoutSeconds: Int = 10): OkHttpClient {
         return OkHttpClient.Builder()
@@ -35,6 +44,7 @@ class BridgeClient {
     private fun Request.Builder.withApiKey(): Request.Builder =
         if (apiKey.isNotBlank()) header("X-Api-Key", apiKey) else this
 
+    /** Fetches the list of open PowerPoint presentations from the bridge. Throws on HTTP error. */
     fun fetchPresentations(url: String): List<Presentation> {
         val client = createClient(timeoutSeconds = 10)
         val request = Request.Builder()
@@ -68,6 +78,7 @@ class BridgeClient {
         }
     }
 
+    /** Returns the bridge's current network type and any hotspot warning. Returns null on error. */
     fun getNetworkStatus(url: String): NetworkStatus? {
         return try {
             val client = createClient(timeoutSeconds = 5)
@@ -96,18 +107,22 @@ class BridgeClient {
         }
     }
 
+    /** Starts the slideshow for the given presentation. Throws on failure. */
     fun startSlideshow(url: String, presentationId: String) {
         post(url, "/api/presentations/${encodedId(presentationId)}/start")
     }
 
+    /** Stops the active slideshow for the given presentation. Throws on failure. */
     fun stopSlideshow(url: String, presentationId: String) {
         post(url, "/api/presentations/${encodedId(presentationId)}/stop")
     }
 
+    /** Advances to the next slide. Auto-starts slideshow if not already running. Throws on failure. */
     fun next(url: String, presentationId: String) {
         post(url, "/api/presentations/${encodedId(presentationId)}/next")
     }
 
+    /** Goes back to the previous slide. Auto-starts slideshow if not already running. Throws on failure. */
     fun previous(url: String, presentationId: String) {
         post(url, "/api/presentations/${encodedId(presentationId)}/previous")
     }
