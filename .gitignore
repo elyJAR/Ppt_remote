@@ -28,7 +28,9 @@ local.properties
 
 # PyInstaller
 dist/
+build/
 *.spec
+*.exe
 
 # Android keystores — never commit these
 *.jks
