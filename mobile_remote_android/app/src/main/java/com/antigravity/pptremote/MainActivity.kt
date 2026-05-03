@@ -14,6 +14,7 @@ import android.os.VibratorManager
 import android.provider.Settings
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -102,6 +103,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.layout.systemGestureExclusion
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -353,6 +355,13 @@ private fun RemoteScreen(
         }
     }
 
+    // Prevent Android's back gesture from minimizing the app accidentally
+    // (the horizontal swipe for prev/next conflicts with the edge back gesture)
+    BackHandler(enabled = true) {
+        // Do nothing — back press is intentionally suppressed in the remote control screen
+        // to avoid accidental app dismissal during presentations
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -451,12 +460,15 @@ private fun RemoteScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
+                    // Exclude this area from Android's system back-gesture zones
+                    // so horizontal swipes are delivered to the app, not intercepted
+                    .systemGestureExclusion()
                     .pointerInput(Unit) {
                         detectHorizontalDragGestures(
                             onDragStart = { swipeHapticFired = false },
                             onDragEnd = { swipeHapticFired = false }
                         ) { _, dragAmount ->
-                            val threshold = 100f
+                            val threshold = 80f  // lowered from 100f for easier triggering
                             if (dragAmount > threshold) {
                                 performGestureHapticFeedback()
                                 onPrevious()
@@ -644,13 +656,13 @@ private fun ConnectionCard(
                             }
                             IconButton(
                                 onClick = { onRemoveBridge(index) },
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(48.dp)  // 48dp = Android minimum touch target
                             ) {
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = "Remove bridge",
-                                    tint = MaterialTheme.colorScheme.textMuted,
-                                    modifier = Modifier.size(14.dp)
+                                    tint = Red.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }

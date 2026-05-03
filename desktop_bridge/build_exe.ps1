@@ -20,7 +20,7 @@ if ($LASTEXITCODE -ne 0) {
 	throw "PyInstaller build failed"
 }
 
-$exePath = Join-Path $PSScriptRoot "dist\PptRemoteBridge.exe"
+$exePath = Join-Path $PSScriptRoot "dist\PptRemoteBridge\PptRemoteBridge.exe"
 if (-not (Test-Path $exePath)) {
 	throw "Build completed but EXE not found at $exePath"
 }

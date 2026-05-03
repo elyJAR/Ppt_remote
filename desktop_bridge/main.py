@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
+import logging.handlers
 import os
+import pathlib
 import socket
 import threading
 import urllib.parse
@@ -26,6 +29,24 @@ from slowapi import (  # pyright: ignore[reportMissingImports]
 )
 from slowapi.errors import RateLimitExceeded  # pyright: ignore[reportMissingImports]
 from slowapi.util import get_remote_address  # pyright: ignore[reportMissingImports]
+
+# ---------------------------------------------------------------------------
+# File logging — written to %APPDATA%\PptRemoteBridge\bridge.log
+# ---------------------------------------------------------------------------
+def _setup_logging() -> None:
+    log_dir = pathlib.Path(os.getenv("APPDATA", "")) / "PptRemoteBridge"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "bridge.log"
+    handler = logging.handlers.RotatingFileHandler(
+        log_file, maxBytes=1_000_000, backupCount=2, encoding="utf-8"
+    )
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s"))
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    root.addHandler(handler)
+
+_setup_logging()
+_logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Configuration (overridable via environment variables)
@@ -249,6 +270,25 @@ def health() -> HealthDto:
         is_hotspot=is_hotspot,
     )
 
+
+@app.get("/api/debug/ppt", include_in_schema=False)
+def debug_ppt():
+    """Diagnostic endpoint — open in browser to see the raw PowerPoint COM status."""
+    import traceback
+    try:
+        items = controller.list_presentations()
+        return {
+            "status": "ok",
+            "presentation_count": len(items),
+            "presentations": [p.name for p in items],
+        }
+    except Exception as exc:
+        _logger.error("debug_ppt: %s", traceback.format_exc())
+        return {
+            "status": "error",
+            "error": str(exc),
+            "type": type(exc).__name__,
+        }
 
 @app.get(
     "/api/network/status",

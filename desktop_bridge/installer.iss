@@ -49,8 +49,8 @@ Name: "desktopicon";    Description: "{cm:CreateDesktopIcon}";    GroupDescripti
 Name: "startupentry";   Description: "Start automatically when Windows starts"; GroupDescription: "Startup:"; Flags: unchecked
 
 [Files]
-; Main executable (built by build_exe.ps1)
-Source: "dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; Main executable and dependencies (built by build_exe.ps1 in onedir mode)
+Source: "dist\PptRemoteBridge\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#AppName}";          Filename: "{app}\{#AppExeName}"
