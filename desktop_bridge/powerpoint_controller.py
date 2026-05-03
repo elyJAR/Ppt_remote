@@ -50,22 +50,91 @@ class PresentationInfo:
     total_slides: int
 
 
+import queue as _queue
+import threading as _threading
+
+
+class _ComWorker:
+    """Single dedicated STA thread that handles ALL COM operations.
+
+    PowerPoint registers itself in the Windows Running Object Table (ROT)
+    from its own STA thread.  GetActiveObject only succeeds when called from
+    an STA that pumps Windows messages — which uvicorn/FastAPI threadpool
+    threads do NOT do.  This worker maintains one permanent STA thread that
+    calls pythoncom.PumpWaitingMessages() in a tight loop, so COM proxies
+    can be created and Office calls can flow correctly.
+    """
+
+    def __init__(self) -> None:
+        self._q: _queue.Queue = _queue.Queue()
+        t = _threading.Thread(target=self._loop, daemon=True, name="com-worker")
+        t.start()
+
+    def _loop(self) -> None:
+        pythoncom.CoInitialize()  # STA — required for Office/GetActiveObject
+        try:
+            while True:
+                # Pump any pending COM/Windows messages so cross-apartment
+                # calls from PowerPoint back to this STA can complete.
+                pythoncom.PumpWaitingMessages()
+                try:
+                    fn, args, kwargs, result_q = self._q.get(timeout=0.02)
+                except _queue.Empty:
+                    continue
+                try:
+                    result_q.put(("ok", fn(*args, **kwargs)))
+                except Exception as exc:
+                    result_q.put(("err", exc))
+        finally:
+            pythoncom.CoUninitialize()
+
+    def call(self, fn, *args, **kwargs):
+        """Execute fn(*args, **kwargs) on the COM STA thread and return its result."""
+        result_q: _queue.SimpleQueue = _queue.SimpleQueue()
+        self._q.put((fn, args, kwargs, result_q))
+        kind, value = result_q.get(timeout=30)
+        if kind == "err":
+            raise value
+        return value
+
+
+# Module-level singleton — created once when the module is imported.
+_com_worker = _ComWorker()
+
+
+def _on_com_thread(fn):
+    """Decorator: run the wrapped method on the COM STA worker thread.
+
+    Combines dispatch-to-STA-thread with one automatic retry so each public
+    controller method is both thread-safe and resilient to transient COM hiccups.
+    """
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        def _execute():
+            try:
+                return fn(*args, **kwargs)
+            except PowerPointControllerError:
+                raise  # our own errors — don't retry
+            except Exception as exc:
+                _logger.warning("COM call failed (%s), retrying once: %s", fn.__name__, exc)
+                try:
+                    return fn(*args, **kwargs)
+                except PowerPointControllerError:
+                    raise
+                except Exception as exc2:
+                    raise PowerPointControllerError(
+                        f"PowerPoint COM error in {fn.__name__}: {exc2}. "
+                        "PowerPoint may have crashed — please reopen it."
+                    ) from exc2
+        return _com_worker.call(_execute)
+    return wrapper
+
+
 @contextmanager
 def com_context():
-    """Initialize COM as MTA for this thread.
+    """No-op context manager kept for backward compatibility."""
+    yield
 
-    FastAPI/uvicorn runs sync endpoints in a threadpool. These threads do NOT
-    pump Windows messages, so STA (CoInitialize) cross-apartment calls to
-    PowerPoint can silently fail. MTA (CoInitializeEx COINIT_MULTITHREADED)
-    avoids this — COM proxies from MTA→STA (PowerPoint) work correctly without
-    a message pump on the calling side.
-    """
-    hr = pythoncom.CoInitializeEx(pythoncom.COINIT_MULTITHREADED)
-    # S_OK (0) = initialized fresh; S_FALSE (1) = already initialized — both OK.
-    try:
-        yield
-    finally:
-        pythoncom.CoUninitialize()
 
 
 def _norm(path: str) -> str:
@@ -202,7 +271,7 @@ class PowerPointController:
     # Public API
     # ------------------------------------------------------------------
 
-    @_com_retry
+    @_on_com_thread
     def list_presentations(self) -> list[PresentationInfo]:
         with com_context():
             app = self._get_app()
@@ -322,7 +391,7 @@ class PowerPointController:
             time.sleep(0.2)
         return None
 
-    @_com_retry
+    @_on_com_thread
     def start_slideshow(self, presentation_id: str) -> None:
         if presentation_id.startswith("__protected__"):
             raise PowerPointControllerError(
@@ -364,7 +433,7 @@ class PowerPointController:
             # Wait for the slideshow window to actually open (important for OneDrive files)
             self._wait_for_slideshow_window(app, presentation_id, timeout=6.0)
 
-    @_com_retry
+    @_on_com_thread
     def stop_slideshow(self, presentation_id: str) -> None:
         with com_context():
             app = self._get_app()
@@ -375,7 +444,7 @@ class PowerPointController:
                 )
             window.View.Exit()
 
-    @_com_retry
+    @_on_com_thread
     def next_slide(self, presentation_id: str) -> None:
         with com_context():
             app = self._get_app()
@@ -411,7 +480,7 @@ class PowerPointController:
                 )
             window.View.Next()
 
-    @_com_retry
+    @_on_com_thread
     def previous_slide(self, presentation_id: str) -> None:
         with com_context():
             app = self._get_app()
@@ -446,7 +515,7 @@ class PowerPointController:
                 )
             window.View.Previous()
 
-    @_com_retry
+    @_on_com_thread
     def get_all_speaker_notes(self, presentation_id: str) -> list[str]:
         """Return speaker-notes text for every slide (empty string if none)."""
         with com_context():
@@ -464,7 +533,7 @@ class PowerPointController:
                     notes.append("")
             return notes
 
-    @_com_retry
+    @_on_com_thread
     def get_current_slide_notes(self, presentation_id: str) -> tuple[int, str]:
         """Return (1-based slide index, notes text) for the active slideshow slide."""
         with com_context():
@@ -485,7 +554,7 @@ class PowerPointController:
                 text = ""
             return slide_index, text.strip()
 
-    @_com_retry
+    @_on_com_thread
     def get_slide_thumbnail(self, presentation_id: str, slide_index: int, width: int = 960) -> bytes:
         """Export a single slide as a PNG and return the raw bytes.
 
@@ -547,7 +616,7 @@ class PowerPointController:
                 except OSError:
                     pass
 
-    @_com_retry
+    @_on_com_thread
     def get_current_slide_thumbnail(self, presentation_id: str, width: int = 960) -> tuple[int, bytes]:
         """Export the currently displayed slideshow slide as PNG bytes.
 
