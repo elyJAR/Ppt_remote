@@ -554,6 +554,48 @@ class PowerPointController:
                 text = ""
             return slide_index, text.strip()
 
+    def _get_slide_thumbnail_impl(self, app: Any, presentation_id: str, slide_index: int, width: int = 960) -> bytes:
+        import tempfile
+        import os as _os
+
+        pres = self._find_presentation(app, presentation_id)
+
+        total = int(pres.Slides.Count)
+        if slide_index < 1 or slide_index > total:
+            raise PowerPointControllerError(
+                f"Slide index {slide_index} is out of range (1–{total})."
+            )
+
+        slide = pres.Slides(slide_index)
+
+        # Calculate height preserving the slide aspect ratio
+        try:
+            slide_width  = float(pres.PageSetup.SlideWidth)
+            slide_height = float(pres.PageSetup.SlideHeight)
+            height = int(width * slide_height / slide_width)
+        except Exception:
+            height = int(width * 9 / 16)  # fallback: 16:9
+
+        # Export to a temp file then read back as bytes
+        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tmp_path = tmp.name
+        tmp.close()
+
+        try:
+            # ppShapeFormatPNG = 2
+            slide.Export(tmp_path, "PNG", width, height)
+            with open(tmp_path, "rb") as f:
+                return f.read()
+        except Exception as exc:
+            raise PowerPointControllerError(
+                f"Could not export slide {slide_index} as PNG: {exc}"
+            ) from exc
+        finally:
+            try:
+                _os.unlink(tmp_path)
+            except OSError:
+                pass
+
     @_on_com_thread
     def get_slide_thumbnail(self, presentation_id: str, slide_index: int, width: int = 960) -> bytes:
         """Export a single slide as a PNG and return the raw bytes.
@@ -573,48 +615,9 @@ class PowerPointController:
             PowerPointControllerError: if the presentation or slide is not found,
                 or if the export fails.
         """
-        import tempfile
-        import os as _os
-
         with com_context():
             app = self._get_app()
-            pres = self._find_presentation(app, presentation_id)
-
-            total = int(pres.Slides.Count)
-            if slide_index < 1 or slide_index > total:
-                raise PowerPointControllerError(
-                    f"Slide index {slide_index} is out of range (1–{total})."
-                )
-
-            slide = pres.Slides(slide_index)
-
-            # Calculate height preserving the slide aspect ratio
-            try:
-                slide_width  = float(pres.PageSetup.SlideWidth)
-                slide_height = float(pres.PageSetup.SlideHeight)
-                height = int(width * slide_height / slide_width)
-            except Exception:
-                height = int(width * 9 / 16)  # fallback: 16:9
-
-            # Export to a temp file then read back as bytes
-            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-            tmp_path = tmp.name
-            tmp.close()
-
-            try:
-                # ppShapeFormatPNG = 2
-                slide.Export(tmp_path, "PNG", width, height)
-                with open(tmp_path, "rb") as f:
-                    return f.read()
-            except Exception as exc:
-                raise PowerPointControllerError(
-                    f"Could not export slide {slide_index} as PNG: {exc}"
-                ) from exc
-            finally:
-                try:
-                    _os.unlink(tmp_path)
-                except OSError:
-                    pass
+            return self._get_slide_thumbnail_impl(app, presentation_id, slide_index, width)
 
     @_on_com_thread
     def get_current_slide_thumbnail(self, presentation_id: str, width: int = 960) -> tuple[int, bytes]:
@@ -635,6 +638,6 @@ class PowerPointController:
                 )
             slide_index = int(window.View.CurrentShowPosition)
 
-        # Delegate to get_slide_thumbnail (opens its own COM context)
-        png_bytes = self.get_slide_thumbnail(presentation_id, slide_index, width)
+        # Delegate to the internal undecorated method to avoid deadlocking the COM worker thread
+        png_bytes = self._get_slide_thumbnail_impl(app, presentation_id, slide_index, width)
         return slide_index, png_bytes
