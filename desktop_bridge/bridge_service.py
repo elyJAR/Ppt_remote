@@ -39,8 +39,8 @@ from network_detector import get_lan_ip  # noqa: E402
 
 def _setup_logging() -> None:
     """Configure root logger: rotating file + optional stderr."""
-    log_dir = Path(__file__).parent / "logs"
-    log_dir.mkdir(exist_ok=True)
+    log_dir = Path(os.getenv("APPDATA", "")) / "PptRemoteBridge"
+    log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "bridge.log"
 
     fmt = logging.Formatter(
