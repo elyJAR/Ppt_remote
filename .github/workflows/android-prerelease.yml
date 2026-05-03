@@ -112,33 +112,37 @@ jobs:
           KEY_PASSWORD:      ${{ secrets.KEY_PASSWORD }}
         run: |
           KEYSTORE_PATH="${RUNNER_TEMP}/release.jks"
-          STORE_PASS="pptremote-ci-store-2024"
-          KEY_PASS="pptremote-ci-key-2024"
+          # Single password for store+key — PKCS12 (JDK 9+ default) requires them to match
+          CI_PASS="pptremote-ci-2024"
+          STORE_PASS="$CI_PASS"
+          KEY_PASS="$CI_PASS"
           ALIAS="pptremote"
 
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "Using keystore from KEYSTORE_BASE64 secret"
-            echo "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+            # Use printf to safely handle multi-line base64 secrets
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
             STORE_PASS="$KEYSTORE_PASSWORD"
             KEY_PASS="$KEY_PASSWORD"
             ALIAS="$KEY_ALIAS"
           else
-            echo "Generating self-signed keystore with fixed password"
+            echo "Generating self-signed JKS keystore..."
             keytool -genkeypair \
               -alias "$ALIAS" \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
+              -storetype JKS \
               -keystore "$KEYSTORE_PATH" \
               -storepass "$STORE_PASS" \
               -keypass "$KEY_PASS" \
               -dname "CN=PPT Remote, OU=AntiGravity, O=AntiGravity, L=Unknown, ST=Unknown, C=US" \
               -noprompt
             echo "Keystore generated. Verifying..."
-            keytool -list -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASS" -alias "$ALIAS"
+            keytool -list -storetype JKS -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASS" -alias "$ALIAS"
           fi
 
-          # Write properties file — use printf to avoid any newline/expansion issues
+          # Write properties file — use printf to avoid newline/expansion issues
           PROPS_FILE="${GITHUB_WORKSPACE}/mobile_remote_android/keystore.properties"
           printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
             "$KEYSTORE_PATH" "$STORE_PASS" "$ALIAS" "$KEY_PASS" > "$PROPS_FILE"
