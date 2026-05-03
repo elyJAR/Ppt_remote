@@ -78,7 +78,8 @@ def _is_providing_hotspot() -> bool:
             ["netsh", "wlan", "show", "hostednetwork"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
+            creationflags=subprocess.CREATE_NO_WINDOW
         )
         
         if result.returncode == 0:
@@ -96,7 +97,8 @@ def _is_providing_hotspot() -> bool:
                 ["netsh", "int", "ipv4", "show", "interfaces"],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                creationflags=subprocess.CREATE_NO_WINDOW
             )
             if result.returncode == 0:
                 # Look for tethering-related interfaces
@@ -125,7 +127,8 @@ def _get_active_interface() -> str | None:
             ["netsh", "interface", "ip", "show", "address"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
+            creationflags=subprocess.CREATE_NO_WINDOW
         )
 
         if result.returncode == 0:
@@ -181,7 +184,8 @@ def _is_using_hotspot_connection(interface_name: str) -> bool:
                 ["netsh", "interface", "show", "interface"],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                creationflags=subprocess.CREATE_NO_WINDOW
             )
 
             if result.returncode == 0:
@@ -210,7 +214,8 @@ def _get_interface_type(interface_name: str) -> str:
             ["netsh", "interface", "show", "interface"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
+            creationflags=subprocess.CREATE_NO_WINDOW
         )
         
         if result.returncode == 0:
