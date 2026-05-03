@@ -293,6 +293,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 } catch (ex: Exception) {
                     lastException = ex
+                    // Fail fast on 4xx client errors (e.g., PowerPoint not open, invalid command)
+                    if (ex is BridgeHttpException && ex.statusCode in 400..499) {
+                        break
+                    }
                     if (attempt < maxRetries) {
                         // Exponential backoff with network-type adjustment
                         val backoffMs = when (current.networkType) {
@@ -305,10 +309,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            _state.value = _state.value.copy(statusMessage = lastException?.message ?: "Bridge call failed")
-            _state.value = _state.value.copy(isBusy = false)
+            _state.value = _state.value.copy(
+                statusMessage = lastException?.message ?: "Bridge call failed",
+                isBusy = false
+            )
         }
     }
+
 
     private fun startPolling() {
         viewModelScope.launch(Dispatchers.IO) {

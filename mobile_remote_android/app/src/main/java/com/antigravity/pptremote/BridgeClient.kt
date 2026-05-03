@@ -115,7 +115,7 @@ class BridgeClient {
                 NetworkStatus(
                     networkType = json.optString("network_type", "unknown"),
                     isHotspot = json.optBoolean("is_hotspot", false),
-                    warning = json.optString("warning", null)
+                    warning = if (json.isNull("warning")) null else json.getString("warning")
                 )
             }
         } catch (ex: Exception) {
@@ -376,7 +376,13 @@ class BridgeClient {
 
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IllegalStateException("Bridge error: HTTP ${response.code}")
+                val detail = try {
+                    val body = response.body?.string().orEmpty()
+                    JSONObject(body).optString("detail", body).take(200)
+                } catch (_: Exception) { "" }
+                val msg = if (detail.isNotBlank()) detail
+                          else "Bridge error: HTTP ${response.code}"
+                throw BridgeHttpException(response.code, msg)
             }
         }
     }
