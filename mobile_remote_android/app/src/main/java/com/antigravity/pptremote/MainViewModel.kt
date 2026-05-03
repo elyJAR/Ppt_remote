@@ -339,7 +339,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 else -> 1500
             }
 
-            val detectedUrl = client.discoverBridge(discoveryTimeoutMs, current.bridgePort + 1)
+            val detectedUrl = client.discoverBridge(
+                timeoutMs = discoveryTimeoutMs,
+                discoveryPort = current.bridgePort + 1,
+                bridgePort = current.bridgePort,
+                networkType = current.networkType
+            )
             if (detectedUrl == null) {
                 _state.value = _state.value.copy(
                     presentations = emptyList(),

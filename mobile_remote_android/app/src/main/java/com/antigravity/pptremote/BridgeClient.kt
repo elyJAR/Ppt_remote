@@ -14,6 +14,8 @@ import java.net.SocketTimeoutException
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 /**
  * HTTP client for communicating with the PPT Remote desktop bridge.
@@ -227,7 +229,77 @@ class BridgeClient {
         }
     }
 
-    fun discoverBridge(timeoutMs: Int = 1500, discoveryPort: Int = 8788): String? {
+    /**
+     * Discover the bridge.
+     *
+     * Strategy:
+     *  1. If [networkType] is HOTSPOT_PROVIDING — the phone IS the gateway, so UDP
+     *     broadcast may not loop back. We scan the hotspot subnet directly via HTTP
+     *     health checks (parallel, fast timeout). Falls through to UDP as backup.
+     *  2. Otherwise — standard UDP broadcast discovery on all interfaces.
+     */
+    fun discoverBridge(
+        timeoutMs: Int = 1500,
+        discoveryPort: Int = 8788,
+        bridgePort: Int = 8787,
+        networkType: NetworkType = NetworkType.UNKNOWN
+    ): String? {
+        // Strategy 1: when phone is hotspot gateway, probe subnet via HTTP directly
+        if (networkType == NetworkType.HOTSPOT_PROVIDING) {
+            val found = discoverViaHotspotSubnet(bridgePort)
+            if (found != null) return found
+        }
+
+        // Strategy 2: UDP broadcast (works for WIFI / HOTSPOT_USING)
+        return discoverViaBroadcast(timeoutMs, discoveryPort)
+    }
+
+    /**
+     * When the phone provides a hotspot, the PC is a client on the hotspot subnet.
+     * Android assigns itself 192.168.43.1 (standard), or occasionally 192.168.1.1
+     * or 192.168.0.1. We scan .2–.20 on each candidate subnet in parallel with a
+     * short HTTP timeout — whichever responds first wins.
+     */
+    private fun discoverViaHotspotSubnet(bridgePort: Int): String? {
+        // Candidate hotspot gateway subnets Android commonly uses
+        val hotspotSubnets = listOf("192.168.43", "192.168.1", "192.168.0", "10.0.0")
+        val scanRangeEnd = 20 // scan .2–.20 (PC gets a low address from DHCP)
+
+        val probeClient = OkHttpClient.Builder()
+            .connectTimeout(400, TimeUnit.MILLISECONDS)
+            .readTimeout(400, TimeUnit.MILLISECONDS)
+            .build()
+
+        val executor = Executors.newFixedThreadPool(16)
+        val futures = mutableListOf<Future<String?>>()
+
+        for (subnet in hotspotSubnets) {
+            for (host in 2..scanRangeEnd) {
+                val candidate = "http://$subnet.$host:$bridgePort"
+                futures += executor.submit<String?> {
+                    try {
+                        val req = Request.Builder().url("$candidate/api/health").get().build()
+                        probeClient.newCall(req).execute().use { resp ->
+                            if (resp.isSuccessful) candidate else null
+                        }
+                    } catch (_: Exception) { null }
+                }
+            }
+        }
+
+        executor.shutdown()
+        // Wait up to 1.5s for any hit
+        executor.awaitTermination(1500, TimeUnit.MILLISECONDS)
+
+        val result = futures.firstNotNullOfOrNull { f ->
+            try { if (f.isDone) f.get() else null } catch (_: Exception) { null }
+        }
+
+        executor.shutdownNow()
+        return result
+    }
+
+    private fun discoverViaBroadcast(timeoutMs: Int, discoveryPort: Int): String? {
         val payload = discoveryToken.toByteArray(StandardCharsets.UTF_8)
         val receiveBuffer = ByteArray(1024)
 
