@@ -13,7 +13,10 @@ RequestExecutionLevel admin
 !define MUI_ICON "${NSISDIR}\Contrib\Graphics\Icons\modern-install.ico"
 
 ; Finish page: offer to launch the app immediately
-!define MUI_FINISHPAGE_RUN "$INSTDIR\PptRemoteBridge.exe"
+; IMPORTANT: Launch via explorer.exe to drop Admin privileges. If launched directly,
+; it runs as Admin and cannot communicate with PowerPoint running as a normal user.
+!define MUI_FINISHPAGE_RUN "explorer.exe"
+!define MUI_FINISHPAGE_RUN_PARAMETERS "$INSTDIR\PptRemoteBridge.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Launch PPT Remote Bridge now"
 
 ; Pages
