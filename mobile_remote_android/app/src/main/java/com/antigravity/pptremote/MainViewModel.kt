@@ -220,6 +220,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             maxOf(0, updated.size - 1) else _state.value.activeBridgeIndex
         RemotePrefs.setActiveBridgeIndex(appContext, newActive)
         val newUrl = updated.getOrNull(newActive)?.url ?: ""
+        // Persist newUrl (empty string re-enables auto-discovery on next poll)
+        RemotePrefs.setBridgeUrl(appContext, newUrl)
         _state.value = _state.value.copy(
             bridges = updated,
             activeBridgeIndex = newActive,
@@ -430,16 +432,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         } catch (ex: Exception) {
             val nowState = _state.value
+
+            // Bridge responded with an HTTP error (4xx/5xx) — the bridge IS reachable,
+            // so do NOT clear the URL or increment the network-failure counter.
+            // Just show a user-friendly status message.
+            if (ex is BridgeHttpException) {
+                val friendlyMsg = when (ex.statusCode) {
+                    400 -> "Bridge reached — no PowerPoint open or controller error"
+                    401 -> "Bridge reached — check your API key in Settings"
+                    429 -> "Bridge reached — too many requests, slowing down"
+                    else -> ex.message ?: "Bridge HTTP error ${ex.statusCode}"
+                }
+                _state.value = nowState.copy(
+                    bridgeReachable = true,
+                    statusMessage = friendlyMsg
+                )
+                return
+            }
+
+            // Network / IO error — bridge may have moved. Increment failure counter
+            // and clear URL after 2 consecutive failures to trigger re-discovery.
             val newFailCount = nowState.failureCount + 1
-            
             if (newFailCount >= 2) {
-                // If we fail twice in a row, clear the URL to trigger auto-discovery on next tick
                 _state.value = nowState.copy(
                     bridgeUrl = "",
                     failureCount = 0,
                     bridgeReachable = false,
                     statusMessage = "Connection lost. Searching for bridge..."
                 )
+                RemotePrefs.setBridgeUrl(appContext, "")
             } else {
                 _state.value = nowState.copy(
                     failureCount = newFailCount,

@@ -18,6 +18,13 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 /**
+ * Thrown when the bridge HTTP server responded but returned a non-2xx status.
+ * Distinct from network errors (IOException/timeout) so callers can decide
+ * whether to reset the bridge URL or just show a status message.
+ */
+class BridgeHttpException(val statusCode: Int, message: String) : Exception(message)
+
+/**
  * HTTP client for communicating with the PPT Remote desktop bridge.
  *
  * All methods are blocking and must be called from a background thread (e.g. via
@@ -57,7 +64,7 @@ class BridgeClient {
 
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IllegalStateException("Bridge error: HTTP ${response.code}")
+                throw BridgeHttpException(response.code, "Bridge error: HTTP ${response.code}")
             }
 
             val body = response.body?.string().orEmpty()
