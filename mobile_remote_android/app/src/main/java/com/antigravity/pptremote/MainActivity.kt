@@ -103,7 +103,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.layout.systemGestureExclusion
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -460,15 +459,12 @@ private fun RemoteScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    // Exclude this area from Android's system back-gesture zones
-                    // so horizontal swipes are delivered to the app, not intercepted
-                    .systemGestureExclusion()
                     .pointerInput(Unit) {
                         detectHorizontalDragGestures(
                             onDragStart = { swipeHapticFired = false },
                             onDragEnd = { swipeHapticFired = false }
                         ) { _, dragAmount ->
-                            val threshold = 80f  // lowered from 100f for easier triggering
+                            val threshold = 80f
                             if (dragAmount > threshold) {
                                 performGestureHapticFeedback()
                                 onPrevious()
