@@ -52,7 +52,16 @@ class PresentationInfo:
 
 @contextmanager
 def com_context():
-    pythoncom.CoInitialize()
+    """Initialize COM as MTA for this thread.
+
+    FastAPI/uvicorn runs sync endpoints in a threadpool. These threads do NOT
+    pump Windows messages, so STA (CoInitialize) cross-apartment calls to
+    PowerPoint can silently fail. MTA (CoInitializeEx COINIT_MULTITHREADED)
+    avoids this — COM proxies from MTA→STA (PowerPoint) work correctly without
+    a message pump on the calling side.
+    """
+    hr = pythoncom.CoInitializeEx(pythoncom.COINIT_MULTITHREADED)
+    # S_OK (0) = initialized fresh; S_FALSE (1) = already initialized — both OK.
     try:
         yield
     finally:
@@ -193,7 +202,8 @@ class PowerPointController:
     # Public API
     # ------------------------------------------------------------------
 
-    @_com_retry`n    def list_presentations(self) -> list[PresentationInfo]:
+    @_com_retry
+    def list_presentations(self) -> list[PresentationInfo]:
         with com_context():
             app = self._get_app()
 
@@ -312,7 +322,8 @@ class PowerPointController:
             time.sleep(0.2)
         return None
 
-    @_com_retry`n    def start_slideshow(self, presentation_id: str) -> None:
+    @_com_retry
+    def start_slideshow(self, presentation_id: str) -> None:
         if presentation_id.startswith("__protected__"):
             raise PowerPointControllerError(
                 "This file is in Protected View. Click 'Enable Editing' in PowerPoint first."
@@ -353,7 +364,8 @@ class PowerPointController:
             # Wait for the slideshow window to actually open (important for OneDrive files)
             self._wait_for_slideshow_window(app, presentation_id, timeout=6.0)
 
-    @_com_retry`n    def stop_slideshow(self, presentation_id: str) -> None:
+    @_com_retry
+    def stop_slideshow(self, presentation_id: str) -> None:
         with com_context():
             app = self._get_app()
             window = self._find_slideshow_window(app, presentation_id)
@@ -363,7 +375,8 @@ class PowerPointController:
                 )
             window.View.Exit()
 
-    @_com_retry`n    def next_slide(self, presentation_id: str) -> None:
+    @_com_retry
+    def next_slide(self, presentation_id: str) -> None:
         with com_context():
             app = self._get_app()
             window = self._find_slideshow_window(app, presentation_id)
@@ -398,7 +411,8 @@ class PowerPointController:
                 )
             window.View.Next()
 
-    @_com_retry`n    def previous_slide(self, presentation_id: str) -> None:
+    @_com_retry
+    def previous_slide(self, presentation_id: str) -> None:
         with com_context():
             app = self._get_app()
             window = self._find_slideshow_window(app, presentation_id)
@@ -432,7 +446,8 @@ class PowerPointController:
                 )
             window.View.Previous()
 
-    @_com_retry`n    def get_all_speaker_notes(self, presentation_id: str) -> list[str]:
+    @_com_retry
+    def get_all_speaker_notes(self, presentation_id: str) -> list[str]:
         """Return speaker-notes text for every slide (empty string if none)."""
         with com_context():
             app = self._get_app()
@@ -449,7 +464,8 @@ class PowerPointController:
                     notes.append("")
             return notes
 
-    @_com_retry`n    def get_current_slide_notes(self, presentation_id: str) -> tuple[int, str]:
+    @_com_retry
+    def get_current_slide_notes(self, presentation_id: str) -> tuple[int, str]:
         """Return (1-based slide index, notes text) for the active slideshow slide."""
         with com_context():
             app = self._get_app()
@@ -469,7 +485,8 @@ class PowerPointController:
                 text = ""
             return slide_index, text.strip()
 
-    @_com_retry`n    def get_slide_thumbnail(self, presentation_id: str, slide_index: int, width: int = 960) -> bytes:
+    @_com_retry
+    def get_slide_thumbnail(self, presentation_id: str, slide_index: int, width: int = 960) -> bytes:
         """Export a single slide as a PNG and return the raw bytes.
 
         Uses PowerPoint's Export() COM method to render the slide at the
@@ -530,7 +547,8 @@ class PowerPointController:
                 except OSError:
                     pass
 
-    @_com_retry`n    def get_current_slide_thumbnail(self, presentation_id: str, width: int = 960) -> tuple[int, bytes]:
+    @_com_retry
+    def get_current_slide_thumbnail(self, presentation_id: str, width: int = 960) -> tuple[int, bytes]:
         """Export the currently displayed slideshow slide as PNG bytes.
 
         Returns:

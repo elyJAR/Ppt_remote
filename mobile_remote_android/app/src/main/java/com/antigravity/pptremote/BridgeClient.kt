@@ -64,7 +64,14 @@ class BridgeClient {
 
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw BridgeHttpException(response.code, "Bridge error: HTTP ${response.code}")
+                val detail = try {
+                    val body = response.body?.string().orEmpty()
+                    // FastAPI wraps errors as {"detail": "..."}.
+                    org.json.JSONObject(body).optString("detail", body).take(200)
+                } catch (_: Exception) { "" }
+                val msg = if (detail.isNotBlank()) "Bridge error ${response.code}: $detail"
+                          else "Bridge error: HTTP ${response.code}"
+                throw BridgeHttpException(response.code, msg)
             }
 
             val body = response.body?.string().orEmpty()
