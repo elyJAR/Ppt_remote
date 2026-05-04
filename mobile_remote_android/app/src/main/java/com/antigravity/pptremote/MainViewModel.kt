@@ -26,6 +26,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val thumbnailWarmupInFlight = ConcurrentHashMap.newKeySet<String>()
     private var lastNetworkType: NetworkType = NetworkType.UNKNOWN
     private var networkChangeCallbackRegistered = false
+    private var lastInteractionTime = 0L
 
     private val _state = MutableStateFlow(
         RemoteState(
@@ -143,6 +144,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun optimisticUpdate(presentationId: String, delta: Int) {
+        lastInteractionTime = System.currentTimeMillis()
         val current = _state.value
         val bridgeUrl = current.bridgeUrl
         if (bridgeUrl.isBlank()) return
@@ -475,26 +477,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 cachedThumbnail(effectiveUrl, activePres.id, it)
             }
 
+            // ── Optimistic state protection ─────────────────────────────────────────
+            // If the user recently changed slides manually, ignore the server's slide index 
+            // if it's lagging behind (smaller than our optimistic index).
+            val isInGracePeriod = System.currentTimeMillis() - lastInteractionTime < 3000L
+            
             // Only re-fetch thumbnail when the slide number actually changes (avoids
             // a 1-3s PowerPoint export on every 2s poll tick)
             val presentationsWithThumbnails = if (activePres != null && activeSlide != null && activeSlide != prevSlide) {
-                val thumb = activeCachedThumb ?: try {
-                    client.fetchCurrentThumbnail(effectiveUrl, activePres.id, PRELOAD_THUMBNAIL_WIDTH)
-                } catch (e: Exception) { null }
-                if (thumb != null) {
-                    cacheThumbnail(effectiveUrl, activePres.id, activeSlide, thumb)
-                }
-                presentations.map { pres ->
-                    if (pres.id == activePres.id) pres.copy(currentThumbnail = thumb)
-                    else pres.copy(currentThumbnail = null)
+                // If in grace period, preserve our optimistic currentSlide
+                if (isInGracePeriod) {
+                     presentations.map { pres ->
+                        if (pres.id == activePres.id) {
+                            val existing = _state.value.presentations.firstOrNull { it.id == pres.id }
+                            pres.copy(
+                                currentSlide = existing?.currentSlide ?: pres.currentSlide,
+                                currentThumbnail = existing?.currentThumbnail ?: pres.currentThumbnail
+                            )
+                        } else pres
+                     }
+                } else {
+                    val thumb = activeCachedThumb ?: try {
+                        client.fetchCurrentThumbnail(effectiveUrl, activePres.id, PRELOAD_THUMBNAIL_WIDTH)
+                    } catch (e: Exception) { null }
+                    if (thumb != null) {
+                        cacheThumbnail(effectiveUrl, activePres.id, activeSlide, thumb)
+                    }
+                    presentations.map { pres ->
+                        if (pres.id == activePres.id) pres.copy(currentThumbnail = thumb)
+                        else pres.copy(currentThumbnail = null)
+                    }
                 }
             } else {
                 // Preserve existing thumbnails from state for the active pres, clear others.
                 val existingThumb = activeCachedThumb ?: _state.value.presentations
                     .firstOrNull { it.id == activePres?.id }?.currentThumbnail
+                
                 presentations.map { pres ->
-                    if (pres.id == activePres?.id) pres.copy(currentThumbnail = existingThumb)
-                    else pres.copy(currentThumbnail = null)
+                    if (pres.id == activePres?.id) {
+                        // If in grace period, also preserve the optimistic slide index
+                        val optimisticSlide = if (isInGracePeriod) {
+                            _state.value.presentations.firstOrNull { it.id == pres.id }?.currentSlide
+                        } else null
+                        
+                        pres.copy(
+                            currentSlide = optimisticSlide ?: pres.currentSlide,
+                            currentThumbnail = existingThumb
+                        )
+                    } else pres.copy(currentThumbnail = null)
                 }
             }
 
