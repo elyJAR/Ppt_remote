@@ -65,7 +65,7 @@ data class RemoteState(
     val showSettings: Boolean = false,
     val showNotes: Boolean = false,
     val bridgePort: Int = 8787,
-    val pollingIntervalSeconds: Int = 3,
+    val pollingIntervalSeconds: Int = 2,
     val isDarkTheme: Boolean = true,
     val connectionHistory: List<String> = emptyList(),
     val notificationText: String = "Tap ⏮ ⏭ to change slides — works with screen off",

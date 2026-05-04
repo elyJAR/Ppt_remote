@@ -407,14 +407,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
                 // Use the user-configured polling interval, adjusted by network type
-                val configuredMs = (_state.value.pollingIntervalSeconds * 1000L)
-                    .coerceIn(1000L, 30_000L)
+                val baseMs = (_state.value.pollingIntervalSeconds * 1000L).coerceIn(1000L, 30_000L)
+                
+                // Adaptive polling: if a slideshow is active, poll much faster to detect PC-side changes
+                val hasActiveSlideshow = _state.value.presentations.any { it.inSlideshow }
+                val configuredMs = if (hasActiveSlideshow) minOf(baseMs, 1000L) else baseMs
+                
                 val delayMs = when (_state.value.networkType) {
                     NetworkType.HOTSPOT_USING, NetworkType.HOTSPOT_PROVIDING ->
                         minOf(configuredMs, 2000L)   // cap at 2s on hotspot
                     NetworkType.CELLULAR ->
                         maxOf(configuredMs, 5000L)   // floor at 5s on cellular
-                    else -> configuredMs
+                    else -> minOf(configuredMs, 1000L) // floor at 1s on WiFi for snappiness
                 }
                 refreshPresentations()
                 delay(delayMs)
