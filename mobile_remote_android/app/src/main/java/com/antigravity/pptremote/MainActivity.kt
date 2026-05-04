@@ -230,6 +230,7 @@ class MainActivity : ComponentActivity() {
                             onAddBridge = viewModel::addBridge,
                             onRemoveBridge = viewModel::removeBridge,
                             onSelectBridge = viewModel::selectBridge,
+                            onSearchQueryChange = viewModel::updateSearchQuery,
                         )
                     }
                 }
@@ -320,6 +321,7 @@ private fun RemoteScreen(
     onAddBridge: (String, String) -> Unit,
     onRemoveBridge: (Int) -> Unit,
     onSelectBridge: (Int) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -329,6 +331,14 @@ private fun RemoteScreen(
     val isTablet = configuration.screenWidthDp >= 600
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val useWideLayout = isTablet || isLandscape
+
+    val filteredPresentations = remember(state.presentations, state.searchQuery) {
+        if (state.searchQuery.isBlank()) state.presentations
+        else state.presentations.filter { 
+            it.name.contains(state.searchQuery, ignoreCase = true) || 
+            it.path.contains(state.searchQuery, ignoreCase = true)
+        }
+    }
 
     // Helper function for haptic feedback in gestures — fires only once per swipe
     var swipeHapticFired = false
@@ -519,21 +529,53 @@ private fun RemoteScreen(
                 )
             }
 
-            // ── Presentations header ─────────────────────────────────────────
-            item {
-                Text(
-                    "Presentations",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.textSecondary,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
-                )
+            // ── Presentations header & Search ───────────────────────────────────────
+            if (state.presentations.size > 5 || state.searchQuery.isNotEmpty()) {
+                item {
+                    OutlinedTextField(
+                        value = state.searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        placeholder = { Text("Search presentations...") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = if (state.searchQuery.isNotEmpty()) {
+                            {
+                                IconButton(onClick = { onSearchQueryChange("") }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Clear")
+                                }
+                            }
+                        } else null,
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.cardBg,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.cardBg,
+                            focusedBorderColor = Accent,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.divider,
+                        )
+                    )
+                }
+            } else {
+                item {
+                    Text(
+                        "Presentations",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.textSecondary,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                    )
+                }
             }
 
             // ── Empty state ──────────────────────────────────────────────────
-            if (state.presentations.isEmpty()) {
-                item { EmptyStateCard(connected = connected) }
+            if (filteredPresentations.isEmpty()) {
+                item { 
+                    EmptyStateCard(
+                        connected = connected,
+                        isFiltered = state.searchQuery.isNotEmpty()
+                    ) 
+                }
             } else {
-                items(state.presentations, key = { it.id }) { presentation ->
+                items(filteredPresentations, key = { it.id }) { presentation ->
                     PresentationCard(
                         presentation = presentation,
                         selected = presentation.id == state.selectedPresentationId,
@@ -1079,7 +1121,7 @@ private fun PresentationCard(
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun EmptyStateCard(connected: Boolean) {
+private fun EmptyStateCard(connected: Boolean, isFiltered: Boolean = false) {
     AppCard {
         Column(
             modifier = Modifier
@@ -1088,18 +1130,23 @@ private fun EmptyStateCard(connected: Boolean) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("📂", fontSize = 40.sp)
+            Text(if (isFiltered) "🔍" else "📂", fontSize = 40.sp)
             Text(
-                if (connected) "No open presentations" else "Not connected",
+                when {
+                    isFiltered -> "No matches found"
+                    connected -> "No open presentations"
+                    else -> "Not connected"
+                },
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.textPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                if (connected)
-                    "Open a .pptx file in PowerPoint on your PC"
-                else
-                    "Make sure the desktop bridge is running on your PC",
+                when {
+                    isFiltered -> "Try searching for a different name or path"
+                    connected -> "Open a .pptx file in PowerPoint on your PC"
+                    else -> "Make sure the desktop bridge is running on your PC"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.textSecondary,
                 textAlign = TextAlign.Center,

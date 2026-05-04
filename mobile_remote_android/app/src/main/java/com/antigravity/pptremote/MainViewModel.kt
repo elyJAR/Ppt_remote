@@ -53,6 +53,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         startPolling()
     }
 
+    fun updateSearchQuery(query: String) {
+        _state.value = _state.value.copy(searchQuery = query)
+    }
+
     private fun updateNetworkType() {
         val currentNetworkType = NetworkDetector.getNetworkType(appContext)
 

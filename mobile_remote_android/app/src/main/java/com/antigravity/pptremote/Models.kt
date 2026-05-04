@@ -54,6 +54,7 @@ data class Presentation(
 data class RemoteState(
     val bridgeUrl: String = "",
     val presentations: List<Presentation> = emptyList(),
+    val searchQuery: String = "",
     val selectedPresentationId: String? = null,
     val statusMessage: String = "Searching for desktop bridge...",
     val isBusy: Boolean = false,
