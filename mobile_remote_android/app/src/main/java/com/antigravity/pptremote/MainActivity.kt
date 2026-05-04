@@ -451,13 +451,12 @@ private fun RemoteScreen(
         // will cause the entire screen to yank downwards with the pull-to-refresh animation!
         val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = false)
 
-        SwipeRefresh(
-            state = swipeRefreshState,
-            onRefresh = onRefresh,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            SwipeRefresh(
+                state = swipeRefreshState,
+                onRefresh = onRefresh,
+                modifier = Modifier.fillMaxSize()
+            ) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -556,6 +555,20 @@ private fun RemoteScreen(
                 )
             }
         }
+    }
+
+    // Global busy indicator fixed at the bottom edge
+    AnimatedVisibility(
+        visible = state.isBusy,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = Modifier.align(Alignment.BottomCenter)
+    ) {
+        LinearProgressIndicator(
+            modifier = Modifier.fillMaxWidth().height(4.dp),
+            color = Accent,
+            trackColor = MaterialTheme.colorScheme.screenBg,
+        )
     }
 }
 }
@@ -905,14 +918,6 @@ private fun SlideControlsCard(
                 }
             }
 
-            // Busy indicator
-            AnimatedVisibility(visible = isBusy, enter = fadeIn(), exit = fadeOut()) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
-                    color = Accent,
-                    trackColor = MaterialTheme.colorScheme.cardBgSelected,
-                )
-            }
             }
         }
     }
