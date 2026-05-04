@@ -167,9 +167,12 @@ def _paths_match(a: str, b: str) -> bool:
 
 class PowerPointController:
     def __init__(self) -> None:
-        # Cache recently exported slide thumbnails so repeated requests for the
-        # same slide can return immediately.
-        self._thumbnail_cache: OrderedDict[tuple[str, int, int], bytes] = OrderedDict()
+        # Persistent disk cache setup
+        self._cache_dir = pathlib.Path(os.getenv("APPDATA", "")) / "PptRemoteBridge" / "thumbnails"
+        self._cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # In-memory LRU cache for speed
+        self._thumbnail_cache: OrderedDict[tuple[str, int, int, float], bytes] = OrderedDict()
         self._thumbnail_warmup_inflight: set[tuple[str, int, int]] = set()
         self._thumbnail_warmup_complete: set[tuple[str, int, int]] = set()
         self._thumbnail_warmup_lock = _threading.Lock()
@@ -601,16 +604,40 @@ class PowerPointController:
             return slide_index, text.strip()
 
     def _get_slide_thumbnail_impl(self, app: Any, presentation_id: str, slide_index: int, width: int = 320) -> bytes:
-        import tempfile
+        import hashlib
         import os as _os
 
-        cache_key = (presentation_id, slide_index, width)
+        pres = self._find_presentation(app, presentation_id)
+        
+        # Get last modified time to ensure cache freshness
+        try:
+            mtime = float(pres.LastSavedTime)
+        except Exception:
+            mtime = 0.0
+
+        cache_key = (presentation_id, slide_index, width, mtime)
+        
+        # 1. Check in-memory cache
         cached = self._thumbnail_cache.get(cache_key)
         if cached is not None:
             self._thumbnail_cache.move_to_end(cache_key)
             return cached
 
-        pres = self._find_presentation(app, presentation_id)
+        # 2. Check disk cache
+        # Create a stable hash for the presentation path to use as a filename
+        path_hash = hashlib.md5(presentation_id.encode("utf-8")).hexdigest()
+        disk_filename = f"{path_hash}_{slide_index}_{width}_{int(mtime)}.png"
+        disk_path = self._cache_dir / disk_filename
+        
+        if disk_path.exists():
+            try:
+                with open(disk_path, "rb") as f:
+                    png_bytes = f.read()
+                # Populate in-memory cache
+                self._thumbnail_cache[cache_key] = png_bytes
+                return png_bytes
+            except Exception:
+                pass # Fallback to export if disk read fails
 
         total = int(pres.Slides.Count)
         if slide_index < 1 or slide_index > total:
@@ -628,30 +655,35 @@ class PowerPointController:
         except Exception:
             height = int(width * 9 / 16)  # fallback: 16:9
 
-        # Export to a temp file then read back as bytes
-        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        tmp_path = tmp.name
-        tmp.close()
-
+        # Export directly to disk cache
+        tmp_path = str(disk_path) + ".tmp"
         try:
             # ppShapeFormatPNG = 2
             slide.Export(tmp_path, "PNG", width, height)
+            
+            # Read back for returning to caller
             with open(tmp_path, "rb") as f:
                 png_bytes = f.read()
+            
+            # Atomic move to final disk path
+            if disk_path.exists():
+                _os.remove(disk_path)
+            _os.rename(tmp_path, disk_path)
+
+            # Update in-memory cache
             self._thumbnail_cache[cache_key] = png_bytes
             self._thumbnail_cache.move_to_end(cache_key)
             while len(self._thumbnail_cache) > 512:
                 self._thumbnail_cache.popitem(last=False)
+                
             return png_bytes
         except Exception as exc:
+            if _os.path.exists(tmp_path):
+                try: _os.remove(tmp_path)
+                except: pass
             raise PowerPointControllerError(
                 f"Could not export slide {slide_index} as PNG: {exc}"
             ) from exc
-        finally:
-            try:
-                _os.unlink(tmp_path)
-            except OSError:
-                pass
 
     @_on_com_thread
     def get_slide_thumbnail(self, presentation_id: str, slide_index: int, width: int = 320) -> bytes:
