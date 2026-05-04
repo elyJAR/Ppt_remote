@@ -866,19 +866,19 @@ private fun SlideControlsCard(
             ) {
                 SlideNavButton(
                     label = "◀  Prev",
-                    enabled = !isBusy && hasPresentation,
+                    enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     onClick = onPrevious,
                 )
                 SlideNavButton(
                     label = "Next  ▶",
-                    enabled = !isBusy && hasPresentation,
+                    enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     onClick = onNext,
                 )
                 FilledTonalButton(
                     onClick = onStart,
-                    enabled = !isBusy && hasPresentation,
+                    enabled = hasPresentation,
                     modifier = Modifier.weight(0.8f),
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = Green.copy(alpha = 0.2f),
@@ -891,7 +891,7 @@ private fun SlideControlsCard(
                 }
                 FilledTonalButton(
                     onClick = onStop,
-                    enabled = !isBusy && hasPresentation,
+                    enabled = hasPresentation,
                     modifier = Modifier.weight(0.8f),
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = Red.copy(alpha = 0.2f),
@@ -914,13 +914,13 @@ private fun SlideControlsCard(
                 ) {
                 SlideNavButton(
                     label = "◀  Prev",
-                    enabled = !isBusy && hasPresentation,
+                    enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     onClick = onPrevious,
                 )
                 SlideNavButton(
                     label = "Next  ▶",
-                    enabled = !isBusy && hasPresentation,
+                    enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     onClick = onNext,
                 )
@@ -933,7 +933,7 @@ private fun SlideControlsCard(
             ) {
                 FilledTonalButton(
                     onClick = onStart,
-                    enabled = !isBusy && hasPresentation,
+                    enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
@@ -947,7 +947,7 @@ private fun SlideControlsCard(
                 }
                 FilledTonalButton(
                     onClick = onStop,
-                    enabled = !isBusy && hasPresentation,
+                    enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
