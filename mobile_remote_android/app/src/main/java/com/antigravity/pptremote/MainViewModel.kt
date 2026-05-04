@@ -176,13 +176,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun nextSlide() {
         val selected = ensureSelectedPresentation() ?: return
         optimisticUpdate(selected, 1)
-        runBridgeAction("Next slide") { url -> client.next(url, selected) }
+        runBridgeAction("Next slide", showBusy = false) { url -> client.next(url, selected) }
     }
 
     fun previousSlide() {
         val selected = ensureSelectedPresentation() ?: return
         optimisticUpdate(selected, -1)
-        runBridgeAction("Previous slide") { url -> client.previous(url, selected) }
+        runBridgeAction("Previous slide", showBusy = false) { url -> client.previous(url, selected) }
     }
 
     fun showNotes() { _state.value = _state.value.copy(showNotes = true) }
@@ -361,10 +361,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return autoPick?.id?.also { selectPresentation(it) }
     }
 
-    private fun runBridgeAction(successMessage: String, action: (String) -> Unit) {
+    private fun runBridgeAction(
+        successMessage: String,
+        showBusy: Boolean = true,
+        action: (String) -> Unit
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             val current = _state.value
-            _state.value = current.copy(isBusy = true)
+            if (showBusy) {
+                _state.value = current.copy(isBusy = true)
+            }
 
             // Use smart retry logic based on network type
             val maxRetries = when (current.networkType) {
@@ -378,7 +384,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             for (attempt in 1..maxRetries) {
                 try {
                     action(current.bridgeUrl)
-                    _state.value = _state.value.copy(statusMessage = successMessage, isBusy = false)
+                    if (showBusy) {
+                        _state.value = _state.value.copy(statusMessage = successMessage, isBusy = false)
+                    }
                     refreshPresentations()
                     return@launch
                 } catch (ex: Exception) {
