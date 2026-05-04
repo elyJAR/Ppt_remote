@@ -142,13 +142,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         runBridgeAction("Slideshow stopped") { url -> client.stopSlideshow(url, selected) }
     }
 
+    private fun optimisticUpdate(presentationId: String, delta: Int) {
+        val current = _state.value
+        val bridgeUrl = current.bridgeUrl
+        if (bridgeUrl.isBlank()) return
+
+        val updatedPresentations = current.presentations.map { pres ->
+            if (pres.id == presentationId && pres.inSlideshow && pres.currentSlide != null) {
+                val newSlideIndex = (pres.currentSlide + delta).coerceIn(1, maxOf(1, pres.totalSlides))
+                val cachedThumb = cachedThumbnail(bridgeUrl, presentationId, newSlideIndex)
+                pres.copy(
+                    currentSlide = newSlideIndex,
+                    currentThumbnail = cachedThumb ?: pres.currentThumbnail
+                )
+            } else pres
+        }
+
+        val activePres = updatedPresentations.firstOrNull { it.id == presentationId }
+        val newSlideIndex = activePres?.currentSlide ?: current.lastThumbnailSlide
+
+        _state.value = current.copy(
+            presentations = updatedPresentations,
+            lastThumbnailSlide = newSlideIndex
+        )
+    }
+
     fun nextSlide() {
         val selected = ensureSelectedPresentation() ?: return
+        optimisticUpdate(selected, 1)
         runBridgeAction("Next slide") { url -> client.next(url, selected) }
     }
 
     fun previousSlide() {
         val selected = ensureSelectedPresentation() ?: return
+        optimisticUpdate(selected, -1)
         runBridgeAction("Previous slide") { url -> client.previous(url, selected) }
     }
 

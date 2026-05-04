@@ -447,7 +447,9 @@ private fun RemoteScreen(
         containerColor = MaterialTheme.colorScheme.screenBg,
     ) { innerPadding ->
 
-        val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = state.isBusy)
+        // We do NOT bind this to state.isBusy, otherwise clicking "Next" (which sets isBusy) 
+        // will cause the entire screen to yank downwards with the pull-to-refresh animation!
+        val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = false)
 
         SwipeRefresh(
             state = swipeRefreshState,
