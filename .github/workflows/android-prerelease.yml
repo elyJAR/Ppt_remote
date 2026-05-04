@@ -42,6 +42,15 @@ jobs:
         shell: bash
         run: gradle wrapper --gradle-version 8.10.2
 
+      # Keep the fallback signing key stable across workflow runs so release
+      # APKs can update previously installed prerelease builds.
+      - name: Restore fallback keystore cache
+        if: ${{ secrets.KEYSTORE_BASE64 == '' }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/release.jks
+          key: android-release-keystore-v1
+
       # ── Auto version bump from tag ────────────────────────────────────────────
       # Reads the tag (e.g. pre-v1.2.1) and writes versionName + versionCode
       # into build.gradle.kts before building so the APK always matches the tag.
@@ -125,6 +134,8 @@ jobs:
             STORE_PASS="$KEYSTORE_PASSWORD"
             KEY_PASS="$KEY_PASSWORD"
             ALIAS="$KEY_ALIAS"
+          elif [ -f "$KEYSTORE_PATH" ]; then
+            echo "Using cached fallback keystore"
           else
             echo "Generating self-signed JKS keystore..."
             keytool -genkeypair \
