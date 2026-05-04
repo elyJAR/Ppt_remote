@@ -5,24 +5,28 @@ This guide explains how to run both the Android app and Desktop Bridge in the ba
 ## Android App - Background Execution
 
 ### Features
+
 - **Foreground Service**: Keeps the app running even when minimized
 - **Persistent Notification**: Shows that the remote control is active
 - **Volume Button Control**: Works even when the app is in the background
 - **Auto-start**: Service starts automatically when you open the app
 
-### How It Works
+### Bridge Operation
+
 1. When you launch the app, a foreground service starts automatically
 2. A persistent notification appears showing "Remote control is active"
 3. The app continues to listen for commands even when:
-   - You switch to other apps
-   - The screen is locked
-   - The phone is in your pocket
+    - You switch to other apps
+    - The screen is locked
+    - The phone is in your pocket
 
 ### Permissions Required
+
 - **FOREGROUND_SERVICE**: Allows the app to run in the background
 - **POST_NOTIFICATIONS**: Shows the persistent notification (Android 13+)
 
 ### User Experience
+
 - Tap the notification to return to the app
 - The service continues running until:
   - You force-stop the app from Settings
@@ -30,6 +34,7 @@ This guide explains how to run both the Android app and Desktop Bridge in the ba
   - The system kills it due to low memory (rare)
 
 ### Battery Impact
+
 The foreground service is designed to be lightweight and should have minimal battery impact. The notification ensures Android gives the app priority to stay running.
 
 ---
@@ -39,6 +44,7 @@ The foreground service is designed to be lightweight and should have minimal bat
 ### Quick Start
 
 #### Option 1: Manual Background Start
+
 ```powershell
 # Start the bridge in background (no console window)
 .\start_background.ps1
@@ -48,6 +54,7 @@ The foreground service is designed to be lightweight and should have minimal bat
 ```
 
 #### Option 2: Automatic Startup on Login
+
 ```powershell
 # Install automatic startup (runs at Windows login)
 .\install_background_startup.ps1
@@ -56,7 +63,8 @@ The foreground service is designed to be lightweight and should have minimal bat
 .\remove_background_startup.ps1
 ```
 
-### Features
+### Bridge Features
+
 - **Hidden Console**: Runs without showing a command prompt window
 - **Auto-start on Login**: Optional scheduled task to start at Windows login
 - **Minimal Logging**: Reduced log output for cleaner background operation
@@ -65,13 +73,17 @@ The foreground service is designed to be lightweight and should have minimal bat
 ### How It Works
 
 #### Background Execution
+
 The `start_background.ps1` script uses `pythonw.exe` (Python without console) to run the bridge service invisibly. The service:
+
 - Listens on port 8787 for API requests
 - Responds to UDP discovery on port 8788
 - Runs with minimal logging (warnings only)
 
 #### Automatic Startup
+
 The `install_background_startup.ps1` creates a Windows Scheduled Task that:
+
 - Runs at user login
 - Starts the bridge automatically
 - Runs hidden in the background
@@ -81,7 +93,7 @@ The `install_background_startup.ps1` creates a Windows Scheduled Task that:
 ### Management Scripts
 
 | Script | Purpose |
-|--------|---------|
+| --- | --- |
 | `start_background.ps1` | Start the bridge in background mode |
 | `stop_background.ps1` | Stop all running bridge processes |
 | `install_background_startup.ps1` | Enable automatic startup at login |
@@ -90,17 +102,20 @@ The `install_background_startup.ps1` creates a Windows Scheduled Task that:
 
 ### Checking If It's Running
 
-**Method 1: Test the API**
+#### Method 1: Test the API
+
 ```powershell
 curl http://localhost:8787/api/health
 ```
 
-**Method 2: Check Task Manager**
+#### Method 2: Check Task Manager
+
 - Open Task Manager (Ctrl+Shift+Esc)
 - Look for `pythonw.exe` or `python.exe` processes
 - Check the command line includes `run_background.py`
 
-**Method 3: Check from Android App**
+#### Method 3: Check from Android App
+
 - Open the PowerPoint Remote app
 - It should automatically discover the bridge
 - Status should show "Connected" or list available presentations
@@ -108,39 +123,51 @@ curl http://localhost:8787/api/health
 ### Troubleshooting
 
 #### Bridge Won't Start
-1. Ensure Python is installed and in PATH
-2. Check if port 8787 is already in use:
-   ```powershell
-   netstat -ano | findstr :8787
-   ```
-3. Try starting with visible console for error messages:
-   ```powershell
-   .\start_bridge.ps1
-   ```
+
+- Ensure Python is installed and in PATH
+- Check if port 8787 is already in use:
+
+```powershell
+netstat -ano | findstr :8787
+```
+
+- Try starting with visible console for error messages:
+
+```powershell
+.\start_bridge.ps1
+```
 
 #### Automatic Startup Not Working
-1. Check if the scheduled task exists:
-   ```powershell
-   Get-ScheduledTask -TaskName "PowerPointBridgeBackground"
-   ```
-2. Verify the task is enabled
-3. Check task history in Task Scheduler (taskschd.msc)
+
+- Check if the scheduled task exists:
+
+```powershell
+Get-ScheduledTask -TaskName "PowerPointBridgeBackground"
+```
+
+- Verify the task is enabled
+- Check task history in Task Scheduler (taskschd.msc)
 
 #### Can't Stop the Bridge
-1. Use the stop script:
-   ```powershell
-   .\stop_background.ps1
-   ```
-2. If that fails, use Task Manager to end the process
-3. As last resort, restart your computer
+
+- Use the stop script:
+
+```powershell
+.\stop_background.ps1
+```
+
+- If that fails, use Task Manager to end the process
+- As last resort, restart your computer
 
 ### Security Notes
+
 - The bridge listens on all network interfaces (0.0.0.0)
 - Ensure your firewall is configured appropriately
 - Only use on trusted networks
 - The bridge has no authentication (designed for local network use)
 
 ### Performance
+
 - **CPU Usage**: Minimal when idle, brief spikes during commands
 - **Memory**: ~50-100 MB depending on Python environment
 - **Network**: Only active when receiving commands or during discovery
@@ -151,6 +178,7 @@ curl http://localhost:8787/api/health
 ## Testing Background Execution
 
 ### Android App Test
+
 1. Open the PowerPoint Remote app
 2. Connect to your desktop bridge
 3. Press the Home button (app goes to background)
@@ -159,22 +187,29 @@ curl http://localhost:8787/api/health
 6. Tap notification to return to app
 
 ### Desktop Bridge Test
+
 1. Start the bridge in background:
-   ```powershell
-   .\start_background.ps1
-   ```
+
+    ```powershell
+    .\start_background.ps1
+    ```
+
 2. Verify no console window appears
 3. Test the API:
-   ```powershell
-   curl http://localhost:8787/api/health
-   ```
+
+    ```powershell
+    curl http://localhost:8787/api/health
+    ```
+
 4. Open the Android app and verify it discovers the bridge
 5. Stop the bridge:
-   ```powershell
-   .\stop_background.ps1
-   ```
+
+    ```powershell
+    .\stop_background.ps1
+    ```
 
 ### End-to-End Test
+
 1. Install automatic startup on desktop
 2. Restart your computer
 3. Wait 10-15 seconds after login
@@ -188,19 +223,19 @@ curl http://localhost:8787/api/health
 
 ## Comparison: Old vs New Behavior
 
-### Android App
+### Android App Uninstall
 
 | Aspect | Before | After |
-|--------|--------|-------|
+| --- | --- | --- |
 | Background execution | Killed when minimized | Stays running with foreground service |
 | Volume buttons | Only work when app is visible | Work even when app is in background |
 | Notification | None | Persistent notification shows status |
 | User awareness | No indication app is running | Clear notification shows active status |
 
-### Desktop Bridge
+### Desktop Bridge Uninstall
 
 | Aspect | Before | After |
-|--------|--------|-------|
+| --- | --- | --- |
 | Console window | Visible command prompt | Hidden background process |
 | Startup | Manual start required | Optional automatic startup at login |
 | Logging | Verbose output | Minimal logging (warnings only) |
@@ -212,11 +247,14 @@ curl http://localhost:8787/api/health
 ## Uninstalling Background Features
 
 ### Android App
+
 The foreground service is part of the app. To disable:
+
 1. Uninstall the app, or
 2. Force-stop the app from Android Settings > Apps
 
 ### Desktop Bridge
+
 ```powershell
 # Remove automatic startup
 .\remove_background_startup.ps1

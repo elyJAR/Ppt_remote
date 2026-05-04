@@ -22,7 +22,7 @@ import java.util.concurrent.Future
  * Distinct from network errors (IOException/timeout) so callers can decide
  * whether to reset the bridge URL or just show a status message.
  */
-class BridgeHttpException(val statusCode: Int, message: String) : Exception(message)
+class BridgeHttpException(val statusCode: Int, message: String) : IllegalStateException(message)
 
 /**
  * HTTP client for communicating with the PPT Remote desktop bridge.
@@ -65,7 +65,7 @@ class BridgeClient {
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val detail = try {
-                    val body = response.body?.string().orEmpty()
+                    val body = response.body?.string().orEmpty().trim()
                     // FastAPI wraps errors as {"detail": "..."}.
                     org.json.JSONObject(body).optString("detail", body).take(200)
                 } catch (_: Exception) { "" }
@@ -74,19 +74,23 @@ class BridgeClient {
                 throw BridgeHttpException(response.code, msg)
             }
 
-            val body = response.body?.string().orEmpty()
+            val body = response.body?.string().orEmpty().trim()
             val arr = JSONArray(body)
             val presentations = mutableListOf<Presentation>()
 
             for (i in 0 until arr.length()) {
                 val item = arr.getJSONObject(i)
                 presentations += Presentation(
-                    id = item.getString("id"),
-                    name = item.getString("name"),
-                    path = item.getString("path"),
-                    inSlideshow = item.getBoolean("in_slideshow"),
-                    currentSlide = if (item.isNull("current_slide")) null else item.getInt("current_slide"),
-                    totalSlides = item.getInt("total_slides")
+                    id = item.optString("id"),
+                    name = item.optString("name"),
+                    path = item.optString("path"),
+                    inSlideshow = item.optBoolean("in_slideshow"),
+                    currentSlide = if (item.has("current_slide") && !item.isNull("current_slide")) {
+                        item.optInt("current_slide")
+                    } else {
+                        null
+                    },
+                    totalSlides = item.optInt("total_slides")
                 )
             }
 
@@ -109,7 +113,7 @@ class BridgeClient {
                     return null
                 }
 
-                val body = response.body?.string().orEmpty()
+                val body = response.body?.string().orEmpty().trim()
                 val json = JSONObject(body)
                 
                 NetworkStatus(
@@ -144,7 +148,7 @@ class BridgeClient {
     }
 
     /** Fetch the current slide thumbnail as raw PNG bytes. Returns null on any error. */
-    fun fetchCurrentThumbnail(url: String, presentationId: String, width: Int = 480): ByteArray? {
+    fun fetchCurrentThumbnail(url: String, presentationId: String, width: Int = 320): ByteArray? {
         return try {
             val client = createClient(timeoutSeconds = 15) // export can be slow
             val request = Request.Builder()
@@ -162,7 +166,7 @@ class BridgeClient {
     }
 
     /** Fetch a specific slide thumbnail by 1-based index. Returns null on any error. */
-    fun fetchSlideThumbnail(url: String, presentationId: String, slideIndex: Int, width: Int = 480): ByteArray? {
+    fun fetchSlideThumbnail(url: String, presentationId: String, slideIndex: Int, width: Int = 320): ByteArray? {
         return try {
             val client = createClient(timeoutSeconds = 15)
             val request = Request.Builder()

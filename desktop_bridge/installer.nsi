@@ -10,7 +10,8 @@ RequestExecutionLevel admin
 
 ; UI Settings
 !define MUI_ABORTWARNING
-!define MUI_ICON "${NSISDIR}\Contrib\Graphics\Icons\modern-install.ico"
+!define MUI_ICON "app_icon.ico"
+!define MUI_UNICON "app_icon.ico"
 
 ; Finish page: offer to launch the app immediately
 ; IMPORTANT: Launch via explorer.exe to drop Admin privileges. If launched directly,

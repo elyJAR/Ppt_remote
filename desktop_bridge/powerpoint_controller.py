@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 import logging
 import os
 import time
@@ -165,6 +166,11 @@ def _paths_match(a: str, b: str) -> bool:
 
 
 class PowerPointController:
+    def __init__(self) -> None:
+        # Cache recently exported slide thumbnails so repeated requests for the
+        # same slide can return immediately.
+        self._thumbnail_cache: OrderedDict[tuple[str, int, int], bytes] = OrderedDict()
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -554,9 +560,15 @@ class PowerPointController:
                 text = ""
             return slide_index, text.strip()
 
-    def _get_slide_thumbnail_impl(self, app: Any, presentation_id: str, slide_index: int, width: int = 960) -> bytes:
+    def _get_slide_thumbnail_impl(self, app: Any, presentation_id: str, slide_index: int, width: int = 320) -> bytes:
         import tempfile
         import os as _os
+
+        cache_key = (presentation_id, slide_index, width)
+        cached = self._thumbnail_cache.get(cache_key)
+        if cached is not None:
+            self._thumbnail_cache.move_to_end(cache_key)
+            return cached
 
         pres = self._find_presentation(app, presentation_id)
 
@@ -585,7 +597,12 @@ class PowerPointController:
             # ppShapeFormatPNG = 2
             slide.Export(tmp_path, "PNG", width, height)
             with open(tmp_path, "rb") as f:
-                return f.read()
+                png_bytes = f.read()
+            self._thumbnail_cache[cache_key] = png_bytes
+            self._thumbnail_cache.move_to_end(cache_key)
+            while len(self._thumbnail_cache) > 16:
+                self._thumbnail_cache.popitem(last=False)
+            return png_bytes
         except Exception as exc:
             raise PowerPointControllerError(
                 f"Could not export slide {slide_index} as PNG: {exc}"
@@ -597,7 +614,7 @@ class PowerPointController:
                 pass
 
     @_on_com_thread
-    def get_slide_thumbnail(self, presentation_id: str, slide_index: int, width: int = 960) -> bytes:
+    def get_slide_thumbnail(self, presentation_id: str, slide_index: int, width: int = 320) -> bytes:
         """Export a single slide as a PNG and return the raw bytes.
 
         Uses PowerPoint's Export() COM method to render the slide at the
@@ -620,7 +637,7 @@ class PowerPointController:
             return self._get_slide_thumbnail_impl(app, presentation_id, slide_index, width)
 
     @_on_com_thread
-    def get_current_slide_thumbnail(self, presentation_id: str, width: int = 960) -> tuple[int, bytes]:
+    def get_current_slide_thumbnail(self, presentation_id: str, width: int = 320) -> tuple[int, bytes]:
         """Export the currently displayed slideshow slide as PNG bytes.
 
         Returns:

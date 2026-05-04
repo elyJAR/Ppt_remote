@@ -327,6 +327,9 @@ def list_presentations() -> list[PresentationDto]:
         items = controller.list_presentations()
         return [PresentationDto(**item.__dict__) for item in items]
     except PowerPointControllerError as exc:
+        message = str(exc)
+        if "PowerPoint is not running" in message or "Open at least one presentation first" in message:
+            return []
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

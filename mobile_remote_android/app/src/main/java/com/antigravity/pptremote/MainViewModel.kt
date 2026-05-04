@@ -408,6 +408,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val note = client.fetchCurrentNotes(effectiveUrl, activePres.id)
                     Pair(note?.notes, note?.slideIndex)
                 } catch (e: Exception) { Pair(null, null) }
+            } else if (activePres == null) {
+                Pair(null, null)
             } else {
                 Pair(_state.value.currentSlideNotes, _state.value.currentSlideNotesIndex)
             }
