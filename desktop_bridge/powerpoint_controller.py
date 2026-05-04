@@ -170,6 +170,10 @@ class PowerPointController:
         # Cache recently exported slide thumbnails so repeated requests for the
         # same slide can return immediately.
         self._thumbnail_cache: OrderedDict[tuple[str, int, int], bytes] = OrderedDict()
+        self._thumbnail_warmup_inflight: set[tuple[str, int, int]] = set()
+        self._thumbnail_warmup_complete: set[tuple[str, int, int]] = set()
+        self._thumbnail_warmup_lock = _threading.Lock()
+        self._thumbnail_warmup_width = 720
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -298,6 +302,7 @@ class PowerPointController:
                 return None
 
             items: list[PresentationInfo] = []
+            warmup_targets: list[tuple[str, int]] = []
 
             for i in range(1, app.Presentations.Count + 1):
                 pres = app.Presentations(i)
@@ -340,6 +345,9 @@ class PowerPointController:
                     )
                 )
 
+                if total_slides > 0:
+                    warmup_targets.append((full_name, total_slides))
+
             # Report files stuck in Protected View so users know why they appear uncontrollable
             try:
                 for i in range(1, app.ProtectedViewWindows.Count + 1):
@@ -360,6 +368,13 @@ class PowerPointController:
                         continue
             except Exception:
                 pass
+
+            for presentation_id, total_slides in warmup_targets:
+                self._schedule_thumbnail_warmup(
+                    presentation_id,
+                    total_slides,
+                    width=self._thumbnail_warmup_width,
+                )
 
             return items
 
@@ -521,6 +536,31 @@ class PowerPointController:
                 )
             window.View.Previous()
 
+    def _schedule_thumbnail_warmup(self, presentation_id: str, total_slides: int, width: int = 720) -> None:
+        cache_key = (presentation_id, total_slides, width)
+        with self._thumbnail_warmup_lock:
+            if cache_key in self._thumbnail_warmup_complete or cache_key in self._thumbnail_warmup_inflight:
+                return
+            self._thumbnail_warmup_inflight.add(cache_key)
+
+        def _worker() -> None:
+            try:
+                self._warm_thumbnail_cache(presentation_id, total_slides, width)
+            finally:
+                with self._thumbnail_warmup_lock:
+                    self._thumbnail_warmup_inflight.discard(cache_key)
+                    self._thumbnail_warmup_complete.add(cache_key)
+
+        _threading.Thread(target=_worker, daemon=True, name=f"thumb-warmup-{_basename(presentation_id)}").start()
+
+    def _warm_thumbnail_cache(self, presentation_id: str, total_slides: int, width: int = 720) -> None:
+        """Pre-render every slide once so later requests hit the in-memory cache."""
+        for slide_index in range(1, total_slides + 1):
+            try:
+                self.get_slide_thumbnail(presentation_id, slide_index, width)
+            except PowerPointControllerError:
+                pass
+
     @_on_com_thread
     def get_all_speaker_notes(self, presentation_id: str) -> list[str]:
         """Return speaker-notes text for every slide (empty string if none)."""
@@ -600,7 +640,7 @@ class PowerPointController:
                 png_bytes = f.read()
             self._thumbnail_cache[cache_key] = png_bytes
             self._thumbnail_cache.move_to_end(cache_key)
-            while len(self._thumbnail_cache) > 16:
+            while len(self._thumbnail_cache) > 512:
                 self._thumbnail_cache.popitem(last=False)
             return png_bytes
         except Exception as exc:
@@ -623,7 +663,7 @@ class PowerPointController:
         Args:
             presentation_id: FullName / path of the open presentation.
             slide_index:      1-based slide number.
-            width:            Output image width in pixels (default 960).
+            width:            Output image width in pixels (default 720).
 
         Returns:
             PNG image bytes.

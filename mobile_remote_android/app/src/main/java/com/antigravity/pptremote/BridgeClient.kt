@@ -37,8 +37,15 @@ class BridgeClient {
     /** Optional API key sent as `X-Api-Key` on every request. Set from [RemotePrefs.getApiKey]. */
     var apiKey: String = ""
 
+    private val baseClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
+        .build()
+
     private fun createClient(timeoutSeconds: Int = 10): OkHttpClient {
-        return OkHttpClient.Builder()
+        return if (timeoutSeconds == 10) baseClient
+        else baseClient.newBuilder()
             .connectTimeout(timeoutSeconds.toLong(), TimeUnit.SECONDS)
             .readTimeout(timeoutSeconds.toLong(), TimeUnit.SECONDS)
             .writeTimeout(timeoutSeconds.toLong(), TimeUnit.SECONDS)
@@ -148,7 +155,7 @@ class BridgeClient {
     }
 
     /** Fetch the current slide thumbnail as raw PNG bytes. Returns null on any error. */
-    fun fetchCurrentThumbnail(url: String, presentationId: String, width: Int = 320): ByteArray? {
+    fun fetchCurrentThumbnail(url: String, presentationId: String, width: Int = 720): ByteArray? {
         return try {
             val client = createClient(timeoutSeconds = 15) // export can be slow
             val request = Request.Builder()
@@ -166,7 +173,7 @@ class BridgeClient {
     }
 
     /** Fetch a specific slide thumbnail by 1-based index. Returns null on any error. */
-    fun fetchSlideThumbnail(url: String, presentationId: String, slideIndex: Int, width: Int = 320): ByteArray? {
+    fun fetchSlideThumbnail(url: String, presentationId: String, slideIndex: Int, width: Int = 720): ByteArray? {
         return try {
             val client = createClient(timeoutSeconds = 15)
             val request = Request.Builder()

@@ -12,10 +12,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+    private companion object {
+        const val PRELOAD_THUMBNAIL_WIDTH = 720
+    }
+
     private val client = BridgeClient()
     private val appContext = getApplication<Application>()
+    private val thumbnailCache = ConcurrentHashMap<String, ConcurrentHashMap<Int, ByteArray>>()
+    private val thumbnailWarmupComplete = ConcurrentHashMap.newKeySet<String>()
+    private val thumbnailWarmupInFlight = ConcurrentHashMap.newKeySet<String>()
     private var lastNetworkType: NetworkType = NetworkType.UNKNOWN
     private var networkChangeCallbackRegistered = false
 
@@ -246,6 +254,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    private fun cacheKey(bridgeUrl: String, presentationId: String): String {
+        return "${bridgeUrl.trimEnd('/')} $presentationId"
+    }
+
+    private fun thumbnailSetKey(bridgeUrl: String, presentationId: String, totalSlides: Int): String {
+        return "${cacheKey(bridgeUrl, presentationId)} $totalSlides $PRELOAD_THUMBNAIL_WIDTH"
+    }
+
+    private fun cacheThumbnail(bridgeUrl: String, presentationId: String, slideIndex: Int, bytes: ByteArray) {
+        val set = thumbnailCache.getOrPut(cacheKey(bridgeUrl, presentationId)) { ConcurrentHashMap() }
+        set[slideIndex] = bytes
+    }
+
+    private fun cachedThumbnail(bridgeUrl: String, presentationId: String, slideIndex: Int): ByteArray? {
+        return thumbnailCache[cacheKey(bridgeUrl, presentationId)]?.get(slideIndex)
+    }
+
+    private fun preloadThumbnailsIfNeeded(bridgeUrl: String, presentations: List<Presentation>) {
+        presentations
+            .filter { it.totalSlides > 0 }
+            .forEach { presentation ->
+                val key = thumbnailSetKey(bridgeUrl, presentation.id, presentation.totalSlides)
+                if (!thumbnailWarmupComplete.add(key) || !thumbnailWarmupInFlight.add(key)) return@forEach
+
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        for (slideIndex in 1..presentation.totalSlides) {
+                            val thumbnail = try {
+                                client.fetchSlideThumbnail(
+                                    bridgeUrl,
+                                    presentation.id,
+                                    slideIndex,
+                                    PRELOAD_THUMBNAIL_WIDTH
+                                )
+                            } catch (_: Exception) {
+                                null
+                            }
+                            if (thumbnail != null) {
+                                cacheThumbnail(bridgeUrl, presentation.id, slideIndex, thumbnail)
+                            }
+                        }
+                    } finally {
+                        thumbnailWarmupInFlight.remove(key)
+                        thumbnailWarmupComplete.add(key)
+                    }
+                }
+            }
+    }
+
     private fun buildBridgeUrl(baseUrl: String, port: Int): String {
         if (baseUrl.isBlank()) return ""
         
@@ -379,22 +436,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val bridgeNetworkWarning = client.getNetworkStatus(effectiveUrl)?.warning
             val bridgeReachable = true  // if fetchPresentations succeeded, bridge is reachable
 
+            // Kick off thumbnail warmup in the background so the bridge can cache
+            // every slide before the user starts browsing on the phone.
+            preloadThumbnailsIfNeeded(effectiveUrl, presentations)
+
             // Find the active slideshow presentation
             val activePres = presentations.firstOrNull { it.inSlideshow }
             val activeSlide = activePres?.currentSlide
             val prevSlide = _state.value.lastThumbnailSlide
+            val activeCachedThumb = activePres?.currentSlide?.let {
+                cachedThumbnail(effectiveUrl, activePres.id, it)
+            }
 
             // Only re-fetch thumbnail when the slide number actually changes (avoids
             // a 1-3s PowerPoint export on every 2s poll tick)
-            val presentationsWithThumbnails = if (activePres != null && activeSlide != prevSlide) {
-                val thumb = try { client.fetchCurrentThumbnail(effectiveUrl, activePres.id) } catch (e: Exception) { null }
+            val presentationsWithThumbnails = if (activePres != null && activeSlide != null && activeSlide != prevSlide) {
+                val thumb = activeCachedThumb ?: try {
+                    client.fetchCurrentThumbnail(effectiveUrl, activePres.id, PRELOAD_THUMBNAIL_WIDTH)
+                } catch (e: Exception) { null }
+                if (thumb != null) {
+                    cacheThumbnail(effectiveUrl, activePres.id, activeSlide, thumb)
+                }
                 presentations.map { pres ->
                     if (pres.id == activePres.id) pres.copy(currentThumbnail = thumb)
                     else pres.copy(currentThumbnail = null)
                 }
             } else {
-                // Preserve existing thumbnails from state for the active pres, clear others
-                val existingThumb = _state.value.presentations
+                // Preserve existing thumbnails from state for the active pres, clear others.
+                val existingThumb = activeCachedThumb ?: _state.value.presentations
                     .firstOrNull { it.id == activePres?.id }?.currentThumbnail
                 presentations.map { pres ->
                     if (pres.id == activePres?.id) pres.copy(currentThumbnail = existingThumb)

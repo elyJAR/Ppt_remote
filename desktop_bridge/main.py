@@ -425,7 +425,7 @@ def get_slide_thumbnail(
     request: Request,
     presentation_id: str,
     slide_index: int,
-    width: int = 960,
+    width: int = 720,
 ):
     from fastapi.responses import Response  # noqa: PLC0415
     try:
@@ -446,7 +446,7 @@ def get_slide_thumbnail(
 def get_current_slide_thumbnail(
     request: Request,
     presentation_id: str,
-    width: int = 960,
+    width: int = 720,
 ):
     from fastapi.responses import Response  # noqa: PLC0415
     try:
