@@ -211,8 +211,8 @@ def main() -> None:
                         # Check LAN IP
                         new_lan_ip = get_lan_ip()
                         
-                        # Check Client IP (for FTP) - access through module
-                        new_client_ip = getattr(main, "LAST_CLIENT_IP", None)
+                        # Check Client IP (for FTP) - access through shared STATE
+                        new_client_ip = main.STATE.get("last_client_ip")
                         
                         if new_lan_ip != current_lan_ip or new_client_ip != current_client_ip:
                             _logger.info("IP state changed (LAN: %s -> %s, Client: %s -> %s) — refreshing tray", 
@@ -220,7 +220,6 @@ def main() -> None:
                             current_lan_ip = new_lan_ip
                             current_client_ip = new_client_ip
                             new_url = f"http://{new_lan_ip}:{BRIDGE_PORT}"
-                            # tray.set_bridge_url rebuilds the entire menu
                             tray.set_bridge_url(new_url)
                     except Exception as e:
                         _logger.debug("IP Monitor loop error: %s", e)

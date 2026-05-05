@@ -158,8 +158,15 @@ class TrayIconManager:
 
         # FTP Feature - Open Android Files
         import main
-        if main.LAST_CLIENT_IP:
+        client_ip = main.STATE.get("last_client_ip")
+        if client_ip:
             menu_items.append(pystray.MenuItem("📁 Open Android Files", self._handle_open_ftp))
+            menu_items.append(pystray.MenuItem("🔄 Refresh Client Info", lambda i, m: self.icon.update_menu()))
+            menu_items.append(pystray.Menu.SEPARATOR)
+        else:
+            # Show a placeholder to confirm the bridge is watching
+            menu_items.append(pystray.MenuItem("⌛ Waiting for Mobile...", lambda i, m: None, enabled=False))
+            menu_items.append(pystray.MenuItem("🔄 Refresh", lambda i, m: self.icon.update_menu()))
             menu_items.append(pystray.Menu.SEPARATOR)
 
         menu_items.append(pystray.MenuItem("Quit", self._handle_quit))
@@ -168,12 +175,15 @@ class TrayIconManager:
     def _handle_open_ftp(self, icon: "pystray.Icon", item: "pystray.MenuItem") -> None:
         import main
         import subprocess
-        if main.LAST_CLIENT_IP:
-            ftp_url = f"ftp://{main.LAST_CLIENT_IP}:2121"
+        client_ip = main.STATE.get("last_client_ip")
+        if client_ip:
+            # Force the trailing slash and ensure port 2121
+            ftp_url = f"ftp://{client_ip}:2121/"
             _logger.info("Opening Android files in Explorer: %s", ftp_url)
             try:
-                # Force Windows File Explorer instead of default browser
-                subprocess.Popen(["explorer", ftp_url])
+                # Force Windows File Explorer by using explorer.exe explicitly with shell=True
+                # and quotes. This is the most reliable way to prevent browser hijacking.
+                subprocess.Popen(f'explorer.exe "{ftp_url}"', shell=True)
             except Exception as exc:
                 _logger.error("Failed to open FTP explorer: %s", exc)
 

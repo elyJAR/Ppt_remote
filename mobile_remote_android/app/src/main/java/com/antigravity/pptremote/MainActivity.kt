@@ -411,9 +411,12 @@ private fun RemoteScreen(
                         Switch(
                             checked = state.isFtpEnabled,
                             onCheckedChange = { onToggleFtp() },
+                            enabled = !state.isFtpAutoStart,
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
                                 checkedTrackColor = Green,
+                                disabledCheckedThumbColor = Color.White.copy(alpha = 0.6f),
+                                disabledCheckedTrackColor = Green.copy(alpha = 0.5f)
                             )
                         )
                     }
