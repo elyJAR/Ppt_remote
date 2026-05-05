@@ -119,18 +119,20 @@ class TrayIconManager:
 
     def set_bridge_url(self, bridge_url: str) -> None:
         """Update the bridge URL displayed in the tray menu."""
-        if self._icon is None or not PYSTRAY_AVAILABLE:
-            self._bridge_url = bridge_url
-            return
-        
         if self._bridge_url == bridge_url:
+            # Still update the menu because client_ip might have changed
+            self.update_menu()
             return
 
         self._bridge_url = bridge_url
         logger.info("Updating tray menu with new bridge URL: %s", bridge_url)
-        
+        self.update_menu()
+
+    def update_menu(self) -> None:
+        """Force a rebuild and refresh of the system tray menu."""
+        if self._icon is None or not PYSTRAY_AVAILABLE:
+            return
         try:
-            # Reconstruct the menu with the new URL
             menu_items = self._build_menu_items()
             self._icon.menu = pystray.Menu(*menu_items)
         except Exception as exc:
@@ -161,12 +163,12 @@ class TrayIconManager:
         client_ip = main.STATE.get("last_client_ip")
         if client_ip:
             menu_items.append(pystray.MenuItem(f"📁 Open Android Files (Port 2121)", self._handle_open_ftp))
-            menu_items.append(pystray.MenuItem("🔄 Refresh Client Info", lambda i, m: self.icon.update_menu()))
+            menu_items.append(pystray.MenuItem("🔄 Refresh Client Info", lambda i, m: self.update_menu()))
             menu_items.append(pystray.Menu.SEPARATOR)
         else:
             # Show a placeholder to confirm the bridge is watching
             menu_items.append(pystray.MenuItem("⌛ Waiting for Mobile...", lambda i, m: None, enabled=False))
-            menu_items.append(pystray.MenuItem("🔄 Refresh", lambda i, m: self.icon.update_menu()))
+            menu_items.append(pystray.MenuItem("🔄 Refresh", lambda i, m: self.update_menu()))
             menu_items.append(pystray.Menu.SEPARATOR)
 
         menu_items.append(pystray.MenuItem("Quit", self._handle_quit))
