@@ -58,6 +58,7 @@ data class RemoteState(
     val selectedPresentationId: String? = null,
     val statusMessage: String = "Searching for desktop bridge...",
     val isBusy: Boolean = false,
+    val isRefreshing: Boolean = false,
     val networkType: NetworkType = NetworkType.UNKNOWN,
     val networkWarning: String? = null,
     val bridgeNetworkWarning: String? = null,
@@ -77,6 +78,7 @@ data class RemoteState(
     // Speaker notes for the current slide
     val currentSlideNotes: String? = null,
     val currentSlideNotesIndex: Int? = null,
+    val speakerNotes: List<String>? = null,
     // Track last thumbnail slide to avoid re-fetching the same slide
     val lastThumbnailSlide: Int? = null,
     // Multi-bridge

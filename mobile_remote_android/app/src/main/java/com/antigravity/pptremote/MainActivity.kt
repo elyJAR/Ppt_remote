@@ -459,7 +459,6 @@ private fun RemoteScreen(
         )
     }
 }
-}
 
 // ─── Connection card ──────────────────────────────────────────────────────────
 
@@ -1241,7 +1240,7 @@ private fun SettingsScreen(
 
             Spacer(Modifier.height(40.dp))
             Text(
-                "Version 1.6.9 • Antigravity AI",
+                "Version 1.7.0 • Antigravity AI",
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
@@ -1366,7 +1365,7 @@ private fun NotesScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(notes.size) { index ->
+                items(count = notes.size) { index ->
                     val isCurrent = pres?.currentSlide == (index + 1)
                     AppCard(
                         borderColor = if (isCurrent) Accent else MaterialTheme.colorScheme.divider,
@@ -1400,10 +1399,11 @@ private fun NotesScreen(
                                     }
                                 }
                             }
+                            val rawNote = notes[index]
                             Text(
-                                text = notes[index].ifBlank { "(No notes for this slide)" },
+                                text = if (rawNote.isBlank()) "(No notes for this slide)" else rawNote,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (notes[index].isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
+                                color = if (rawNote.isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
                                 lineHeight = 22.sp
                             )
                         }
