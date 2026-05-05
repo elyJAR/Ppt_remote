@@ -936,10 +936,10 @@ private fun EmptyStateCard(connected: Boolean, isFiltered: Boolean = false) {
 fun ShimmerBrush(): Brush {
     val transition = rememberInfiniteTransition(label = "shimmer")
     val translateAnim by transition.animateFloat(
-        initialValue = -500f,
-        targetValue = 1500f,
+        initialValue = -1000f,
+        targetValue = 2000f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "shimmer"
@@ -947,12 +947,12 @@ fun ShimmerBrush(): Brush {
 
     return Brush.linearGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
         ),
         start = Offset(x = translateAnim, y = translateAnim),
-        end = Offset(x = translateAnim + 500f, y = translateAnim + 500f)
+        end = Offset(x = translateAnim + 800f, y = translateAnim + 800f)
     )
 }
 

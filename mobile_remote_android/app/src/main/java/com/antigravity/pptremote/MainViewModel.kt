@@ -282,6 +282,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Reset connection state when switching bridges
             presentations = emptyList(),
             statusMessage = "Connecting...",
+            isBusy = true,
             lastThumbnailSlide = null,
             currentSlideNotes = null
         )
@@ -459,6 +460,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (detectedUrl == null) {
                 _state.value = _state.value.copy(
                     presentations = emptyList(),
+                    isBusy = true,
                     statusMessage = "Searching for desktop bridge..."
                 )
                 return
@@ -579,7 +581,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     "No open PowerPoint files detected"
                 } else {
                     "Connected"
-                }
+                },
+                isBusy = false
             )
         } catch (ex: Exception) {
             val nowState = _state.value
@@ -596,6 +599,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 _state.value = nowState.copy(
                     bridgeReachable = true,
+                    isBusy = false,
                     statusMessage = friendlyMsg
                 )
                 return
@@ -609,6 +613,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     bridgeUrl = "",
                     failureCount = 0,
                     bridgeReachable = false,
+                    isBusy = true,
                     statusMessage = "Connection lost. Searching for bridge..."
                 )
                 RemotePrefs.setBridgeUrl(appContext, "")
@@ -616,6 +621,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = nowState.copy(
                     failureCount = newFailCount,
                     bridgeReachable = false,
+                    isBusy = false,
                     statusMessage = ex.message ?: "Unable to reach bridge"
                 )
             }
