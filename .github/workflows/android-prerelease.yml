@@ -18,7 +18,7 @@ jobs:
   build-and-prerelease:
     runs-on: ubuntu-latest
     env:
-      RELEASE_KEYSTORE_BASE64: ${{ secrets['KEYSTORE_BASE64'] }}
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
     defaults:
       run:
@@ -117,10 +117,10 @@ jobs:
         id: keystore
         shell: bash
         env:
-          KEYSTORE_BASE64:   ${{ secrets['KEYSTORE_BASE64'] }}
-          KEYSTORE_PASSWORD: ${{ secrets['KEYSTORE_PASSWORD'] }}
-          KEY_ALIAS:         ${{ secrets['KEY_ALIAS'] }}
-          KEY_PASSWORD:      ${{ secrets['KEY_PASSWORD'] }}
+          KEYSTORE_BASE64:   ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS:         ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD:      ${{ secrets.KEY_PASSWORD }}
         run: |
           KEYSTORE_PATH="${RUNNER_TEMP}/release.jks"
           # Single password for store+key — PKCS12 (JDK 9+ default) requires them to match
