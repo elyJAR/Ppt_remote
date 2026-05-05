@@ -458,6 +458,7 @@ private fun RemoteScreen(
             trackColor = MaterialTheme.colorScheme.screenBg,
         )
     }
+    }
 }
 
 // ─── Connection card ──────────────────────────────────────────────────────────
