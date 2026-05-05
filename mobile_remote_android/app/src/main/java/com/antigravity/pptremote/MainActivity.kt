@@ -519,6 +519,19 @@ private fun RemoteScreen(
         }
     }
 
+    // Floating Settings Button
+    FloatingActionButton(
+        onClick = onShowSettings,
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = Color.White,
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(16.dp)
+            .padding(bottom = 12.dp) // extra padding to avoid linear progress indicator
+    ) {
+        Icon(Icons.Default.Settings, contentDescription = "Settings")
+    }
+
     // Global busy indicator fixed at the bottom edge
     AnimatedVisibility(
         visible = state.isBusy,
