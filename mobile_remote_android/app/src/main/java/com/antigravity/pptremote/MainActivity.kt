@@ -1354,7 +1354,14 @@ private fun SettingsSection(title: String, content: @Composable () -> Unit) {
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 4.dp)
         )
-        AppCard(content = content)
+        AppCard {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                content()
+            }
+        }
     }
 }
 
