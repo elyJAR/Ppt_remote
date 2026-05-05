@@ -160,7 +160,7 @@ class TrayIconManager:
         import main
         client_ip = main.STATE.get("last_client_ip")
         if client_ip:
-            menu_items.append(pystray.MenuItem("📁 Open Android Files", self._handle_open_ftp))
+            menu_items.append(pystray.MenuItem(f"📁 Open Android Files (Port 2121)", self._handle_open_ftp))
             menu_items.append(pystray.MenuItem("🔄 Refresh Client Info", lambda i, m: self.icon.update_menu()))
             menu_items.append(pystray.Menu.SEPARATOR)
         else:
@@ -179,13 +179,13 @@ class TrayIconManager:
         if client_ip:
             # Force the trailing slash and ensure port 2121
             ftp_url = f"ftp://{client_ip}:2121/"
-            _logger.info("Opening Android files in Explorer: %s", ftp_url)
+            logger.info("Opening Android files in Explorer: %s", ftp_url)
             try:
-                # Force Windows File Explorer by using explorer.exe explicitly with shell=True
-                # and quotes. This is the most reliable way to prevent browser hijacking.
-                subprocess.Popen(f'explorer.exe "{ftp_url}"', shell=True)
+                # Force Windows File Explorer by using explorer.exe explicitly.
+                # Using a list instead of a shell string is generally more robust.
+                subprocess.Popen(["explorer.exe", ftp_url])
             except Exception as exc:
-                _logger.error("Failed to open FTP explorer: %s", exc)
+                logger.error("Failed to open FTP explorer: %s", exc)
 
     # ------------------------------------------------------------------
 
