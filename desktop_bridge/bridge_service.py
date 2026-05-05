@@ -201,15 +201,24 @@ def main() -> None:
 
             # Start IP monitoring thread
             def _monitor_ip() -> None:
-                current_ip = lan_ip
+                current_lan_ip = lan_ip
+                current_client_ip = None
                 while True:
-                    time.sleep(10)
-                    new_ip = get_lan_ip()
-                    if new_ip != current_ip:
-                        _logger.info("LAN IP changed from %s to %s — updating tray", current_ip, new_ip)
-                        current_ip = new_ip
-                        new_url = f"http://{new_ip}:{BRIDGE_PORT}"
-                        tray.set_bridge_url(new_url)
+                    time.sleep(5)
+                    # Check LAN IP
+                    new_lan_ip = get_lan_ip()
+                    
+                    # Check Client IP (for FTP)
+                    from main import LAST_CLIENT_IP
+                    new_client_ip = LAST_CLIENT_IP
+                    
+                    if new_lan_ip != current_lan_ip or new_client_ip != current_client_ip:
+                        _logger.info("IP state changed (LAN: %s -> %s, Client: %s -> %s) — updating tray", 
+                                    current_lan_ip, new_lan_ip, current_client_ip, new_client_ip)
+                        current_lan_ip = new_lan_ip
+                        current_client_ip = new_client_ip
+                        new_url = f"http://{new_lan_ip}:{BRIDGE_PORT}"
+                        tray.set_bridge_url(new_url) # This refreshes the menu in tray_icon.py
 
             threading.Thread(target=_monitor_ip, daemon=True, name="IpMonitor").start()
 

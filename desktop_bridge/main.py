@@ -48,6 +48,9 @@ def _setup_logging() -> None:
 _setup_logging()
 _logger = logging.getLogger(__name__)
 
+# Track the last client IP that contacted the bridge
+LAST_CLIENT_IP: str | None = None
+
 # ---------------------------------------------------------------------------
 # Configuration (overridable via environment variables)
 # ---------------------------------------------------------------------------
@@ -234,6 +237,19 @@ if REQUEST_TIMEOUT > 0:
                 )
 
     app.add_middleware(TimeoutMiddleware)
+
+# ---------------------------------------------------------------------------
+# Client IP tracking middleware
+# ---------------------------------------------------------------------------
+class ClientIpTrackerMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        global LAST_CLIENT_IP
+        client_host = request.client.host if request.client else None
+        if client_host and client_host != "127.0.0.1":
+            LAST_CLIENT_IP = client_host
+        return await call_next(request)
+
+app.add_middleware(ClientIpTrackerMiddleware)
 
 # ---------------------------------------------------------------------------
 # Rate limiting (slowapi)

@@ -43,6 +43,18 @@ class RemoteControlService : Service() {
         const val ACTION_START         = "com.antigravity.pptremote.action.START"
         const val ACTION_STOP_SHOW     = "com.antigravity.pptremote.action.STOP_SHOW"
         const val ACTION_STOP_SERVICE  = "com.antigravity.pptremote.action.STOP_SERVICE"
+        const val ACTION_TOGGLE_FTP    = "com.antigravity.pptremote.action.TOGGLE_FTP"
+
+        private val ftpManager = FtpServerManager()
+
+        fun toggleFtp(context: Context) {
+            val intent = Intent(context, RemoteControlService::class.java).apply {
+                action = ACTION_TOGGLE_FTP
+            }
+            context.startService(intent)
+        }
+
+        fun isFtpRunning(): Boolean = ftpManager.isRunning()
 
         fun start(context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -101,6 +113,12 @@ class RemoteControlService : Service() {
             try {
                 startForeground(NOTIFICATION_ID, createNotification())
                 isStarted = true
+
+                // Auto-start FTP if enabled
+                if (RemotePrefs.isFtpAutoStart(this)) {
+                    ftpManager.start()
+                    RemotePrefs.setFtpEnabled(this, true)
+                }
             } catch (e: Exception) {
                 android.util.Log.e("RemoteControlService", "startForeground failed", e)
                 stopSelf()
@@ -114,7 +132,17 @@ class RemoteControlService : Service() {
             ACTION_PREVIOUS      -> executeBridgeAction("previous")
             ACTION_START         -> executeBridgeAction("start")
             ACTION_STOP_SHOW     -> executeBridgeAction("stop")
+            ACTION_TOGGLE_FTP    -> {
+                if (ftpManager.isRunning()) {
+                    ftpManager.stop()
+                    RemotePrefs.setFtpEnabled(this, false)
+                } else {
+                    ftpManager.start()
+                    RemotePrefs.setFtpEnabled(this, true)
+                }
+            }
             ACTION_STOP_SERVICE  -> {
+                ftpManager.stop()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -127,6 +155,7 @@ class RemoteControlService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        ftpManager.stop()
         mediaSession?.isActive = false
         mediaSession?.release()
         mediaSession = null

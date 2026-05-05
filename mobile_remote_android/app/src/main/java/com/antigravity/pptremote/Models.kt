@@ -85,5 +85,8 @@ data class RemoteState(
     val bridges: List<SavedBridge> = emptyList(),
     val activeBridgeIndex: Int = 0,
     // Connection tracking
-    val failureCount: Int = 0
+    val failureCount: Int = 0,
+    // FTP Feature
+    val isFtpEnabled: Boolean = false,
+    val isFtpAutoStart: Boolean = false
 )

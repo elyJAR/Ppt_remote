@@ -39,7 +39,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             notificationText = RemotePrefs.getNotificationText(appContext),
             apiKey = RemotePrefs.getApiKey(appContext),
             bridges = RemotePrefs.getBridges(appContext),
-            activeBridgeIndex = RemotePrefs.getActiveBridgeIndex(appContext)
+            activeBridgeIndex = RemotePrefs.getActiveBridgeIndex(appContext),
+            isFtpEnabled = RemotePrefs.isFtpEnabled(appContext),
+            isFtpAutoStart = RemotePrefs.isFtpAutoStart(appContext)
         )
     )
     val state: StateFlow<RemoteState> = _state.asStateFlow()
@@ -242,6 +244,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         RemotePrefs.setApiKey(appContext, key)
         client.apiKey = key
         _state.value = _state.value.copy(apiKey = key)
+    }
+
+    fun toggleFtp() {
+        RemoteControlService.toggleFtp(appContext)
+        // Briefly delay to let the service update the state
+        viewModelScope.launch {
+            delay(200)
+            _state.value = _state.value.copy(isFtpEnabled = RemotePrefs.isFtpEnabled(appContext))
+        }
+    }
+
+    fun updateFtpAutoStart(enabled: Boolean) {
+        RemotePrefs.setFtpAutoStart(appContext, enabled)
+        _state.value = _state.value.copy(isFtpAutoStart = enabled)
     }
 
     // ── Multi-bridge ──────────────────────────────────────────────────────────

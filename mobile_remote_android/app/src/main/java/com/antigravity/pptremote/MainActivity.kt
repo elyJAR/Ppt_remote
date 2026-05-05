@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -141,6 +142,7 @@ class MainActivity : ComponentActivity() {
                             onUpdateTheme = viewModel::updateTheme,
                             onUpdateNotificationText = viewModel::updateNotificationText,
                             onUpdateApiKey = viewModel::updateApiKey,
+                            onUpdateFtpAutoStart = viewModel::updateFtpAutoStart,
                         )
                     }
                     state.showNotes -> {
@@ -166,6 +168,7 @@ class MainActivity : ComponentActivity() {
                             onRemoveBridge = viewModel::removeBridge,
                             onSelectBridge = viewModel::selectBridge,
                             onSearchQueryChange = viewModel::updateSearchQuery,
+                            onToggleFtp = viewModel::toggleFtp,
                         )
                     }
                 }
@@ -222,6 +225,20 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (_: Exception) {}
         }
+        
+        // Request Manage External Storage for FTP on Android 11+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                    intent.data = Uri.parse("package:$packageName")
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    startActivity(intent)
+                }
+            }
+        }
     }
 
     private fun ensureNotificationPermissionAndStartService() {
@@ -257,6 +274,7 @@ private fun RemoteScreen(
     onRemoveBridge: (Int) -> Unit,
     onSelectBridge: (Int) -> Unit,
     onSearchQueryChange: (String) -> Unit,
+    onToggleFtp: () -> Unit,
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -348,6 +366,58 @@ private fun RemoteScreen(
                     onRemoveBridge = onRemoveBridge,
                     onSelectBridge = onSelectBridge,
                 )
+            }
+
+            // ── FTP Server card ──────────────────────────────────────────────
+            item {
+                AppCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (state.isFtpEnabled) Green.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Folder,
+                                    contentDescription = null,
+                                    tint = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    "FTP Server",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.textPrimary
+                                )
+                                Text(
+                                    if (state.isFtpEnabled) "Running on port 2121" else "Offline",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = state.isFtpEnabled,
+                            onCheckedChange = { onToggleFtp() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Green,
+                            )
+                        )
+                    }
+                }
             }
 
             // ── Warning banners ──────────────────────────────────────────────
@@ -1175,6 +1245,7 @@ private fun SettingsScreen(
     onUpdateTheme: (Boolean) -> Unit,
     onUpdateNotificationText: (String) -> Unit,
     onUpdateApiKey: (String) -> Unit,
+    onUpdateFtpAutoStart: (Boolean) -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -1230,6 +1301,12 @@ private fun SettingsScreen(
                     value = state.apiKey ?: "",
                     onValueChange = onUpdateApiKey,
                     isPassword = true
+                )
+                SettingsSwitchRow(
+                    title = "Auto-start FTP",
+                    subtitle = "Start FTP server when app opens",
+                    checked = state.isFtpAutoStart,
+                    onCheckedChange = onUpdateFtpAutoStart
                 )
             }
 
