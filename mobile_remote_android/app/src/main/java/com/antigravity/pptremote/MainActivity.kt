@@ -299,7 +299,11 @@ private fun RemoteScreen(
         } catch (_: Exception) {}
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.screenBg)) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(MaterialTheme.colorScheme.screenBg)
+        .statusBarsPadding()
+    ) {
         SwipeRefresh(
             state = rememberSwipeRefreshState(state.isRefreshing),
             onRefresh = onRefresh,
@@ -932,10 +936,10 @@ private fun EmptyStateCard(connected: Boolean, isFiltered: Boolean = false) {
 fun ShimmerBrush(): Brush {
     val transition = rememberInfiniteTransition(label = "shimmer")
     val translateAnim by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
+        initialValue = -500f,
+        targetValue = 1500f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "shimmer"
@@ -943,13 +947,12 @@ fun ShimmerBrush(): Brush {
 
     return Brush.linearGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            MaterialTheme.colorScheme.surfaceVariant,
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         ),
-        start = Offset(x = translateAnim - 500f, y = translateAnim - 500f),
-        end = Offset(x = translateAnim, y = translateAnim),
-        tileMode = TileMode.Repeated
+        start = Offset(x = translateAnim, y = translateAnim),
+        end = Offset(x = translateAnim + 500f, y = translateAnim + 500f)
     )
 }
 
