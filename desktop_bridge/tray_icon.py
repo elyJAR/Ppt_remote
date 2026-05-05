@@ -157,8 +157,8 @@ class TrayIconManager:
             menu_items.append(pystray.Menu.SEPARATOR)
 
         # FTP Feature - Open Android Files
-        from main import LAST_CLIENT_IP  # noqa: PLC0415
-        if LAST_CLIENT_IP:
+        import main
+        if main.LAST_CLIENT_IP:
             menu_items.append(pystray.MenuItem("📁 Open Android Files", self._handle_open_ftp))
             menu_items.append(pystray.Menu.SEPARATOR)
 
@@ -166,17 +166,16 @@ class TrayIconManager:
         return menu_items
 
     def _handle_open_ftp(self, icon: "pystray.Icon", item: "pystray.MenuItem") -> None:
-        import os
+        import main
         import subprocess
-        from main import LAST_CLIENT_IP
-        if LAST_CLIENT_IP:
-            ftp_url = f"ftp://{LAST_CLIENT_IP}:2121"
-            logger.info("Opening FTP explorer for %s", ftp_url)
+        if main.LAST_CLIENT_IP:
+            ftp_url = f"ftp://{main.LAST_CLIENT_IP}:2121"
+            _logger.info("Opening Android files in Explorer: %s", ftp_url)
             try:
-                # On Windows, 'start' can open ftp links in Explorer
-                os.startfile(ftp_url)
+                # Force Windows File Explorer instead of default browser
+                subprocess.Popen(["explorer", ftp_url])
             except Exception as exc:
-                logger.error("Failed to open FTP explorer: %s", exc)
+                _logger.error("Failed to open FTP explorer: %s", exc)
 
     # ------------------------------------------------------------------
 

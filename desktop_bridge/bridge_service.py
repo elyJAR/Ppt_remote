@@ -201,6 +201,7 @@ def main() -> None:
 
             # Start IP monitoring thread
             def _monitor_ip() -> None:
+                import main
                 current_lan_ip = lan_ip
                 current_client_ip = None
                 while True:
@@ -209,8 +210,7 @@ def main() -> None:
                     new_lan_ip = get_lan_ip()
                     
                     # Check Client IP (for FTP)
-                    from main import LAST_CLIENT_IP
-                    new_client_ip = LAST_CLIENT_IP
+                    new_client_ip = main.LAST_CLIENT_IP
                     
                     if new_lan_ip != current_lan_ip or new_client_ip != current_client_ip:
                         _logger.info("IP state changed (LAN: %s -> %s, Client: %s -> %s) — updating tray", 
