@@ -79,6 +79,6 @@ jobs:
           tag: ${{ steps.tag.outputs.value }}
           prerelease: true
           allowUpdates: true
-          replacesArtifacts: false
+          replacesArtifacts: true
           artifacts: desktop_bridge/dist/PptRemoteBridge.exe
           artifactErrorsFailBuild: true
