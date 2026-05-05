@@ -204,21 +204,27 @@ def main() -> None:
                 import main
                 current_lan_ip = lan_ip
                 current_client_ip = None
+                _logger.info("IP Monitor thread started (poll: 2s)")
                 while True:
-                    time.sleep(5)
-                    # Check LAN IP
-                    new_lan_ip = get_lan_ip()
-                    
-                    # Check Client IP (for FTP)
-                    new_client_ip = main.LAST_CLIENT_IP
-                    
-                    if new_lan_ip != current_lan_ip or new_client_ip != current_client_ip:
-                        _logger.info("IP state changed (LAN: %s -> %s, Client: %s -> %s) — updating tray", 
-                                    current_lan_ip, new_lan_ip, current_client_ip, new_client_ip)
-                        current_lan_ip = new_lan_ip
-                        current_client_ip = new_client_ip
-                        new_url = f"http://{new_lan_ip}:{BRIDGE_PORT}"
-                        tray.set_bridge_url(new_url) # This refreshes the menu in tray_icon.py
+                    try:
+                        time.sleep(2)
+                        # Check LAN IP
+                        new_lan_ip = get_lan_ip()
+                        
+                        # Check Client IP (for FTP) - access through module
+                        new_client_ip = getattr(main, "LAST_CLIENT_IP", None)
+                        
+                        if new_lan_ip != current_lan_ip or new_client_ip != current_client_ip:
+                            _logger.info("IP state changed (LAN: %s -> %s, Client: %s -> %s) — refreshing tray", 
+                                        current_lan_ip, new_lan_ip, current_client_ip, new_client_ip)
+                            current_lan_ip = new_lan_ip
+                            current_client_ip = new_client_ip
+                            new_url = f"http://{new_lan_ip}:{BRIDGE_PORT}"
+                            # tray.set_bridge_url rebuilds the entire menu
+                            tray.set_bridge_url(new_url)
+                    except Exception as e:
+                        _logger.debug("IP Monitor loop error: %s", e)
+                        time.sleep(5)
 
             threading.Thread(target=_monitor_ip, daemon=True, name="IpMonitor").start()
 
