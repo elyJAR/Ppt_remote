@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -14,107 +15,41 @@ import android.os.VibratorManager
 import android.provider.Settings
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import android.graphics.BitmapFactory
-import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Article
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.Computer
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import com.google.accompanist.swiperefresh.SwipeRefresh
-import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
 // ─── Colour palette — dark ───────────────────────────────────────────────────
 private val Navy900   = Color(0xFF0D1117)
@@ -333,11 +268,13 @@ private fun RemoteScreen(
     val useWideLayout = isTablet || isLandscape
 
     val filteredPresentations = remember(state.presentations, state.searchQuery) {
-        if (state.searchQuery.isBlank()) state.presentations
+        val base = if (state.searchQuery.isBlank()) state.presentations
         else state.presentations.filter { 
             it.name.contains(state.searchQuery, ignoreCase = true) || 
             it.path.contains(state.searchQuery, ignoreCase = true)
         }
+        // Move in-slideshow presentations to the top
+        base.sortedByDescending { it.inSlideshow }
     }
 
     // Helper function for haptic feedback in gestures — fires only once per swipe
@@ -359,114 +296,15 @@ private fun RemoteScreen(
                 @Suppress("DEPRECATION")
                 vibrator?.vibrate(50)
             }
-        } catch (e: Exception) {
-            // Haptic feedback is not critical, silently ignore errors
-        }
+        } catch (_: Exception) {}
     }
 
-    // Prevent Android's back gesture from minimizing the app accidentally
-    // (the horizontal swipe for prev/next conflicts with the edge back gesture)
-    BackHandler(enabled = true) {
-        // Do nothing — back press is intentionally suppressed in the remote control screen
-        // to avoid accidental app dismissal during presentations
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "PPT Remote",
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.textPrimary,
-                            fontSize = 18.sp
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        StatusDot(
-                            connected = connected,
-                            serviceRunning = state.isServiceRunning
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = onToggleService,
-                        modifier = Modifier.semantics {
-                            role = Role.Button
-                            contentDescription = if (state.isServiceRunning) "Stop background service" else "Start background service"
-                        }
-                    ) {
-                        Icon(
-                            imageVector = if (state.isServiceRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                            contentDescription = if (state.isServiceRunning) "Stop background service" else "Start background service",
-                            tint = if (state.isServiceRunning) MaterialTheme.colorScheme.textPrimary else MaterialTheme.colorScheme.textMuted
-                        )
-                    }
-                    IconButton(
-                        onClick = onRefresh,
-                        enabled = !state.isBusy,
-                        modifier = Modifier.semantics {
-                            role = Role.Button
-                            contentDescription = "Refresh presentations"
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh presentations",
-                            tint = if (state.isBusy) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary
-                        )
-                    }
-                    // Notes button — only shown when a slideshow is active
-                    if (state.presentations.any { it.inSlideshow }) {
-                        IconButton(
-                            onClick = onShowNotes,
-                            modifier = Modifier.semantics {
-                                role = Role.Button
-                                contentDescription = "Speaker notes"
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Article,
-                                contentDescription = "Speaker notes",
-                                tint = if (!state.currentSlideNotes.isNullOrBlank()) Accent
-                                       else MaterialTheme.colorScheme.textPrimary
-                            )
-                        }
-                    }
-                    IconButton(
-                        onClick = onShowSettings,
-                        modifier = Modifier.semantics {
-                            role = Role.Button
-                            contentDescription = "Settings"
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.textPrimary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.cardBg,
-                    titleContentColor = MaterialTheme.colorScheme.textPrimary,
-                )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.screenBg,
-    ) { innerPadding ->
-
-        // We do NOT bind this to state.isBusy, otherwise clicking "Next" (which sets isBusy) 
-        // will cause the entire screen to yank downwards with the pull-to-refresh animation!
-        val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = false)
-
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            SwipeRefresh(
-                state = swipeRefreshState,
-                onRefresh = onRefresh,
-                modifier = Modifier.fillMaxSize()
-            ) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.screenBg)) {
+        SwipeRefresh(
+            state = rememberSwipeRefreshState(state.isRefreshing),
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -566,13 +404,21 @@ private fun RemoteScreen(
                 }
             }
 
-            // ── Empty state ──────────────────────────────────────────────────
+            // ── Empty state / Skeleton ──────────────────────────────────────────
             if (filteredPresentations.isEmpty()) {
-                item { 
-                    EmptyStateCard(
-                        connected = connected,
-                        isFiltered = state.searchQuery.isNotEmpty()
-                    ) 
+                if (state.isBusy && !connected) {
+                    // Show skeleton when searching for bridge or connecting
+                    items(3) { PresentationSkeleton() }
+                } else if (state.isBusy && connected) {
+                    // Show skeleton when connected but fetching presentations
+                    items(2) { PresentationSkeleton() }
+                } else {
+                    item { 
+                        EmptyStateCard(
+                            connected = connected,
+                            isFiltered = state.searchQuery.isNotEmpty()
+                        ) 
+                    }
                 }
             } else {
                 items(filteredPresentations, key = { it.id }) { presentation ->
@@ -612,7 +458,6 @@ private fun RemoteScreen(
             trackColor = MaterialTheme.colorScheme.screenBg,
         )
     }
-}
 }
 }
 
@@ -657,187 +502,137 @@ private fun ConnectionCard(
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f)
                 )
-            }
-
-            // Saved bridges list (shown when more than 0 saved)
-            if (bridges.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        "Saved Bridges",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.textSecondary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    bridges.forEachIndexed { index, bridge ->
-                        val isActive = index == activeBridgeIndex
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(
-                                    if (isActive) Accent.copy(alpha = 0.12f)
-                                    else MaterialTheme.colorScheme.cardBgSelected
-                                )
-                                .border(
-                                    1.dp,
-                                    if (isActive) Accent.copy(alpha = 0.4f)
-                                    else MaterialTheme.colorScheme.divider,
-                                    RoundedCornerShape(6.dp)
-                                )
-                                .clickable { onSelectBridge(index) }
-                                .padding(horizontal = 10.dp, vertical = 8.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isActive) Icons.Default.CheckCircle else Icons.Default.Computer,
-                                contentDescription = null,
-                                tint = if (isActive) Accent else MaterialTheme.colorScheme.textSecondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    bridge.name,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (isActive) Accent else MaterialTheme.colorScheme.textPrimary
-                                )
-                                Text(
-                                    bridge.url,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.textMuted
-                                )
-                            }
-                            IconButton(
-                                onClick = { onRemoveBridge(index) },
-                                modifier = Modifier.size(48.dp)  // 48dp = Android minimum touch target
-                            ) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Remove bridge",
-                                    tint = Red.copy(alpha = 0.8f),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Manual URL field (shown when no saved bridges, or as fallback)
-            if (bridges.isEmpty()) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                
+                IconButton(
+                    onClick = { showHistory = !showHistory },
+                    modifier = Modifier.size(28.dp)
                 ) {
-                    OutlinedTextField(
-                        value = bridgeUrl,
-                        onValueChange = onBridgeUrlChange,
-                        label = { Text("Bridge URL", color = MaterialTheme.colorScheme.textSecondary) },
-                        placeholder = { Text("Auto-detecting…", color = MaterialTheme.colorScheme.textMuted) },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Accent,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.divider,
-                            focusedTextColor = MaterialTheme.colorScheme.textPrimary,
-                            unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
-                        )
+                    Icon(
+                        if (showHistory) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.textSecondary
                     )
-                    if (connectionHistory.isNotEmpty()) {
-                        IconButton(onClick = { showHistory = !showHistory }) {
-                            Icon(
-                                imageVector = if (showHistory) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (showHistory) "Hide history" else "Show history",
-                                tint = MaterialTheme.colorScheme.textSecondary
-                            )
-                        }
-                    }
                 }
+            }
 
-                if (showHistory && connectionHistory.isNotEmpty()) {
+            if (showHistory) {
+                // Saved bridges list (shown when more than 0 saved)
+                if (bridges.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            "Recent Connections",
+                            "Saved Bridges",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.textSecondary,
                             fontWeight = FontWeight.Medium
                         )
-                        connectionHistory.takeLast(5).forEach { historyUrl ->
+                        bridges.forEachIndexed { index, bridge ->
+                            val isActive = index == activeBridgeIndex
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onBridgeUrlChange(historyUrl) }
-                                    .padding(vertical = 4.dp, horizontal = 8.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(
+                                        if (isActive) Accent.copy(alpha = 0.12f)
+                                        else MaterialTheme.colorScheme.cardBgSelected
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isActive) Accent.copy(alpha = 0.4f)
+                                        else MaterialTheme.colorScheme.divider,
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .clickable { onSelectBridge(index) }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
                             ) {
-                                Icon(Icons.Default.History, null, tint = MaterialTheme.colorScheme.textMuted, modifier = Modifier.size(16.dp))
-                                Text(historyUrl, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.textSecondary, modifier = Modifier.weight(1f))
+                                Icon(
+                                    imageVector = if (isActive) Icons.Default.CheckCircle else Icons.Default.Computer,
+                                    contentDescription = null,
+                                    tint = if (isActive) Accent else MaterialTheme.colorScheme.textSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        bridge.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isActive) Accent else MaterialTheme.colorScheme.textPrimary
+                                    )
+                                    Text(
+                                        bridge.url,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.textSecondary
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { onRemoveBridge(index) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(14.dp), tint = Red.copy(alpha = 0.6f))
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // Add bridge button / form
-            if (showAddBridge) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Add Bridge", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.textSecondary, fontWeight = FontWeight.Medium)
-                    OutlinedTextField(
-                        value = newBridgeName,
-                        onValueChange = { newBridgeName = it },
-                        label = { Text("Name (e.g. Work PC)", color = MaterialTheme.colorScheme.textSecondary) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Accent,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.divider,
-                            focusedTextColor = MaterialTheme.colorScheme.textPrimary,
-                            unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
+                if (showAddBridge) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                        OutlinedTextField(
+                            value = newBridgeName,
+                            onValueChange = { newBridgeName = it },
+                            label = { Text("Bridge Name (e.g. Office PC)", color = MaterialTheme.colorScheme.textSecondary) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Accent,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.divider,
+                                focusedTextColor = MaterialTheme.colorScheme.textPrimary,
+                                unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
+                            )
                         )
-                    )
-                    OutlinedTextField(
-                        value = newBridgeUrl,
-                        onValueChange = { newBridgeUrl = it },
-                        label = { Text("URL (e.g. 192.168.1.5)", color = MaterialTheme.colorScheme.textSecondary) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Accent,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.divider,
-                            focusedTextColor = MaterialTheme.colorScheme.textPrimary,
-                            unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
+                        OutlinedTextField(
+                            value = newBridgeUrl,
+                            onValueChange = { newBridgeUrl = it },
+                            label = { Text("URL (e.g. 192.168.1.5)", color = MaterialTheme.colorScheme.textSecondary) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Accent,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.divider,
+                                focusedTextColor = MaterialTheme.colorScheme.textPrimary,
+                                unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
+                            )
                         )
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(
-                            onClick = {
-                                if (newBridgeUrl.isNotBlank()) {
-                                    onAddBridge(newBridgeName, newBridgeUrl)
-                                    newBridgeName = ""
-                                    newBridgeUrl = ""
-                                    showAddBridge = false
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = Accent.copy(alpha = 0.15f), contentColor = Accent)
-                        ) { Text("Save", fontWeight = FontWeight.SemiBold) }
-                        FilledTonalButton(
-                            onClick = { showAddBridge = false; newBridgeName = ""; newBridgeUrl = "" },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.cardBgSelected, contentColor = MaterialTheme.colorScheme.textSecondary)
-                        ) { Text("Cancel") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilledTonalButton(
+                                onClick = {
+                                    if (newBridgeUrl.isNotBlank()) {
+                                        onAddBridge(newBridgeName, newBridgeUrl)
+                                        newBridgeName = ""
+                                        newBridgeUrl = ""
+                                        showAddBridge = false
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.filledTonalButtonColors(containerColor = Accent.copy(alpha = 0.15f), contentColor = Accent)
+                            ) { Text("Save", fontWeight = FontWeight.SemiBold) }
+                            FilledTonalButton(
+                                onClick = { showAddBridge = false; newBridgeName = ""; newBridgeUrl = "" },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.cardBgSelected, contentColor = MaterialTheme.colorScheme.textSecondary)
+                            ) { Text("Cancel") }
+                        }
                     }
-                }
-            } else {
-                TextButton(
-                    onClick = { showAddBridge = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Add Bridge", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    TextButton(
+                        onClick = { showAddBridge = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add Bridge", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
@@ -998,105 +793,81 @@ private fun PresentationCard(
     onClick: () -> Unit,
 ) {
     val progress by animateFloatAsState(
-        targetValue = if (presentation.inSlideshow && presentation.currentSlide != null && presentation.totalSlides > 0)
-            presentation.currentSlide.toFloat() / presentation.totalSlides.toFloat()
+        targetValue = if (presentation.totalSlides > 0)
+            (presentation.currentSlide?.toFloat() ?: 0f) / presentation.totalSlides
         else 0f,
-        label = "slideProgress"
+        label = "progress"
     )
 
-    val borderColor = when {
-        selected && presentation.inSlideshow -> Accent
-        selected -> Accent.copy(alpha = 0.5f)
-        else -> Color.Transparent
-    }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .semantics {
-                role = Role.Button
-                contentDescription = buildString {
-                    append("Presentation: ${presentation.name}")
-                    if (presentation.inSlideshow) {
-                        append(", currently in slideshow")
-                        if (presentation.currentSlide != null) {
-                            append(", slide ${presentation.currentSlide} of ${presentation.totalSlides}")
-                        }
-                    } else {
-                        append(", ${presentation.totalSlides} slides total")
-                    }
-                    if (selected) append(", selected")
-                }
-            },
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.cardBgSelected else MaterialTheme.colorScheme.cardBg
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    AppCard(
+        onClick = onClick,
+        backgroundColor = if (selected) MaterialTheme.colorScheme.cardBgSelected else MaterialTheme.colorScheme.cardBg,
+        borderColor = if (selected) Accent else MaterialTheme.colorScheme.divider,
+        elevation = if (selected) 4.dp else 1.dp
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // File icon
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (presentation.inSlideshow) Accent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.divider),
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (presentation.inSlideshow) Green.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (presentation.inSlideshow) Icons.Default.PlayArrow else Icons.Default.Folder,
+                        imageVector = if (presentation.inSlideshow) Icons.Default.PlayArrow else Icons.Default.Article,
                         contentDescription = null,
-                        tint = if (presentation.inSlideshow) Accent else MaterialTheme.colorScheme.textSecondary,
-                        modifier = Modifier.size(18.dp)
+                        tint = if (presentation.inSlideshow) Green else MaterialTheme.colorScheme.textSecondary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = presentation.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (selected) MaterialTheme.colorScheme.textPrimary else MaterialTheme.colorScheme.textPrimary.copy(alpha = 0.85f),
+                        presentation.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.textPrimary
                     )
                     Text(
-                        text = if (presentation.inSlideshow)
-                            "Slide ${presentation.currentSlide ?: 1} of ${presentation.totalSlides}"
+                        if (presentation.inSlideshow)
+                            "Currently Presenting • Slide ${presentation.currentSlide} of ${presentation.totalSlides}"
                         else
-                            "${presentation.totalSlides} slides",
+                            "${presentation.totalSlides} slides • Ready",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (presentation.inSlideshow) Accent else MaterialTheme.colorScheme.textSecondary,
+                        color = if (presentation.inSlideshow) Green else MaterialTheme.colorScheme.textSecondary
                     )
                 }
 
-                // Live badge
-                if (presentation.inSlideshow) {
-                    LiveBadge()
+                if (selected) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = "Selected",
+                        tint = Accent,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
 
-            // Slide progress bar
-            if (presentation.inSlideshow && presentation.totalSlides > 0) {
+            // Mini progress bar for each presentation
+            if (presentation.totalSlides > 0) {
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(3.dp)
-                        .clip(RoundedCornerShape(2.dp)),
-                    color = Accent,
-                    trackColor = MaterialTheme.colorScheme.divider,
+                        .clip(CircleShape),
+                    color = if (presentation.inSlideshow) Green else Accent,
+                    trackColor = MaterialTheme.colorScheme.divider.copy(alpha = 0.5f),
                 )
             }
 
-            // Slide thumbnail — shown when in slideshow and thumbnail is available
+            // Preview thumbnail
             val thumbBytes = presentation.currentThumbnail
             if (presentation.inSlideshow && thumbBytes != null && thumbBytes.isNotEmpty()) {
                 val bitmap = remember(thumbBytes) {
@@ -1155,91 +926,76 @@ private fun EmptyStateCard(connected: Boolean, isFiltered: Boolean = false) {
     }
 }
 
-// ─── Warning banner ───────────────────────────────────────────────────────────
+// ─── Shimmer / Skeleton ──────────────────────────────────────────────────────
 
 @Composable
-private fun WarningBanner(message: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Amber.copy(alpha = 0.12f))
-            .border(1.dp, Amber.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Default.Warning, contentDescription = null, tint = Amber, modifier = Modifier.size(16.dp))
-        Text(message, style = MaterialTheme.typography.bodySmall, color = Amber)
-    }
+fun ShimmerBrush(): Brush {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translateAnim by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+
+    return Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        ),
+        start = Offset(x = translateAnim - 500f, y = translateAnim - 500f),
+        end = Offset(x = translateAnim, y = translateAnim),
+        tileMode = TileMode.Repeated
+    )
 }
 
-// ─── Status dot ───────────────────────────────────────────────────────────────
-
 @Composable
-private fun StatusDot(connected: Boolean, serviceRunning: Boolean) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Connection status dot
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(if (connected) Green else MaterialTheme.colorScheme.textMuted)
-        )
-        
-        // Service status dot
-        Box(
-            modifier = Modifier
-                .size(6.dp)
-                .clip(CircleShape)
-                .background(if (serviceRunning) Blue else Gray)
-        )
-    }
-}
-
-// ─── Live badge ───────────────────────────────────────────────────────────────
-
-@Composable
-private fun LiveBadge() {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(Red.copy(alpha = 0.15f))
-            .border(1.dp, Red.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp)
-    ) {
-        Text(
-            "LIVE",
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = Red,
-            letterSpacing = 0.5.sp,
-        )
-    }
-}
-
-// ─── Shared card surface ──────────────────────────────────────────────────────
-
-@Composable
-private fun AppCard(content: @Composable () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.cardBg,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.divider),
-    ) {
-        Box(modifier = Modifier.padding(16.dp)) {
-            content()
+private fun PresentationSkeleton() {
+    val shimmer = ShimmerBrush()
+    AppCard {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Icon placeholder
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(shimmer)
+            )
+            
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Title placeholder
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .height(16.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmer)
+                )
+                // Subtitle placeholder
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.4f)
+                        .height(12.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmer)
+                )
+            }
         }
     }
 }
 
-// ─── Onboarding Screen ────────────────────────────────────────────────────────
+// ─── Onboarding screen ───────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1247,61 +1003,20 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "Welcome to PPT Remote",
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.textPrimary
-                    )
-                },
+                title = { Text("Welcome to PPT Remote") },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.cardBg,
-                    titleContentColor = MaterialTheme.colorScheme.textPrimary,
+                    containerColor = MaterialTheme.colorScheme.screenBg,
+                    titleContentColor = MaterialTheme.colorScheme.textPrimary
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.screenBg,
-    ) { innerPadding ->
-        
+        containerColor = MaterialTheme.colorScheme.screenBg
+    ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            
-            item {
-                AppCard {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = Accent,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        
-                        Text(
-                            "Control PowerPoint from your phone",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.textPrimary,
-                            textAlign = TextAlign.Center
-                        )
-                        
-                        Text(
-                            "Use volume buttons or swipe gestures to navigate slides, even with your screen off.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.textSecondary,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            }
-            
             item {
                 AppCard {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1403,11 +1118,11 @@ private fun OnboardingStep(
             )
         }
         
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 title,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.textPrimary
             )
             Text(
@@ -1420,27 +1135,32 @@ private fun OnboardingStep(
 }
 
 @Composable
-private fun ControlItem(action: String, result: String) {
+private fun ControlItem(key: String, action: String) {
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
     ) {
+        Surface(
+            color = MaterialTheme.colorScheme.cardBgSelected,
+            shape = RoundedCornerShape(4.dp)
+        ) {
+            Text(
+                key,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = Accent
+            )
+        }
         Text(
             action,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.textPrimary
-        )
-        Text(
-            result,
-            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.textSecondary
         )
     }
 }
 
-// ─── Settings Screen ──────────────────────────────────────────────────────────
+// ─── Settings screen ─────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1456,315 +1176,142 @@ private fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "Settings",
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.textPrimary
-                    )
-                },
+                title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.textPrimary
-                        )
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.cardBg,
+                    containerColor = MaterialTheme.colorScheme.screenBg,
                     titleContentColor = MaterialTheme.colorScheme.textPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.textPrimary
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.screenBg,
-    ) { innerPadding ->
-        
-        LazyColumn(
+        containerColor = MaterialTheme.colorScheme.screenBg
+    ) { padding ->
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            
-            item {
-                SettingsSection(title = "Connection") {
-                    SettingsNumberItem(
-                        title = "Bridge Port",
-                        description = "Port number for desktop bridge connection (affects new connections)",
-                        value = state.bridgePort,
-                        range = 1024..65535,
-                        onValueChange = onUpdateBridgePort
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    SettingsTextItem(
-                        title = "API Key",
-                        description = "Leave blank if the bridge has no PPT_API_KEY set",
-                        value = state.apiKey,
-                        onValueChange = onUpdateApiKey,
-                        isPassword = true
-                    )
-                }
+            SettingsSection(title = "Appearance") {
+                SettingsSwitchRow(
+                    title = "Dark Theme",
+                    subtitle = "Use high-contrast dark mode",
+                    checked = state.isDarkTheme,
+                    onCheckedChange = onUpdateTheme
+                )
             }
-            
-            item {
-                SettingsSection(title = "Performance") {
-                    SettingsNumberItem(
-                        title = "Polling Interval",
-                        description = "How often to check for presentation updates (seconds)",
-                        value = state.pollingIntervalSeconds,
-                        range = 1..30,
-                        onValueChange = onUpdatePollingInterval
-                    )
-                }
-            }
-            
-            item {
-                SettingsSection(title = "Appearance") {
-                    SettingsSwitchItem(
-                        title = "Dark Theme",
-                        description = "Use dark color scheme throughout the app",
-                        checked = state.isDarkTheme,
-                        onCheckedChange = onUpdateTheme
-                    )
-                }
-            }
-            
-            item {
-                SettingsSection(title = "Notifications") {
-                    SettingsTextItem(
-                        title = "Default Notification Text",
-                        description = "Text shown when no presentation is active",
-                        value = state.notificationText,
-                        onValueChange = onUpdateNotificationText
-                    )
-                }
-            }
-            
-            item {
-                SettingsSection(title = "About") {
-                    SettingsInfoItem(
-                        title = "Version",
-                        value = "1.1.0"
-                    )
-                    SettingsInfoItem(
-                        title = "Bridge Status",
-                        value = if (state.bridgeReachable) "✓ Connected" else "✗ Unreachable"
-                    )
-                    SettingsInfoItem(
-                        title = "Current Bridge URL",
-                        value = state.bridgeUrl.ifBlank { "Auto-discovery enabled" }
-                    )
-                }
-            }
-        }
-    }
-}
 
-@Composable
-private fun SettingsSection(
-    title: String,
-    content: @Composable () -> Unit
-) {
-    AppCard {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsSection(title = "Connection") {
+                SettingsInputRow(
+                    title = "Bridge Port",
+                    subtitle = "Default is 8787",
+                    value = state.bridgePort.toString(),
+                    onValueChange = { val p = it.toIntOrNull(); if (p != null) onUpdateBridgePort(p) }
+                )
+                SettingsInputRow(
+                    title = "Polling Interval",
+                    subtitle = "Frequency to check for PC slide changes",
+                    value = state.pollingIntervalSeconds.toString(),
+                    onValueChange = { val i = it.toIntOrNull(); if (i != null) onUpdatePollingInterval(i) }
+                )
+                SettingsInputRow(
+                    title = "Bridge API Key",
+                    subtitle = "Required if PPT_API_KEY is set on PC",
+                    value = state.apiKey ?: "",
+                    onValueChange = onUpdateApiKey,
+                    isPassword = true
+                )
+            }
+
+            SettingsSection(title = "Notification") {
+                SettingsInputRow(
+                    title = "Custom Text",
+                    subtitle = "Message shown when app is in background",
+                    value = state.notificationText,
+                    onValueChange = onUpdateNotificationText
+                )
+            }
+
+            Spacer(Modifier.height(40.dp))
             Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.textPrimary
+                "Version 1.6.9 • Antigravity AI",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.textMuted
             )
-            content()
         }
     }
 }
 
 @Composable
-private fun SettingsNumberItem(
-    title: String,
-    description: String,
-    value: Int,
-    range: IntRange,
-    onValueChange: (Int) -> Unit
-) {
-    var textValue by remember(value) { mutableStateOf(value.toString()) }
-    var isError by remember { mutableStateOf(false) }
-    
+private fun SettingsSection(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.textPrimary
-                )
-                Text(
-                    description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.textSecondary
-                )
-            }
-            
-            OutlinedTextField(
-                value = textValue,
-                onValueChange = { newValue ->
-                    textValue = newValue
-                    val intValue = newValue.toIntOrNull()
-                    if (intValue != null && intValue in range) {
-                        isError = false
-                        onValueChange(intValue)
-                    } else {
-                        isError = true
-                    }
-                },
-                isError = isError,
-                singleLine = true,
-                modifier = Modifier.width(100.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Accent,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.divider,
-                    focusedTextColor = MaterialTheme.colorScheme.textPrimary,
-                    unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
-                )
-            )
-        }
-        
-        if (isError) {
-            Text(
-                "Value must be between ${range.first} and ${range.last}",
-                style = MaterialTheme.typography.bodySmall,
-                color = Red
-            )
-        }
+        Text(
+            title.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = Accent,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        AppCard(content = content)
     }
 }
 
 @Composable
-private fun SettingsSwitchItem(
+private fun SettingsSwitchRow(
     title: String,
-    description: String,
+    subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.textPrimary
-            )
-            Text(
-                description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.textSecondary
-            )
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.textPrimary)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.textSecondary)
         }
-        
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = Accent,
-                uncheckedThumbColor = MaterialTheme.colorScheme.textMuted,
-                uncheckedTrackColor = MaterialTheme.colorScheme.divider
+                uncheckedThumbColor = MaterialTheme.colorScheme.textSecondary,
+                uncheckedTrackColor = MaterialTheme.colorScheme.cardBgSelected
             )
         )
     }
 }
 
 @Composable
-private fun SettingsInfoItem(
+private fun SettingsInputRow(
     title: String,
-    value: String
-) {
-    Row(
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.textPrimary
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.textSecondary,
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-private fun SettingsTextItem(
-    title: String,
-    description: String,
+    subtitle: String,
     value: String,
     onValueChange: (String) -> Unit,
-    isPassword: Boolean = false,
+    isPassword: Boolean = false
 ) {
-    var textValue by remember(value) { mutableStateOf(value) }
-    var showPassword by remember { mutableStateOf(false) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.textPrimary
-        )
-        Text(
-            description,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.textSecondary
-        )
-
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.textPrimary)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.textSecondary)
         OutlinedTextField(
-            value = textValue,
-            onValueChange = { newValue ->
-                textValue = newValue
-                onValueChange(newValue)
-            },
-            placeholder = {
-                Text(
-                    if (isPassword) "Enter API key (optional)" else "Enter text",
-                    color = MaterialTheme.colorScheme.textMuted
-                )
-            },
-            visualTransformation = if (isPassword && !showPassword)
-                androidx.compose.ui.text.input.PasswordVisualTransformation()
-            else
-                androidx.compose.ui.text.input.VisualTransformation.None,
-            trailingIcon = if (isPassword) {
-                {
-                    IconButton(onClick = { showPassword = !showPassword }) {
-                        Icon(
-                            imageVector = if (showPassword) Icons.Default.VisibilityOff
-                                          else Icons.Default.Visibility,
-                            contentDescription = if (showPassword) "Hide key" else "Show key",
-                            tint = MaterialTheme.colorScheme.textSecondary
-                        )
-                    }
-                }
-            } else null,
-            singleLine = isPassword,
-            modifier = Modifier.fillMaxWidth(),
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            singleLine = true,
+            visualTransformation = if (isPassword) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+            shape = RoundedCornerShape(8.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Accent,
                 unfocusedBorderColor = MaterialTheme.colorScheme.divider,
@@ -1775,109 +1322,140 @@ private fun SettingsTextItem(
     }
 }
 
-// ─── Notes Screen ─────────────────────────────────────────────────────────────
+// ─── Speaker notes screen ───────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NotesScreen(
     state: RemoteState,
-    onBack: () -> Unit,
+    onBack: () -> Unit
 ) {
-    val activePres = state.presentations.firstOrNull { it.inSlideshow }
+    val pres = state.presentations.find { it.id == state.selectedPresentationId }
+    val notes = state.speakerNotes
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
+                title = { 
                     Column {
-                        Text(
-                            "Speaker Notes",
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.textPrimary
-                        )
-                        if (activePres != null && state.currentSlideNotesIndex != null) {
-                            Text(
-                                "${activePres.name} • Slide ${state.currentSlideNotesIndex}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.textSecondary
-                            )
-                        }
+                        Text("Speaker Notes", style = MaterialTheme.typography.titleMedium)
+                        Text(pres?.name ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.textSecondary)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MaterialTheme.colorScheme.textPrimary
-                        )
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.cardBg,
+                    containerColor = MaterialTheme.colorScheme.screenBg,
                     titleContentColor = MaterialTheme.colorScheme.textPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.textPrimary
                 )
             )
         },
-        containerColor = MaterialTheme.colorScheme.screenBg,
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Thumbnail of current slide
-            val thumbBytes = activePres?.currentThumbnail
-            if (thumbBytes != null && thumbBytes.isNotEmpty()) {
-                val bitmap = remember(thumbBytes) {
-                    BitmapFactory.decodeByteArray(thumbBytes, 0, thumbBytes.size)
-                }
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Current slide preview",
-                        contentScale = ContentScale.FillWidth,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, MaterialTheme.colorScheme.divider, RoundedCornerShape(8.dp))
-                    )
+        containerColor = MaterialTheme.colorScheme.screenBg
+    ) { padding ->
+        if (notes == null) {
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Accent)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(notes.size) { index ->
+                    val isCurrent = pres?.currentSlide == (index + 1)
+                    AppCard(
+                        borderColor = if (isCurrent) Accent else MaterialTheme.colorScheme.divider,
+                        borderWidth = if (isCurrent) 2.dp else 1.dp,
+                        backgroundColor = if (isCurrent) Accent.copy(alpha = 0.05f) else MaterialTheme.colorScheme.cardBg
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Slide ${index + 1}",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isCurrent) Accent else MaterialTheme.colorScheme.textSecondary
+                                )
+                                if (isCurrent) {
+                                    Surface(
+                                        color = Accent,
+                                        shape = CircleShape
+                                    ) {
+                                        Text(
+                                            "ACTIVE",
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                            Text(
+                                text = notes[index].ifBlank { "(No notes for this slide)" },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (notes[index].isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
+                                lineHeight = 22.sp
+                            )
+                        }
+                    }
                 }
             }
+        }
+    }
+}
 
-            // Notes content
-            AppCard {
-                if (activePres == null) {
-                    Text(
-                        "No active slideshow. Start a presentation to see speaker notes.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.textSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp)
-                    )
-                } else if (state.currentSlideNotes.isNullOrBlank()) {
-                    Text(
-                        "No notes for this slide.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.textSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 16.dp)
-                    )
-                } else {
-                    Text(
-                        text = state.currentSlideNotes,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.textPrimary,
-                        lineHeight = 26.sp
-                    )
-                }
-            }
+// ─── Shared UI components ────────────────────────────────────────────────────
+
+@Composable
+private fun WarningBanner(message: String) {
+    Surface(
+        color = Amber.copy(alpha = 0.15f),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+        border = BorderStroke(1.dp, Amber.copy(alpha = 0.4f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(Icons.Default.Warning, contentDescription = null, tint = Amber, modifier = Modifier.size(20.dp))
+            Text(message, style = MaterialTheme.typography.bodySmall, color = Amber, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+private fun AppCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    backgroundColor: Color = MaterialTheme.colorScheme.cardBg,
+    borderColor: Color = MaterialTheme.colorScheme.divider,
+    borderWidth: androidx.compose.ui.unit.Dp = 1.dp,
+    elevation: androidx.compose.ui.unit.Dp = 1.dp,
+    content: @Composable () -> Unit
+) {
+    val clickableModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    
+    Surface(
+        modifier = modifier.then(clickableModifier).fillMaxWidth(),
+        color = backgroundColor,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(borderWidth, borderColor),
+        shadowElevation = elevation
+    ) {
+        Box(modifier = Modifier.padding(16.dp)) {
+            content()
         }
     }
 }
