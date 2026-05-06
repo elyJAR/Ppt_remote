@@ -77,6 +77,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     "Using cellular data: Consider switching to WiFi for better stability."
                 }
                 else -> null
+            }
 
             _state.value = current.copy(
                 networkType = currentNetworkType,
