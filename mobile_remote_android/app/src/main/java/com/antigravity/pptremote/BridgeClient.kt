@@ -19,22 +19,14 @@ import java.util.concurrent.Future
 
 /**
  * Thrown when the bridge HTTP server responded but returned a non-2xx status.
- * Distinct from network errors (IOException/timeout) so callers can decide
- * whether to reset the bridge URL or just show a status message.
  */
 class BridgeHttpException(val statusCode: Int, message: String) : IllegalStateException(message)
 
 /**
  * HTTP client for communicating with the PPT Remote desktop bridge.
- *
- * All methods are blocking and must be called from a background thread (e.g. via
- * [kotlinx.coroutines.Dispatchers.IO]). Every request automatically includes the
- * [apiKey] header when one is configured.
  */
 class BridgeClient {
     private val discoveryToken = "PPT_REMOTE_DISCOVER"
-
-    /** Optional API key sent as `X-Api-Key` on every request. Set from [RemotePrefs.getApiKey]. */
     var apiKey: String = ""
 
     private val baseClient = OkHttpClient.Builder()
@@ -56,11 +48,9 @@ class BridgeClient {
     private fun encodedId(id: String): String =
         URLEncoder.encode(id, StandardCharsets.UTF_8.toString()).replace("+", "%20")
 
-    /** Add X-Api-Key header when a key is configured. */
     private fun Request.Builder.withApiKey(): Request.Builder =
         if (apiKey.isNotBlank()) header("X-Api-Key", apiKey) else this
 
-    /** Fetches the list of open PowerPoint presentations from the bridge. Throws on HTTP error. */
     fun fetchPresentations(url: String): List<Presentation> {
         val client = createClient(timeoutSeconds = 10)
         val request = Request.Builder()
@@ -73,8 +63,7 @@ class BridgeClient {
             if (!response.isSuccessful) {
                 val detail = try {
                     val body = response.body?.string().orEmpty().trim()
-                    // FastAPI wraps errors as {"detail": "..."}.
-                    org.json.JSONObject(body).optString("detail", body).take(200)
+                    JSONObject(body).optString("detail", body).take(200)
                 } catch (_: Exception) { "" }
                 val msg = if (detail.isNotBlank()) "Bridge error ${response.code}: $detail"
                           else "Bridge error: HTTP ${response.code}"
@@ -94,18 +83,14 @@ class BridgeClient {
                     inSlideshow = item.optBoolean("in_slideshow"),
                     currentSlide = if (item.has("current_slide") && !item.isNull("current_slide")) {
                         item.optInt("current_slide")
-                    } else {
-                        null
-                    },
+                    } else null,
                     totalSlides = item.optInt("total_slides")
                 )
             }
-
             return presentations
         }
     }
 
-    /** Returns the bridge's current network type and any hotspot warning. Returns null on error. */
     fun getNetworkStatus(url: String): NetworkStatus? {
         return try {
             val client = createClient(timeoutSeconds = 5)
@@ -116,68 +101,37 @@ class BridgeClient {
                 .build()
 
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return null
-                }
-
-                val body = response.body?.string().orEmpty().trim()
-                val json = JSONObject(body)
-                
+                if (!response.isSuccessful) return null
+                val json = JSONObject(response.body?.string().orEmpty().trim())
                 NetworkStatus(
                     networkType = json.optString("network_type", "unknown"),
                     isHotspot = json.optBoolean("is_hotspot", false),
                     warning = if (json.isNull("warning")) null else json.getString("warning")
                 )
             }
-        } catch (ex: Exception) {
-            null
-        }
+        } catch (ex: Exception) { null }
     }
 
-    /** Starts the slideshow for the given presentation. Throws on failure. */
-    fun startSlideshow(url: String, presentationId: String) {
-        post(url, "/api/presentations/${encodedId(presentationId)}/start")
-    }
+    fun startSlideshow(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/start")
+    fun stopSlideshow(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/stop")
+    fun next(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/next")
+    fun previous(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/previous")
+    fun openFtpOnPc(url: String) = post(url, "/api/ftp/open")
 
-    /** Stops the active slideshow for the given presentation. Throws on failure. */
-    fun stopSlideshow(url: String, presentationId: String) {
-        post(url, "/api/presentations/${encodedId(presentationId)}/stop")
-    }
-
-    /** Advances to the next slide. Auto-starts slideshow if not already running. Throws on failure. */
-    fun next(url: String, presentationId: String) {
-        post(url, "/api/presentations/${encodedId(presentationId)}/next")
-    }
-
-    /** Goes back to the previous slide. Auto-starts slideshow if not already running. Throws on failure. */
-    fun previous(url: String, presentationId: String) {
-        post(url, "/api/presentations/${encodedId(presentationId)}/previous")
-    }
-
-    /** Triggers the PC to open Windows File Explorer pointing to the phone's FTP server. */
-    fun openFtpOnPc(url: String) {
-        post(url, "/api/ftp/open")
-    }
-
-    /** Fetch the current slide thumbnail as raw PNG bytes. Returns null on any error. */
     fun fetchCurrentThumbnail(url: String, presentationId: String, width: Int = 720): ByteArray? {
         return try {
-            val client = createClient(timeoutSeconds = 15) // export can be slow
+            val client = createClient(timeoutSeconds = 15)
             val request = Request.Builder()
                 .url("${baseUrl(url)}/api/presentations/${encodedId(presentationId)}/current-thumbnail?width=$width")
                 .withApiKey()
                 .get()
                 .build()
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return null
-                response.body?.bytes()
+                if (!response.isSuccessful) null else response.body?.bytes()
             }
-        } catch (e: Exception) {
-            null
-        }
+        } catch (e: Exception) { null }
     }
 
-    /** Fetch a specific slide thumbnail by 1-based index. Returns null on any error. */
     fun fetchSlideThumbnail(url: String, presentationId: String, slideIndex: Int, width: Int = 720): ByteArray? {
         return try {
             val client = createClient(timeoutSeconds = 15)
@@ -187,40 +141,11 @@ class BridgeClient {
                 .get()
                 .build()
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return null
-                response.body?.bytes()
+                if (!response.isSuccessful) null else response.body?.bytes()
             }
-        } catch (e: Exception) {
-            null
-        }
+        } catch (e: Exception) { null }
     }
 
-    /** Fetch speaker notes for all slides. Returns empty list on error. */
-    fun fetchAllNotes(url: String, presentationId: String): List<SlideNote> {
-        return try {
-            val client = createClient(timeoutSeconds = 10)
-            val request = Request.Builder()
-                .url("${baseUrl(url)}/api/presentations/${encodedId(presentationId)}/notes")
-                .withApiKey()
-                .get()
-                .build()
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return emptyList()
-                val arr = JSONArray(response.body?.string().orEmpty())
-                (0 until arr.length()).map { i ->
-                    val obj = arr.getJSONObject(i)
-                    SlideNote(
-                        slideIndex = obj.getInt("slide_index"),
-                        notes = obj.getString("notes")
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    /** Fetch speaker notes for the current slideshow slide. Returns null if not in slideshow or on error. */
     fun fetchCurrentNotes(url: String, presentationId: String): SlideNote? {
         return try {
             val client = createClient(timeoutSeconds = 10)
@@ -232,69 +157,29 @@ class BridgeClient {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return null
                 val obj = JSONObject(response.body?.string().orEmpty())
-                SlideNote(
-                    slideIndex = obj.getInt("slide_index"),
-                    notes = obj.getString("notes")
-                )
+                SlideNote(slideIndex = obj.getInt("slide_index"), notes = obj.getString("notes"))
             }
-        } catch (e: Exception) {
-            null
-        }
+        } catch (e: Exception) { null }
     }
 
-    /** Check bridge health. Returns true if reachable. */
-    fun checkHealth(url: String): Boolean {
-        return try {
-            val client = createClient(timeoutSeconds = 5)
-            val request = Request.Builder()
-                .url("${baseUrl(url)}/api/health")
-                .withApiKey()
-                .get()
-                .build()
-            client.newCall(request).execute().use { response ->
-                response.isSuccessful
-            }
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    /**
-     * Discover the bridge.
-     *
-     * Strategy:
-     *  1. If [networkType] is HOTSPOT_PROVIDING — the phone IS the gateway, so UDP
-     *     broadcast may not loop back. We scan the hotspot subnet directly via HTTP
-     *     health checks (parallel, fast timeout). Falls through to UDP as backup.
-     *  2. Otherwise — standard UDP broadcast discovery on all interfaces.
-     */
     fun discoverBridge(
         timeoutMs: Int = 1500,
         discoveryPort: Int = 8788,
         bridgePort: Int = 8787,
         networkType: NetworkType = NetworkType.UNKNOWN
     ): String? {
-        // Strategy 1: when phone is hotspot gateway, probe subnet via HTTP directly
-        if (networkType == NetworkType.HOTSPOT_PROVIDING) {
-            val found = discoverViaHotspotSubnet(bridgePort)
-            if (found != null) return found
-        }
-
-        // Strategy 2: UDP broadcast (works for WIFI / HOTSPOT_USING)
-        return discoverViaBroadcast(timeoutMs, discoveryPort)
+        return try {
+            if (networkType == NetworkType.HOTSPOT_PROVIDING) {
+                val found = discoverViaHotspotSubnet(bridgePort)
+                if (found != null) return found
+            }
+            discoverViaBroadcast(timeoutMs, discoveryPort)
+        } catch (e: Exception) { null }
     }
 
-    /**
-     * When the phone provides a hotspot, the PC is a client on the hotspot subnet.
-     * Android assigns itself 192.168.43.1 (standard), or occasionally 192.168.1.1
-     * or 192.168.0.1. We scan .2–.20 on each candidate subnet in parallel with a
-     * short HTTP timeout — whichever responds first wins.
-     */
     private fun discoverViaHotspotSubnet(bridgePort: Int): String? {
-        // Candidate hotspot gateway subnets Android commonly uses
         val hotspotSubnets = listOf("192.168.43", "192.168.1", "192.168.0", "10.0.0")
-        val scanRangeEnd = 20 // scan .2–.20 (PC gets a low address from DHCP)
-
+        val scanRangeEnd = 20
         val probeClient = OkHttpClient.Builder()
             .connectTimeout(400, TimeUnit.MILLISECONDS)
             .readTimeout(400, TimeUnit.MILLISECONDS)
@@ -318,13 +203,11 @@ class BridgeClient {
         }
 
         executor.shutdown()
-        // Wait up to 1.5s for any hit
-        executor.awaitTermination(1500, TimeUnit.MILLISECONDS)
+        try { executor.awaitTermination(1500, TimeUnit.MILLISECONDS) } catch (_: Exception) {}
 
         val result = futures.firstNotNullOfOrNull { f ->
             try { if (f.isDone) f.get() else null } catch (_: Exception) { null }
         }
-
         executor.shutdownNow()
         return result
     }
@@ -333,56 +216,52 @@ class BridgeClient {
         val payload = discoveryToken.toByteArray(StandardCharsets.UTF_8)
         val receiveBuffer = ByteArray(1024)
 
-        DatagramSocket().use { socket ->
-            socket.broadcast = true
-            socket.soTimeout = timeoutMs
-
-            val targets = mutableSetOf<InetAddress>()
-            targets += InetAddress.getByName("255.255.255.255")
-            targets += getBroadcastTargets()
-
-            for (target in targets) {
-                val packet = DatagramPacket(payload, payload.size, target, discoveryPort)
-                socket.send(packet)
-            }
-
-            while (true) {
+        return try {
+            DatagramSocket().use { socket ->
+                socket.broadcast = true
+                socket.soTimeout = timeoutMs
+                val targets = mutableSetOf<InetAddress>()
+                targets += InetAddress.getByName("255.255.255.255")
                 try {
-                    val response = DatagramPacket(receiveBuffer, receiveBuffer.size)
-                    socket.receive(response)
-                    val body = String(response.data, 0, response.length, StandardCharsets.UTF_8)
-                    val json = JSONObject(body)
-                    val url = json.optString("bridge_url", "")
-                    if (url.isNotBlank()) {
-                        return url
+                    val interfaces = NetworkInterface.getNetworkInterfaces()
+                    if (interfaces != null) {
+                        while (interfaces.hasMoreElements()) {
+                            val iface = interfaces.nextElement()
+                            if (!iface.isUp || iface.isLoopback) continue
+                            for (address in iface.interfaceAddresses) {
+                                address.broadcast?.let { targets += it }
+                            }
+                        }
                     }
-                } catch (_: SocketTimeoutException) {
-                    return null
+                } catch (_: Exception) {}
+
+                for (target in targets) {
+                    try {
+                        socket.send(DatagramPacket(payload, payload.size, target, discoveryPort))
+                    } catch (_: Exception) {}
                 }
+
+                val startTime = System.currentTimeMillis()
+                while (System.currentTimeMillis() - startTime < timeoutMs) {
+                    try {
+                        val response = DatagramPacket(receiveBuffer, receiveBuffer.size)
+                        socket.receive(response)
+                        val body = String(response.data, 0, response.length, StandardCharsets.UTF_8)
+                        if (!body.trim().startsWith("{")) continue
+                        val json = JSONObject(body)
+                        val url = json.optString("bridge_url", "")
+                        if (url.isNotBlank()) return url
+                    } catch (_: SocketTimeoutException) { break }
+                    catch (e: org.json.JSONException) { continue }
+                    catch (e: Exception) { break }
+                }
+                null
             }
-        }
-    }
-
-    private fun getBroadcastTargets(): List<InetAddress> {
-        val targets = mutableListOf<InetAddress>()
-        val interfaces = NetworkInterface.getNetworkInterfaces() ?: return targets
-
-        while (interfaces.hasMoreElements()) {
-            val iface = interfaces.nextElement()
-            if (!iface.isUp || iface.isLoopback) {
-                continue
-            }
-
-            for (address in iface.interfaceAddresses) {
-                val broadcast = address.broadcast ?: continue
-                targets += broadcast
-            }
-        }
-
-        return targets
+        } catch (e: Exception) { null }
     }
 
     private fun post(url: String, path: String) {
+        if (url.isBlank()) return
         val client = createClient(timeoutSeconds = 10)
         val request = Request.Builder()
             .url("${baseUrl(url)}$path")
@@ -396,21 +275,11 @@ class BridgeClient {
                     val body = response.body?.string().orEmpty()
                     JSONObject(body).optString("detail", body).take(200)
                 } catch (_: Exception) { "" }
-                val msg = if (detail.isNotBlank()) detail
-                          else "Bridge error: HTTP ${response.code}"
-                throw BridgeHttpException(response.code, msg)
+                throw BridgeHttpException(response.code, detail.ifBlank { "Bridge error: HTTP ${response.code}" })
             }
         }
     }
 }
 
-data class NetworkStatus(
-    val networkType: String,
-    val isHotspot: Boolean,
-    val warning: String?
-)
-
-data class SlideNote(
-    val slideIndex: Int,
-    val notes: String
-)
+data class NetworkStatus(val networkType: String, val isHotspot: Boolean, val warning: String?)
+data class SlideNote(val slideIndex: Int, val notes: String)

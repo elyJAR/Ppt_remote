@@ -60,10 +60,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun updateNetworkType() {
-        val currentNetworkType = NetworkDetector.getNetworkType(appContext)
-
-        // Only update if network type changed
-        if (currentNetworkType != lastNetworkType) {
+        try {
+            val currentNetworkType = NetworkDetector.getNetworkType(appContext)
+            val current = _state.value
+            if (current.networkType == currentNetworkType) return
             lastNetworkType = currentNetworkType
 
             val warning = when (currentNetworkType) {
@@ -84,6 +84,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 networkType = currentNetworkType,
                 networkWarning = warning
             )
+            
+            // If we just connected to a network, trigger a discovery
+            if (currentNetworkType != NetworkType.UNKNOWN && currentNetworkType != NetworkType.CELLULAR) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    refreshPresentations()
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainViewModel", "Failed to update network type", e)
         }
     }
 
@@ -404,7 +413,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             for (attempt in 1..maxRetries) {
                 try {
+                if (current.bridgeUrl.isNotBlank()) {
                     action(current.bridgeUrl)
+                } else {
+                    throw Exception("Bridge URL is missing. Please search for bridge first.")
+                }
                     if (showBusy) {
                         _state.value = _state.value.copy(statusMessage = successMessage, isBusy = false)
                     }

@@ -15,11 +15,6 @@ enum class NetworkType {
 
 /**
  * Detects the current network type of the Android device.
- *
- * Used to adjust polling frequency and retry behaviour:
- * - [NetworkType.WIFI] — standard polling
- * - [NetworkType.HOTSPOT_USING] / [NetworkType.HOTSPOT_PROVIDING] — more aggressive polling
- * - [NetworkType.CELLULAR] — reduced polling to save data
  */
 object NetworkDetector {
     /** Returns the current [NetworkType] based on active network capabilities and SSID heuristics. */
@@ -68,28 +63,35 @@ object NetworkDetector {
     
     private fun isProvidingHotspot(context: Context): Boolean {
         return try {
-            // Check if WiFi hotspot is enabled on this device
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             @Suppress("DEPRECATION")
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
             
-            // Try to check if hotspot is active (requires reflection on some Android versions)
             try {
-                val method = wifiManager.javaClass.getDeclaredMethod("isWifiApEnabled")
-                method.invoke(wifiManager) as Boolean
+                // Primary method: getTetheredIfaces (standard but hidden)
+                val method = connectivityManager.javaClass.getMethod("getTetheredIfaces")
+                val result = method.invoke(connectivityManager)
+                if (result is Array<*>) {
+                    if (result.isNotEmpty()) return true
+                } else if (result is List<*>) {
+                    if (result.isNotEmpty()) return true
+                }
+                
+                // Fallback for some versions/vendors
+                val method2 = connectivityManager.javaClass.getMethod("getTetherableIfaces")
+                val result2 = method2.invoke(connectivityManager)
+                if (result2 is Array<*>) {
+                    if (result2.isNotEmpty()) return true
+                }
+                false
             } catch (e: Exception) {
-                // Fallback: check via connectivity manager if device is a local AP
-                val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    // In Android 10+, check for local network sharing
-                    try {
-                        val tetheredIfaces = connectivityManager.javaClass
-                            .getMethod("getTetheredIfaces")
-                            .invoke(connectivityManager) as Array<*>
-                        tetheredIfaces.isNotEmpty()
-                    } catch (e: Exception) {
-                        false
-                    }
-                } else {
+                // Secondary fallback: check via wifiManager reflection
+                try {
+                    val method = wifiManager.javaClass.getDeclaredMethod("isWifiApEnabled")
+                    method.isAccessible = true
+                    val res = method.invoke(wifiManager)
+                    if (res is Boolean) res else false
+                } catch (e2: Exception) {
                     false
                 }
             }
@@ -107,34 +109,19 @@ object NetworkDetector {
             @Suppress("DEPRECATION")
             val ssid = connectionInfo.ssid?.replace("\"", "") ?: return false
 
-            // Common patterns for personal hotspot names — checked case-insensitively
+            // Common patterns for personal hotspot names
             val hotspotIndicators = listOf(
-                "iphone",
-                "samsung",
-                "hotspot",
-                "personal",
-                "pixel",
-                "oneplus",
-                "motorola",
-                "nokia",
-                "xiaomi",
-                "huawei",
-                "tethering",
-                "moto hotspot",
-                "android ap",
-                "wifi direct",   // normalised: no hyphen, lowercase
-                "wifidirect"
+                "iphone", "samsung", "hotspot", "personal", "pixel", "oneplus",
+                "motorola", "nokia", "xiaomi", "huawei", "tethering", "moto hotspot",
+                "android ap", "wifi direct", "wifidirect"
             )
 
             val ssidNorm = ssid.lowercase().replace("-", "").replace(" ", "")
             hotspotIndicators.any { indicator ->
                 ssidNorm.contains(indicator.replace("-", "").replace(" ", ""))
             }
-            // Removed unreliable link-speed heuristic (< 54 Mbps is not a reliable
-            // hotspot indicator — many routers and 5 GHz bands report lower speeds)
         } catch (e: Exception) {
             false
         }
     }
 }
-
