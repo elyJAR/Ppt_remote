@@ -395,25 +395,40 @@ private fun RemoteScreen(
                 drawerShape = RoundedCornerShape(topEnd = 32.dp, bottomEnd = 32.dp)
             ) {
                 // Glassmorphism effect overlay with native blur (Android 12+)
-                Box(modifier = Modifier.fillMaxSize()) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                renderEffect = android.graphics.RenderEffect.createBlurEffect(
+                                    60f, 60f, android.graphics.Shader.TileMode.CLAMP
+                                ).asComposeRenderEffect()
+                            }
+                    ) {
+                        // Background glow for the glass effect
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .graphicsLayer {
-                                    renderEffect = android.graphics.RenderEffect.createBlurEffect(
-                                        40f, 40f, android.graphics.Shader.TileMode.CLAMP
-                                    ).asComposeRenderEffect()
-                                }
-                                .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.4f))
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.9f))
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            iOSAccent.copy(alpha = 0.15f),
+                                            MaterialTheme.colorScheme.screenBg.copy(alpha = 0.8f)
+                                        )
+                                    )
+                                )
                         )
                     }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.95f))
+                    )
+                }
+
+                // Content on top of blur
+                Box(modifier = Modifier.fillMaxSize()) {
 
                     Column(
                         modifier = Modifier
@@ -585,39 +600,57 @@ private fun RemoteScreen(
                         }
 
                         // Bottom Dock
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            // FTP Quick Toggle in Sidebar
-                            Surface(
-                                onClick = { onToggleFtp() },
-                                color = if (state.isFtpEnabled) iOSGreen.copy(alpha = 0.1f) else Color.Transparent,
-                                shape = iOSSquircleSmall,
-                                border = BorderStroke(1.dp, if (state.isFtpEnabled) iOSGreen.copy(alpha = 0.3f) else MaterialTheme.colorScheme.divider),
-                                modifier = Modifier.fillMaxWidth()
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            // FTP Server Full Card in Sidebar
+                            val ftpActive = state.isFtpEnabled || state.isFtpAutoStart
+                            AppCard(
+                                backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.05f) else MaterialTheme.colorScheme.cardBg,
+                                borderColor = if (ftpActive) iOSGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.divider
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    iOSIcon(
-                                        imageVector = Icons.Default.Folder, 
-                                        contentDescription = null, 
-                                        tint = if (state.isFtpEnabled) iOSGreen else MaterialTheme.colorScheme.textSecondary,
-                                        backgroundColor = if (state.isFtpEnabled) iOSGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
-                                        size = 20.dp
-                                    )
-                                    Text(
-                                        "FTP Server", 
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (state.isFtpEnabled) iOSGreen else MaterialTheme.colorScheme.textPrimary,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Switch(
-                                        checked = state.isFtpEnabled || state.isFtpAutoStart,
-                                        onCheckedChange = { onToggleFtp() },
-                                        enabled = true,
-                                        modifier = Modifier.scale(0.8f)
-                                    )
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        iOSIcon(
+                                            imageVector = Icons.Default.Folder, 
+                                            contentDescription = null, 
+                                            tint = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary,
+                                            backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
+                                            size = 20.dp
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("FTP Server", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Text(
+                                                if (ftpActive) "Running" else "Offline", 
+                                                fontSize = 11.sp, 
+                                                color = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary
+                                            )
+                                        }
+                                        Switch(
+                                            checked = ftpActive,
+                                            onCheckedChange = { onToggleFtp() },
+                                            modifier = Modifier.scale(0.7f)
+                                        )
+                                    }
+                                    
+                                    if (ftpActive) {
+                                        Button(
+                                            onClick = onOpenFtpOnPc,
+                                            enabled = connected,
+                                            modifier = Modifier.fillMaxWidth().height(40.dp),
+                                            shape = iOSSquircleSmall,
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = iOSAccent,
+                                                contentColor = Color.White
+                                            ),
+                                            contentPadding = PaddingValues(0.dp)
+                                        ) {
+                                            Icon(Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Open on PC", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                             }
 
@@ -778,75 +811,7 @@ private fun RemoteScreen(
                             }
                         }
 
-                        // ── 3. FTP Server Quick Access (Moved slightly down) ─────────────
-                        item {
-                            val ftpActive = state.isFtpEnabled || state.isFtpAutoStart
-                            AppCard {
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(40.dp)
-                                                    .clip(iOSSquircleSmall)
-                                                    .background(if (ftpActive) iOSGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Folder,
-                                                    contentDescription = null,
-                                                    tint = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary,
-                                                    modifier = Modifier.size(22.dp)
-                                                )
-                                            }
-                                            Column {
-                                                Text(
-                                                    "FTP Server",
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.textPrimary
-                                                )
-                                                Text(
-                                                    if (ftpActive) "Running (Port 2121)" else "Offline",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary
-                                                )
-                                            }
-                                        }
-                                        Switch(
-                                            checked = ftpActive,
-                                            onCheckedChange = { onToggleFtp() },
-                                            enabled = !state.isFtpAutoStart
-                                        )
-                                    }
-
-                                    if (ftpActive) {
-                                        Button(
-                                            onClick = onOpenFtpOnPc,
-                                            enabled = connected,
-                                            modifier = Modifier.fillMaxWidth(),
-                                            shape = iOSSquircleSmall,
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = if (connected) iOSAccent else MaterialTheme.colorScheme.cardBgSelected,
-                                                contentColor = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
-                                            ),
-                                            contentPadding = PaddingValues(vertical = 12.dp)
-                                        ) {
-                                            Icon(Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(18.dp))
-                                            Spacer(Modifier.width(8.dp))
-                                            Text("Open Files on PC", fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        // FTP card removed from dashboard as it is now in the sidebar
 
                         // ── 4. Slide Controls (Bottom) ────────────────────────────────────
                         item {

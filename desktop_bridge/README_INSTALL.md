@@ -12,7 +12,7 @@ The portable version allows you to run the bridge without modifying your system 
 
 ---
 
-## Method 2: Installer Version (NSIS/Inno)
+## Method 2: Installer Version (Inno Setup)
 If you used the installer:
 
 1. **Run Setup**: Double-click `PptRemoteBridgeSetup.exe`.
