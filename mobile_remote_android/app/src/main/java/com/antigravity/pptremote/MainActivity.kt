@@ -53,62 +53,66 @@ import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.launch
 
-// ─── Colour palette — dark ───────────────────────────────────────────────────
-private val Navy900   = Color(0xFF0D1117)
-private val Navy800   = Color(0xFF161B22)
-private val Navy700   = Color(0xFF21262D)
-private val Navy600   = Color(0xFF30363D)
-private val Accent    = Color(0xFF2F81F7)
-private val AccentDim = Color(0xFF1F6FEB)
-private val Green     = Color(0xFF3FB950)
-private val Blue      = Color(0xFF2F81F7)
-private val Gray      = Color(0xFF6E7681)
-private val Amber     = Color(0xFFD29922)
-private val Red       = Color(0xFFF85149)
+// ─── Colour palette — iOS Dark Inspired ───────────────────────────────────────
+private val iOSBlack     = Color(0xFF000000)
+private val iOSGray900   = Color(0xFF1C1C1E)
+private val iOSGray800   = Color(0xFF2C2C2E)
+private val iOSGray700   = Color(0xFF3A3A3C)
+private val iOSAccent     = Color(0xFF0A84FF)
+private val iOSAccentDim  = Color(0xFF007AFF).copy(alpha = 0.8f)
+private val iOSGreen      = Color(0xFF32D74B)
+private val iOSBlue       = Color(0xFF0A84FF)
+private val iOSGray       = Color(0xFF8E8E93)
+private val iOSAmber      = Color(0xFFFF9F0A)
+private val iOSRed        = Color(0xFFFF453A)
 
-private val DarkTextPrimary   = Color(0xFFE6EDF3)
-private val DarkTextSecondary = Color(0xFF8B949E)
-private val DarkTextMuted     = Color(0xFF484F58)
+private val DarkTextPrimary   = Color(0xFFFFFFFF)
+private val DarkTextSecondary = Color(0xFFEBEBF5).copy(alpha = 0.6f)
+private val DarkTextMuted     = Color(0xFFEBEBF5).copy(alpha = 0.3f)
 
 // ─── Colour palette — light ──────────────────────────────────────────────────
-private val LightTextPrimary   = Color(0xFF1F2328)
-private val LightTextSecondary = Color(0xFF656D76)
-private val LightTextMuted     = Color(0xFFAFB8C1)
+private val LightTextPrimary   = Color(0xFF000000)
+private val LightTextSecondary = Color(0xFF3C3C43).copy(alpha = 0.6f)
+private val LightTextMuted     = Color(0xFF3C3C43).copy(alpha = 0.3f)
 
 private val DarkColorScheme = darkColorScheme(
-    primary          = Accent,
+    primary          = iOSAccent,
     onPrimary        = Color.White,
-    primaryContainer = AccentDim,
-    background       = Navy900,
-    surface          = Navy800,
-    surfaceVariant   = Navy700,
+    primaryContainer = iOSAccentDim,
+    background       = iOSBlack,
+    surface          = iOSGray900,
+    surfaceVariant   = iOSGray800,
     onBackground     = DarkTextPrimary,
     onSurface        = DarkTextPrimary,
     onSurfaceVariant = DarkTextSecondary,
-    outline          = Navy600,
+    outline          = iOSGray700,
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary          = Accent,
+    primary          = iOSAccent,
     onPrimary        = Color.White,
     primaryContainer = Color(0xFFDBEAFE),
-    background       = Color(0xFFF6F8FA),
+    background       = Color(0xFFF2F2F7),
     surface          = Color(0xFFFFFFFF),
-    surfaceVariant   = Color(0xFFF0F2F5),
+    surfaceVariant   = Color(0xFFE5E5EA),
     onBackground     = LightTextPrimary,
     onSurface        = LightTextPrimary,
     onSurfaceVariant = LightTextSecondary,
-    outline          = Color(0xFFD0D7DE),
+    outline          = Color(0xFFC7C7CC),
 )
 
-// ─── Theme-aware color shorthand (extension properties on ColorScheme) ────────
+// ─── Theme-aware color shorthand ────────
 private val androidx.compose.material3.ColorScheme.textPrimary    inline get() = onBackground
 private val androidx.compose.material3.ColorScheme.textSecondary  inline get() = onSurfaceVariant
-private val androidx.compose.material3.ColorScheme.textMuted      inline get() = outline.copy(alpha = 0.7f)
+private val androidx.compose.material3.ColorScheme.textMuted      inline get() = onSurfaceVariant.copy(alpha = 0.5f)
 private val androidx.compose.material3.ColorScheme.cardBg         inline get() = surface
 private val androidx.compose.material3.ColorScheme.cardBgSelected inline get() = surfaceVariant
 private val androidx.compose.material3.ColorScheme.screenBg       inline get() = background
-private val androidx.compose.material3.ColorScheme.divider        inline get() = outline
+private val androidx.compose.material3.ColorScheme.divider        inline get() = outline.copy(alpha = 0.3f)
+
+// iOS Squircle helper
+private val iOSSquircle = RoundedCornerShape(22.dp)
+private val iOSSquircleSmall = RoundedCornerShape(12.dp)
 
 class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<MainViewModel>()
@@ -333,129 +337,166 @@ private fun RemoteScreen(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = MaterialTheme.colorScheme.screenBg,
-                modifier = Modifier.width(320.dp)
+                drawerContainerColor = MaterialTheme.colorScheme.screenBg.copy(alpha = 0.85f),
+                drawerTonalElevation = 0.dp,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(310.dp)
+                    .border(
+                        1.dp, 
+                        Color.White.copy(alpha = 0.1f), 
+                        RoundedCornerShape(topEnd = 32.dp, bottomEnd = 32.dp)
+                    ),
+                drawerShape = RoundedCornerShape(topEnd = 32.dp, bottomEnd = 32.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                        // Drawer Header
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Glassmorphism effect overlay
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(28.dp)
+                    ) {
+                        // Header
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Accent.copy(alpha = 0.15f)),
+                                    .size(44.dp)
+                                    .clip(iOSSquircleSmall)
+                                    .background(iOSAccent.copy(alpha = 0.2f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.SettingsRemote, contentDescription = null, tint = Accent)
+                                Icon(Icons.Default.SettingsRemote, contentDescription = null, tint = iOSAccent)
                             }
                             Text(
                                 "PPT Remote",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.ExtraBold,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.textPrimary
                             )
                         }
                         
-                        Divider(color = MaterialTheme.colorScheme.divider, thickness = 0.5.dp)
+                        Divider(color = MaterialTheme.colorScheme.divider)
 
                         // Connection Status
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(
-                                "Connection Status",
-                                style = MaterialTheme.typography.labelMedium,
+                                "CONNECTION STATUS",
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.textSecondary,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
                             )
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Icon(
                                     imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
                                     contentDescription = null,
-                                    tint = if (connected) Green else MaterialTheme.colorScheme.textSecondary,
-                                    modifier = Modifier.size(22.dp)
+                                    tint = if (connected) iOSGreen else MaterialTheme.colorScheme.textSecondary,
+                                    modifier = Modifier.size(24.dp)
                                 )
                                 Text(
-                                    text = state.statusMessage,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = if (connected) Green else MaterialTheme.colorScheme.textPrimary,
-                                    fontWeight = FontWeight.Medium
+                                    text = if (connected) "Connected" else state.statusMessage,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = if (connected) iOSGreen else MaterialTheme.colorScheme.textPrimary,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
 
-                        Divider(color = MaterialTheme.colorScheme.divider, thickness = 0.5.dp)
+                        Divider(color = MaterialTheme.colorScheme.divider)
 
                         // Bridges List
-                        Text(
-                            "Available PCs",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.textSecondary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        if (state.discoveredBridges.isEmpty()) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(
-                                "No PCs found yet. Make sure the bridge is running on your network.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.textMuted
+                                "AVAILABLE PCS",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.textSecondary,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
                             )
-                        }
-
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.weight(1f, fill = false)
-                        ) {
-                            items(state.discoveredBridges) { bridge ->
-                                val isSelected = bridge.id == state.selectedBridgeId
-                                NavigationDrawerItem(
-                                    label = {
-                                        Column {
-                                            Text(bridge.name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text(bridge.url, style = MaterialTheme.typography.labelSmall, color = if (isSelected) Accent.copy(alpha = 0.7f) else MaterialTheme.colorScheme.textSecondary)
-                                        }
-                                    },
-                                    selected = isSelected,
-                                    onClick = { 
-                                        onSelectBridge(bridge)
-                                        scope.launch { drawerState.close() }
-                                    },
-                                    icon = { Icon(Icons.Default.Computer, contentDescription = null) },
-                                    colors = NavigationDrawerItemDefaults.colors(
-                                        selectedContainerColor = Accent.copy(alpha = 0.12f),
-                                        selectedTextColor = Accent,
-                                        selectedIconColor = Accent,
-                                        unselectedContainerColor = Color.Transparent,
-                                        unselectedTextColor = MaterialTheme.colorScheme.textPrimary,
-                                        unselectedIconColor = MaterialTheme.colorScheme.textSecondary
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.padding(horizontal = 0.dp)
+                            
+                            if (state.discoveredBridges.isEmpty()) {
+                                Text(
+                                    "No PCs found. Scanning network...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.textMuted
                                 )
                             }
-                        }
-                    }
 
-                    // Bottom: Settings
-                    NavigationDrawerItem(
-                        label = { Text("App Settings", fontWeight = FontWeight.Bold) },
-                        selected = false,
-                        onClick = { 
-                            onShowSettings()
-                            scope.launch { drawerState.close() }
-                        },
-                        icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = NavigationDrawerItemDefaults.colors(
-                            unselectedContainerColor = MaterialTheme.colorScheme.cardBgSelected,
-                            unselectedTextColor = MaterialTheme.colorScheme.textPrimary,
-                            unselectedIconColor = MaterialTheme.colorScheme.textSecondary
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(state.discoveredBridges) { bridge ->
+                                    val isSelected = bridge.id == state.selectedBridgeId
+                                    val interactionSource = remember { MutableInteractionSource() }
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(iOSSquircleSmall)
+                                            .background(if (isSelected) iOSAccent.copy(alpha = 0.15f) else Color.Transparent)
+                                            .border(
+                                                1.dp,
+                                                if (isSelected) iOSAccent.copy(alpha = 0.5f) else Color.Transparent,
+                                                iOSSquircleSmall
+                                            )
+                                            .clickable(interactionSource = interactionSource, indication = rememberRipple()) {
+                                                onSelectBridge(bridge)
+                                                scope.launch { drawerState.close() }
+                                            }
+                                            .padding(12.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Computer, 
+                                                contentDescription = null,
+                                                tint = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textSecondary,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            Column {
+                                                Text(
+                                                    bridge.name, 
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textPrimary
+                                                )
+                                                Text(
+                                                    bridge.url.substringAfter("://").substringBefore(":"),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.textSecondary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Bottom Settings
+                        NavigationDrawerItem(
+                            label = { Text("App Settings", fontWeight = FontWeight.Bold) },
+                            selected = false,
+                            onClick = { 
+                                onShowSettings()
+                                scope.launch { drawerState.close() }
+                            },
+                            icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                unselectedContainerColor = Color.Transparent,
+                                unselectedTextColor = MaterialTheme.colorScheme.textPrimary,
+                                unselectedIconColor = MaterialTheme.colorScheme.textSecondary
+                            ),
+                            shape = iOSSquircleSmall,
+                            modifier = Modifier.padding(horizontal = 0.dp)
                         )
-                    )
+                    }
                 }
             }
         }
@@ -468,11 +509,11 @@ private fun RemoteScreen(
                             Icon(
                                 Icons.Default.SettingsRemote,
                                 contentDescription = null,
-                                tint = Accent,
-                                modifier = Modifier.size(24.dp)
+                                tint = iOSAccent,
+                                modifier = Modifier.size(28.dp)
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Text("PPT Remote", fontWeight = FontWeight.ExtraBold)
+                            Spacer(Modifier.width(10.dp))
+                            Text("PPT Remote", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
                         }
                     },
                     navigationIcon = {
@@ -786,23 +827,22 @@ private fun SlideControlsCard(
             }
         } else {
             // Compact layout: original two-row design
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-
-                // Large Prev / Next buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Large Prev / Next buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 SlideNavButton(
                     label = "Prev",
-                    icon = Icons.Default.NavigateBefore,
+                    icon = Icons.Default.ArrowBackIosNew,
                     enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     onClick = onPrevious,
                 )
                 SlideNavButton(
                     label = "Next",
-                    icon = Icons.Default.NavigateNext,
+                    icon = Icons.Default.ArrowForwardIos,
                     enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     onClick = onNext,
@@ -812,39 +852,40 @@ private fun SlideControlsCard(
             // Start / Stop row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                FilledTonalButton(
+                Button(
                     onClick = onStart,
-                    enabled = hasPresentation,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = Green.copy(alpha = 0.15f),
-                        contentColor = Green,
+                    enabled = hasPresentation && !isBusy,
+                    modifier = Modifier.weight(1f).height(60.dp),
+                    shape = iOSSquircle,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = iOSGreen,
+                        contentColor = Color.White
                     )
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Start", fontWeight = FontWeight.SemiBold)
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Start", fontWeight = FontWeight.Bold)
                 }
-                FilledTonalButton(
+                
+                Button(
                     onClick = onStop,
-                    enabled = hasPresentation,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = Red.copy(alpha = 0.15f),
-                        contentColor = Red,
-                    )
+                    enabled = hasPresentation && !isBusy,
+                    modifier = Modifier.weight(1f).height(60.dp),
+                    shape = iOSSquircle,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = iOSRed.copy(alpha = 0.15f),
+                        contentColor = iOSRed
+                    ),
+                    border = BorderStroke(1.dp, iOSRed.copy(alpha = 0.3f))
                 ) {
-                    Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Stop", fontWeight = FontWeight.SemiBold)
+                    Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Stop", fontWeight = FontWeight.Bold)
                 }
             }
-
-            }
+        }
         }
     }
 }
@@ -860,21 +901,26 @@ private fun SlideNavButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(58.dp),
-        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.height(68.dp),
+        shape = iOSSquircle,
         colors = ButtonDefaults.buttonColors(
-            containerColor = Accent,
-            contentColor = Color.White,
-            disabledContainerColor = MaterialTheme.colorScheme.cardBgSelected,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.textPrimary,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             disabledContentColor = MaterialTheme.colorScheme.textMuted,
         ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 6.dp)
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
     ) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(6.dp))
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(26.dp))
+            }
+            Text(label, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         }
-        Text(label, fontWeight = FontWeight.Bold, fontSize = 16.sp)
     }
 }
 
@@ -893,36 +939,40 @@ private fun PresentationCard(
         label = "progress"
     )
 
-    AppCard(
+    Surface(
         onClick = onClick,
-        backgroundColor = if (selected) MaterialTheme.colorScheme.cardBgSelected else MaterialTheme.colorScheme.cardBg,
-        borderColor = if (selected) Accent else MaterialTheme.colorScheme.divider,
-        elevation = if (selected) 4.dp else 1.dp
+        color = if (selected) iOSAccent.copy(alpha = 0.1f) else MaterialTheme.colorScheme.cardBg,
+        shape = iOSSquircle,
+        border = BorderStroke(
+            if (selected) 2.dp else 0.5.dp,
+            if (selected) iOSAccent else Color.White.copy(alpha = 0.05f)
+        ),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (presentation.inSlideshow) Green.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
+                        .size(48.dp)
+                        .clip(iOSSquircleSmall)
+                        .background(if (presentation.inSlideshow) iOSGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.cardBgSelected),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (presentation.inSlideshow) Icons.Default.PlayArrow else Icons.Default.Article,
+                        imageVector = if (presentation.inSlideshow) Icons.Default.PlayArrow else Icons.Default.Slideshow,
                         contentDescription = null,
-                        tint = if (presentation.inSlideshow) Green else MaterialTheme.colorScheme.textSecondary,
-                        modifier = Modifier.size(20.dp)
+                        tint = if (presentation.inSlideshow) iOSGreen else MaterialTheme.colorScheme.textSecondary,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         presentation.name,
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -930,11 +980,11 @@ private fun PresentationCard(
                     )
                     Text(
                         if (presentation.inSlideshow)
-                            "Currently Presenting • Slide ${presentation.currentSlide} of ${presentation.totalSlides}"
+                            "Presenting • Slide ${presentation.currentSlide} of ${presentation.totalSlides}"
                         else
-                            "${presentation.totalSlides} slides • Ready",
+                            "${presentation.totalSlides} slides",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (presentation.inSlideshow) Green else MaterialTheme.colorScheme.textSecondary
+                        color = if (presentation.inSlideshow) iOSGreen else MaterialTheme.colorScheme.textSecondary
                     )
                 }
 
@@ -942,26 +992,13 @@ private fun PresentationCard(
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = "Selected",
-                        tint = Accent,
-                        modifier = Modifier.size(20.dp)
+                        tint = iOSAccent,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
 
-            // Mini progress bar for each presentation
-            if (presentation.totalSlides > 0) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(CircleShape),
-                    color = if (presentation.inSlideshow) Green else Accent,
-                    trackColor = MaterialTheme.colorScheme.divider.copy(alpha = 0.5f),
-                )
-            }
-
-            // Preview thumbnail
+            // Preview thumbnail with premium framing
             val thumbBytes = presentation.currentThumbnail
             if (presentation.inSlideshow && thumbBytes != null && thumbBytes.isNotEmpty()) {
                 val bitmap = remember(thumbBytes) {
@@ -970,12 +1007,12 @@ private fun PresentationCard(
                 if (bitmap != null) {
                     Image(
                         bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Slide ${presentation.currentSlide} preview",
+                        contentDescription = "Preview",
                         contentScale = ContentScale.FillWidth,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .border(1.dp, MaterialTheme.colorScheme.divider, RoundedCornerShape(6.dp))
+                            .clip(iOSSquircleSmall)
+                            .border(0.5.dp, Color.White.copy(alpha = 0.1f), iOSSquircleSmall)
                     )
                 }
             }
@@ -1341,7 +1378,7 @@ private fun SettingsScreen(
 
             Spacer(Modifier.height(40.dp))
             Text(
-                "Version 2.0.2 • Antigravity AI",
+                "Version 2.1.0 • iOS Style • Antigravity AI",
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
