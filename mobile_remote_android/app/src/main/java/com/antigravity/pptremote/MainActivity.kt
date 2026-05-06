@@ -225,8 +225,9 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) {}
         }
         
-        // Request Manage External Storage for FTP on Android 11+
+        // Request storage permissions for FTP server
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+
             if (!Environment.isExternalStorageManager()) {
                 try {
                     val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
@@ -236,6 +237,16 @@ class MainActivity : ComponentActivity() {
                     val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
                     startActivity(intent)
                 }
+            }
+        } else {
+            // Android 10 and below: request legacy permissions
+            val readGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+            val writeGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+            if (!readGranted || !writeGranted) {
+                requestPermissions(
+                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                    1001
+                )
             }
         }
     }
@@ -422,20 +433,21 @@ private fun RemoteScreen(
                                 onClick = onOpenFtpOnPc,
                                 enabled = connected,
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (connected) Accent else MaterialTheme.colorScheme.cardBgSelected,
                                     contentColor = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
-                                )
+                                ),
+                                contentPadding = PaddingValues(vertical = 12.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.OpenInNew, 
+                                    Icons.Default.Devices, 
                                     contentDescription = null, 
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(20.dp),
                                     tint = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
                                 )
-                                Spacer(Modifier.width(8.dp))
-                                Text("Open on PC", fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.width(10.dp))
+                                Text("Open on PC", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                             }
                         }
                     }
@@ -703,13 +715,15 @@ private fun SlideControlsCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 SlideNavButton(
-                    label = "◀  Prev",
+                    label = "Prev",
+                    icon = Icons.Default.NavigateBefore,
                     enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     onClick = onPrevious,
                 )
                 SlideNavButton(
-                    label = "Next  ▶",
+                    label = "Next",
+                    icon = Icons.Default.NavigateNext,
                     enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     onClick = onNext,
@@ -751,13 +765,15 @@ private fun SlideControlsCard(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                 SlideNavButton(
-                    label = "◀  Prev",
+                    label = "Prev",
+                    icon = Icons.Default.NavigateBefore,
                     enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     onClick = onPrevious,
                 )
                 SlideNavButton(
-                    label = "Next  ▶",
+                    label = "Next",
+                    icon = Icons.Default.NavigateNext,
                     enabled = hasPresentation,
                     modifier = Modifier.weight(1f),
                     onClick = onNext,
@@ -809,21 +825,27 @@ private fun SlideNavButton(
     label: String,
     enabled: Boolean,
     modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     onClick: () -> Unit,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.height(58.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = Accent,
             contentColor = Color.White,
             disabledContainerColor = MaterialTheme.colorScheme.cardBgSelected,
             disabledContentColor = MaterialTheme.colorScheme.textMuted,
-        )
+        ),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 6.dp)
     ) {
-        Text(label, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        if (icon != null) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(label, fontWeight = FontWeight.Bold, fontSize = 16.sp)
     }
 }
 

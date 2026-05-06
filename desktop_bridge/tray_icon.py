@@ -28,19 +28,21 @@ def _make_icon_image(running: bool = True) -> "Image.Image":
     img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    # Background circle — dark navy
-    draw.ellipse([2, 2, 62, 62], fill=(28, 30, 50, 235))
+    # Background circle with subtle depth (dark navy)
+    draw.ellipse([2, 2, 62, 62], fill=(20, 22, 40, 255))
+    draw.ellipse([4, 4, 60, 60], fill=(28, 30, 50, 235))
 
     # 'P' letterform — vertical stem
-    draw.rectangle([15, 13, 24, 51], fill=(255, 255, 255, 245))
+    draw.rectangle([16, 14, 25, 50], fill=(255, 255, 255, 245))
 
     # 'P' letterform — top bowl
-    draw.ellipse([20, 13, 44, 37], fill=(255, 255, 255, 245))
-    draw.ellipse([24, 19, 40, 33], fill=(28, 30, 50, 235))
+    draw.ellipse([21, 14, 43, 36], fill=(255, 255, 255, 245))
+    draw.ellipse([25, 19, 39, 31], fill=(28, 30, 50, 235))
 
-    # Status indicator dot
-    dot_color = (0, 210, 90, 255) if running else (220, 55, 55, 255)
+    # Status indicator dot with glow
+    dot_color = (0, 230, 110, 255) if running else (255, 60, 60, 255)
     draw.ellipse([40, 40, 60, 60], fill=dot_color)
+    draw.ellipse([44, 44, 56, 56], fill=(255, 255, 255, 120)) # center highlight
 
     return img
 
@@ -142,10 +144,12 @@ class TrayIconManager:
         """Construct the list of menu items based on current state."""
         import main
         bridge_name = main.get_bridge_name()
+        active_clients = main.client_registry.get_active_clients()
 
         menu_items = [
             pystray.MenuItem(f"Bridge: {bridge_name}", None, enabled=False),
             pystray.MenuItem(f"  {self._bridge_url}", None, enabled=False),
+            pystray.MenuItem(f"  Devices Connected: {len(active_clients)}", None, enabled=False),
             pystray.Menu.SEPARATOR,
         ]
 

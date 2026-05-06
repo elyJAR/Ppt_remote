@@ -126,6 +126,11 @@ class ClientRegistry:
             for k in expired:
                 del self._clients[k]
             return list(self._clients.values())
+            
+    def get_active_client_ips_hash(self) -> int:
+        """Return a hash of the current active client IPs to detect changes."""
+        clients = self.get_active_clients()
+        return hash(tuple(sorted(c.ip_address for c in clients)))
 
 client_registry = ClientRegistry()
 
@@ -141,8 +146,9 @@ def open_ftp_explorer(client_ip: str | None = None) -> bool:
     ftp_url = f"ftp://{target_ip}:2121/"
     _logger.info("Opening Android files in Explorer: %s", ftp_url)
     try:
-        # Force Windows File Explorer by using explorer.exe explicitly.
-        subprocess.Popen(["explorer.exe", ftp_url])
+        # Use shell=True and quotes for maximum compatibility with protocol handlers
+        # This helps in cases where explorer.exe needs to be invoked via shell to handle the ftp: scheme
+        subprocess.Popen(f'explorer.exe "{ftp_url}"', shell=True)
         return True
     except Exception as exc:
         _logger.error("Failed to open FTP explorer: %s", exc)
@@ -586,8 +592,10 @@ def get_current_slide_thumbnail(
     summary="Open Android FTP server in Windows File Explorer",
     dependencies=[Depends(verify_api_key)],
 )
-def open_ftp_on_pc(client_ip: str | None = None):
-    if not open_ftp_explorer(client_ip):
+def open_ftp_on_pc(request: Request, client_ip: str | None = None):
+    # Prefer provided IP, then the IP of the device making the request
+    target = client_ip or (request.client.host if request.client else None)
+    if not open_ftp_explorer(target):
         raise HTTPException(
             status_code=400,
             detail="Client not detected or failed to launch Explorer.",

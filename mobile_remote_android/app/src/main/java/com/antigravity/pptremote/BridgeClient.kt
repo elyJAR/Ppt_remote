@@ -268,10 +268,16 @@ class BridgeClient {
                 }
 
                 val startTime = System.currentTimeMillis()
-                while (System.currentTimeMillis() - startTime < timeoutMs) {
+                while (true) {
+                    val elapsed = System.currentTimeMillis() - startTime
+                    val remaining = timeoutMs - elapsed
+                    if (remaining <= 0) break
+
                     try {
+                        socket.soTimeout = remaining.toInt().coerceAtLeast(100)
                         val response = DatagramPacket(receiveBuffer, receiveBuffer.size)
                         socket.receive(response)
+                        
                         val body = String(response.data, 0, response.length, StandardCharsets.UTF_8)
                         if (!body.trim().startsWith("{")) continue
                         val json = JSONObject(body)
@@ -285,8 +291,9 @@ class BridgeClient {
                                 isAutoDiscovered = true
                             )
                         }
-                    } catch (_: SocketTimeoutException) { break }
-                    catch (e: org.json.JSONException) { continue }
+                    } catch (_: SocketTimeoutException) { 
+                        // Just loop again to check total time
+                    } catch (e: org.json.JSONException) { continue }
                     catch (e: Exception) { break }
                 }
             }

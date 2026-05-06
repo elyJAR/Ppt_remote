@@ -203,7 +203,7 @@ def main() -> None:
             def _monitor_ip() -> None:
                 import main
                 current_lan_ip = lan_ip
-                current_client_ip = None
+                current_client_hash = 0
                 _logger.info("IP Monitor thread started (poll: 2s)")
                 while True:
                     try:
@@ -211,14 +211,14 @@ def main() -> None:
                         # Check LAN IP
                         new_lan_ip = get_lan_ip()
                         
-                        # Check Client IP (for FTP) - access through shared STATE
-                        new_client_ip = main.STATE.get("last_client_ip")
+                        # Check Client Registry (for multi-phone tray updates)
+                        new_client_hash = main.client_registry.get_active_client_ips_hash()
                         
-                        if new_lan_ip != current_lan_ip or new_client_ip != current_client_ip:
-                            _logger.info("IP state changed (LAN: %s -> %s, Client: %s -> %s) — refreshing tray", 
-                                        current_lan_ip, new_lan_ip, current_client_ip, new_client_ip)
+                        if new_lan_ip != current_lan_ip or new_client_hash != current_client_hash:
+                            _logger.info("Network state changed (LAN: %s -> %s, Clients hash: %s -> %s) — refreshing tray", 
+                                        current_lan_ip, new_lan_ip, current_client_hash, new_client_hash)
                             current_lan_ip = new_lan_ip
-                            current_client_ip = new_client_ip
+                            current_client_hash = new_client_hash
                             new_url = f"http://{new_lan_ip}:{BRIDGE_PORT}"
                             tray.set_bridge_url(new_url)
                     except Exception as e:
