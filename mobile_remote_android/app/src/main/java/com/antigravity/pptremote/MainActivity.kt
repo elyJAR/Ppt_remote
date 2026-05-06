@@ -24,7 +24,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -446,7 +445,7 @@ private fun RemoteScreen(
                                                 if (isSelected) iOSAccent.copy(alpha = 0.5f) else Color.Transparent,
                                                 iOSSquircleSmall
                                             )
-                                            .clickable(interactionSource = interactionSource, indication = androidx.compose.material.ripple.rememberRipple()) {
+                                            .clickable(interactionSource = interactionSource, indication = ripple()) {
                                                 onSelectBridge(bridge)
                                                 scope.launch { drawerState.close() }
                                             }
