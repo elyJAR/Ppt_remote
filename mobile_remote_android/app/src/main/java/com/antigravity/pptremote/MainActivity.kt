@@ -1505,7 +1505,6 @@ private fun SettingsScreen(
     onUpdateTheme: (Boolean) -> Unit,
     onUpdateNotificationText: (String) -> Unit,
     onUpdateApiKey: (String) -> Unit,
-    onUpdateApiKey: (String) -> Unit,
     onUpdateFtpAutoStart: (Boolean) -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -1583,7 +1582,7 @@ private fun SettingsScreen(
 
             Spacer(Modifier.height(40.dp))
             Text(
-                "Version 2.1.0 • iOS Style • Antigravity AI",
+                "Version 2.2.2 • Premium iOS • Antigravity AI",
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
