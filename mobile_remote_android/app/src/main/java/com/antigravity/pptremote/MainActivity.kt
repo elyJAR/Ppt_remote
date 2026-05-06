@@ -395,20 +395,26 @@ private fun RemoteScreen(
                 drawerShape = RoundedCornerShape(topEnd = 32.dp, bottomEnd = 32.dp)
             ) {
                 // Glassmorphism effect overlay with native blur (Android 12+)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.6f))
-                        .then(
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                Modifier.graphicsLayer {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
                                     renderEffect = android.graphics.RenderEffect.createBlurEffect(
-                                        50f, 50f, android.graphics.Shader.TileMode.CLAMP
+                                        40f, 40f, android.graphics.Shader.TileMode.CLAMP
                                     ).asComposeRenderEffect()
                                 }
-                            } else Modifier
+                                .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.4f))
                         )
-                ) {
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.9f))
+                        )
+                    }
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -609,7 +615,7 @@ private fun RemoteScreen(
                                     Switch(
                                         checked = state.isFtpEnabled || state.isFtpAutoStart,
                                         onCheckedChange = { onToggleFtp() },
-                                        enabled = !state.isFtpAutoStart,
+                                        enabled = true,
                                         modifier = Modifier.scale(0.8f)
                                     )
                                 }
@@ -856,66 +862,7 @@ private fun RemoteScreen(
                             )
                         }
 
-                        // ── Presentations header & Search ───────────────────────────────────────
-                        if (state.presentations.size > 5 || state.searchQuery.isNotEmpty()) {
-                            item {
-                                OutlinedTextField(
-                                    value = state.searchQuery,
-                                    onValueChange = onSearchQueryChange,
-                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                    placeholder = { Text("Search presentations...") },
-                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                                    trailingIcon = if (state.searchQuery.isNotEmpty()) {
-                                        {
-                                            IconButton(onClick = { onSearchQueryChange("") }) {
-                                                Icon(Icons.Default.Close, contentDescription = "Clear")
-                                            }
-                                        }
-                                    } else null,
-                                    singleLine = true,
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = MaterialTheme.colorScheme.cardBg,
-                                        unfocusedContainerColor = MaterialTheme.colorScheme.cardBg,
-                                        focusedBorderColor = iOSAccent,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.divider,
-                                    )
-                                )
-                            }
-                        } else {
-                            item {
-                                Text(
-                                    "Presentations",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.textSecondary,
-                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
-                                )
-                            }
-                        }
-
-                        // ── Empty state / Skeleton ──────────────────────────────────────────
-                        if (filteredPresentations.isEmpty()) {
-                            if (state.isBusy && !connected) {
-                                items(3) { PresentationSkeleton() }
-                            } else if (state.isBusy && connected) {
-                                items(2) { PresentationSkeleton() }
-                            } else {
-                                item { 
-                                    EmptyStateCard(
-                                        connected = connected,
-                                        isFiltered = state.searchQuery.isNotEmpty()
-                                    ) 
-                                }
-                            }
-                        } else {
-                            items(filteredPresentations, key = { it.id }) { presentation ->
-                                PresentationCard(
-                                    presentation = presentation,
-                                    selected = presentation.id == state.selectedPresentationId,
-                                    onClick = { onPresentationSelect(presentation.id) }
-                                )
-                            }
-                        }
+                        // Presentations list removed from dashboard as it is now in the sidebar
 
                         // ── Bottom hint ──────────────────────────────────────────────────
                         item {
