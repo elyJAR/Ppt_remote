@@ -53,6 +53,25 @@ STATE = {
     "last_client_ip": None
 }
 
+def open_ftp_explorer() -> bool:
+    """Launch Windows Explorer pointed at the mobile device's FTP server."""
+    client_ip = STATE.get("last_client_ip")
+    if not client_ip:
+        _logger.warning("open_ftp_explorer: No mobile client IP known.")
+        return False
+
+    import subprocess
+    # Force the trailing slash and ensure port 2121
+    ftp_url = f"ftp://{client_ip}:2121/"
+    _logger.info("Opening Android files in Explorer: %s", ftp_url)
+    try:
+        # Force Windows File Explorer by using explorer.exe explicitly.
+        subprocess.Popen(["explorer.exe", ftp_url])
+        return True
+    except Exception as exc:
+        _logger.error("Failed to open FTP explorer: %s", exc)
+        return False
+
 # ---------------------------------------------------------------------------
 # Configuration (overridable via environment variables)
 # ---------------------------------------------------------------------------
@@ -475,3 +494,17 @@ def get_current_slide_thumbnail(
         return Response(content=png, media_type="image/png")
     except PowerPointControllerError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/ftp/open",
+    summary="Open Android FTP server in Windows File Explorer",
+    dependencies=[Depends(verify_api_key)],
+)
+def open_ftp_on_pc():
+    if not open_ftp_explorer():
+        raise HTTPException(
+            status_code=400,
+            detail="No mobile client detected yet or failed to launch Explorer.",
+        )
+    return {"ok": True}

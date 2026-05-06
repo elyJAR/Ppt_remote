@@ -255,6 +255,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun openFtpOnPc() {
+        runBridgeAction("Opened files on PC") { url -> client.openFtpOnPc(url) }
+    }
+
     fun updateFtpAutoStart(enabled: Boolean) {
         RemotePrefs.setFtpAutoStart(appContext, enabled)
         _state.value = _state.value.copy(isFtpAutoStart = enabled)

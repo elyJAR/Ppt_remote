@@ -154,6 +154,11 @@ class BridgeClient {
         post(url, "/api/presentations/${encodedId(presentationId)}/previous")
     }
 
+    /** Triggers the PC to open Windows File Explorer pointing to the phone's FTP server. */
+    fun openFtpOnPc(url: String) {
+        post(url, "/api/ftp/open")
+    }
+
     /** Fetch the current slide thumbnail as raw PNG bytes. Returns null on any error. */
     fun fetchCurrentThumbnail(url: String, presentationId: String, width: Int = 720): ByteArray? {
         return try {

@@ -169,6 +169,7 @@ class MainActivity : ComponentActivity() {
                             onSelectBridge = viewModel::selectBridge,
                             onSearchQueryChange = viewModel::updateSearchQuery,
                             onToggleFtp = viewModel::toggleFtp,
+                            onOpenFtpOnPc = viewModel::openFtpOnPc,
                         )
                     }
                 }
@@ -275,6 +276,7 @@ private fun RemoteScreen(
     onSelectBridge: (Int) -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onToggleFtp: () -> Unit,
+    onOpenFtpOnPc: () -> Unit,
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -371,54 +373,72 @@ private fun RemoteScreen(
             // ── FTP Server card ──────────────────────────────────────────────
             item {
                 AppCard {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (state.isFtpEnabled) Green.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
-                                contentAlignment = Alignment.Center
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Folder,
-                                    contentDescription = null,
-                                    tint = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (state.isFtpEnabled) Green.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Folder,
+                                        contentDescription = null,
+                                        tint = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        "FTP Server",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.textPrimary
+                                    )
+                                    Text(
+                                        if (state.isFtpEnabled) "Running on port 2121" else "Offline",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary
+                                    )
+                                }
                             }
-                            Column {
-                                Text(
-                                    "FTP Server",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.textPrimary
+                            Switch(
+                                checked = state.isFtpEnabled,
+                                onCheckedChange = { onToggleFtp() },
+                                enabled = !state.isFtpAutoStart,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = Green,
+                                    disabledCheckedThumbColor = Color.White.copy(alpha = 0.6f),
+                                    disabledCheckedTrackColor = Green.copy(alpha = 0.5f)
                                 )
-                                Text(
-                                    if (state.isFtpEnabled) "Running on port 2121" else "Offline",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary
+                            )
+                        }
+
+                        if (state.isFtpEnabled && connected) {
+                            Button(
+                                onClick = onOpenFtpOnPc,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Accent,
+                                    contentColor = Color.White
                                 )
+                            ) {
+                                Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Open on PC", fontWeight = FontWeight.SemiBold)
                             }
                         }
-                        Switch(
-                            checked = state.isFtpEnabled,
-                            onCheckedChange = { onToggleFtp() },
-                            enabled = !state.isFtpAutoStart,
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = Green,
-                                disabledCheckedThumbColor = Color.White.copy(alpha = 0.6f),
-                                disabledCheckedTrackColor = Green.copy(alpha = 0.5f)
-                            )
-                        )
                     }
                 }
             }

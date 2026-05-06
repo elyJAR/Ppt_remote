@@ -176,18 +176,7 @@ class TrayIconManager:
 
     def _handle_open_ftp(self, icon: "pystray.Icon", item: "pystray.MenuItem") -> None:
         import main
-        import subprocess
-        client_ip = main.STATE.get("last_client_ip")
-        if client_ip:
-            # Force the trailing slash and ensure port 2121
-            ftp_url = f"ftp://{client_ip}:2121/"
-            logger.info("Opening Android files in Explorer: %s", ftp_url)
-            try:
-                # Force Windows File Explorer by using explorer.exe explicitly.
-                # Using a list instead of a shell string is generally more robust.
-                subprocess.Popen(["explorer.exe", ftp_url])
-            except Exception as exc:
-                logger.error("Failed to open FTP explorer: %s", exc)
+        main.open_ftp_explorer()
 
     # ------------------------------------------------------------------
 
