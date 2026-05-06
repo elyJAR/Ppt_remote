@@ -51,6 +51,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+import kotlinx.coroutines.launch
 
 // ─── Colour palette — dark ───────────────────────────────────────────────────
 private val Navy900   = Color(0xFF0D1117)
@@ -288,6 +289,8 @@ private fun RemoteScreen(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val connected = state.bridgeReachable
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
     
     // Determine if we're on a tablet or in landscape
     val isTablet = configuration.screenWidthDp >= 600
@@ -326,368 +329,394 @@ private fun RemoteScreen(
         } catch (_: Exception) {}
     }
 
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .background(MaterialTheme.colorScheme.screenBg)
-        .statusBarsPadding()
-    ) {
-        SwipeRefresh(
-            state = rememberSwipeRefreshState(state.isRefreshing),
-            onRefresh = onRefresh,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragStart = { swipeHapticFired = false },
-                            onDragEnd = { swipeHapticFired = false }
-                        ) { _, dragAmount ->
-                            val threshold = 80f
-                            if (dragAmount > threshold) {
-                                performGestureHapticFeedback()
-                                onPrevious()
-                            } else if (dragAmount < -threshold) {
-                                performGestureHapticFeedback()
-                                onNext()
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = MaterialTheme.colorScheme.screenBg,
+                modifier = Modifier.width(320.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        // Drawer Header
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Accent.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.SettingsRemote, contentDescription = null, tint = Accent)
+                            }
+                            Text(
+                                "PPT Remote",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.textPrimary
+                            )
+                        }
+                        
+                        Divider(color = MaterialTheme.colorScheme.divider, thickness = 0.5.dp)
+
+                        // Connection Status
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "Connection Status",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.textSecondary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Icon(
+                                    imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = if (connected) Green else MaterialTheme.colorScheme.textSecondary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Text(
+                                    text = state.statusMessage,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (connected) Green else MaterialTheme.colorScheme.textPrimary,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
                         }
-                    },
-            contentPadding = PaddingValues(
-                horizontal = if (useWideLayout) 32.dp else 16.dp, 
-                vertical = 12.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(if (useWideLayout) 16.dp else 12.dp)
-        ) {
 
-            // ── Connection card ──────────────────────────────────────────────
-            item {
-                ConnectionCard(
-                    bridgeUrl = state.bridgeUrl,
-                    statusMessage = state.statusMessage,
-                    connected = connected,
-                    discoveredBridges = state.discoveredBridges,
-                    selectedBridgeId = state.selectedBridgeId,
-                    onBridgeUrlChange = onBridgeUrlChange,
-                    onSelectBridge = onSelectBridge,
-                )
-            }
+                        Divider(color = MaterialTheme.colorScheme.divider, thickness = 0.5.dp)
 
-            // ── FTP Server card ──────────────────────────────────────────────
-            item {
-                AppCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (state.isFtpEnabled) Green.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Folder,
-                                        contentDescription = null,
-                                        tint = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Column {
-                                    Text(
-                                        "FTP Server",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.textPrimary
-                                    )
-                                    Text(
-                                        if (state.isFtpEnabled) "Running on port 2121" else "Offline",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary
-                                    )
-                                }
-                            }
-                            Switch(
-                                checked = state.isFtpEnabled,
-                                onCheckedChange = { onToggleFtp() },
-                                enabled = !state.isFtpAutoStart,
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = Green,
-                                    disabledCheckedThumbColor = Color.White.copy(alpha = 0.6f),
-                                    disabledCheckedTrackColor = Green.copy(alpha = 0.5f)
-                                )
+                        // Bridges List
+                        Text(
+                            "Available PCs",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.textSecondary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        if (state.discoveredBridges.isEmpty()) {
+                            Text(
+                                "No PCs found yet. Make sure the bridge is running on your network.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.textMuted
                             )
                         }
 
-                        if (state.isFtpEnabled) {
-                            Button(
-                                onClick = onOpenFtpOnPc,
-                                enabled = connected,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (connected) Accent else MaterialTheme.colorScheme.cardBgSelected,
-                                    contentColor = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
-                                ),
-                                contentPadding = PaddingValues(vertical = 12.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Devices, 
-                                    contentDescription = null, 
-                                    modifier = Modifier.size(20.dp),
-                                    tint = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f, fill = false)
+                        ) {
+                            items(state.discoveredBridges) { bridge ->
+                                val isSelected = bridge.id == state.selectedBridgeId
+                                NavigationDrawerItem(
+                                    label = {
+                                        Column {
+                                            Text(bridge.name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(bridge.url, style = MaterialTheme.typography.labelSmall, color = if (isSelected) Accent.copy(alpha = 0.7f) else MaterialTheme.colorScheme.textSecondary)
+                                        }
+                                    },
+                                    selected = isSelected,
+                                    onClick = { 
+                                        onSelectBridge(bridge)
+                                        scope.launch { drawerState.close() }
+                                    },
+                                    icon = { Icon(Icons.Default.Computer, contentDescription = null) },
+                                    colors = NavigationDrawerItemDefaults.colors(
+                                        selectedContainerColor = Accent.copy(alpha = 0.12f),
+                                        selectedTextColor = Accent,
+                                        selectedIconColor = Accent,
+                                        unselectedContainerColor = Color.Transparent,
+                                        unselectedTextColor = MaterialTheme.colorScheme.textPrimary,
+                                        unselectedIconColor = MaterialTheme.colorScheme.textSecondary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.padding(horizontal = 0.dp)
                                 )
-                                Spacer(Modifier.width(10.dp))
-                                Text("Open on PC", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                             }
                         }
                     }
-                }
-            }
 
-            // ── Warning banners ──────────────────────────────────────────────
-            if (!state.networkWarning.isNullOrBlank()) {
-                item { WarningBanner(message = state.networkWarning) }
-            }
-            if (!state.bridgeNetworkWarning.isNullOrBlank()) {
-                item { WarningBanner(message = "Desktop: ${state.bridgeNetworkWarning}") }
-            }
-
-            // ── Slide controls ───────────────────────────────────────────────
-            item {
-                SlideControlsCard(
-                    isBusy = state.isBusy,
-                    hasPresentation = state.selectedPresentationId != null,
-                    useWideLayout = useWideLayout,
-                    onPrevious = onPrevious,
-                    onNext = onNext,
-                    onStart = onStartSlideshow,
-                    onStop = onStopSlideshow,
-                )
-            }
-
-            // ── Presentations header & Search ───────────────────────────────────────
-            if (state.presentations.size > 5 || state.searchQuery.isNotEmpty()) {
-                item {
-                    OutlinedTextField(
-                        value = state.searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        placeholder = { Text("Search presentations...") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        trailingIcon = if (state.searchQuery.isNotEmpty()) {
-                            {
-                                IconButton(onClick = { onSearchQueryChange("") }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Clear")
-                                }
-                            }
-                        } else null,
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.cardBg,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.cardBg,
-                            focusedBorderColor = Accent,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.divider,
+                    // Bottom: Settings
+                    NavigationDrawerItem(
+                        label = { Text("App Settings", fontWeight = FontWeight.Bold) },
+                        selected = false,
+                        onClick = { 
+                            onShowSettings()
+                            scope.launch { drawerState.close() }
+                        },
+                        icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = NavigationDrawerItemDefaults.colors(
+                            unselectedContainerColor = MaterialTheme.colorScheme.cardBgSelected,
+                            unselectedTextColor = MaterialTheme.colorScheme.textPrimary,
+                            unselectedIconColor = MaterialTheme.colorScheme.textSecondary
                         )
                     )
                 }
-            } else {
-                item {
-                    Text(
-                        "Presentations",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.textSecondary,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
-                    )
-                }
-            }
-
-            // ── Empty state / Skeleton ──────────────────────────────────────────
-            if (filteredPresentations.isEmpty()) {
-                if (state.isBusy && !connected) {
-                    // Show skeleton when searching for bridge or connecting
-                    items(3) { PresentationSkeleton() }
-                } else if (state.isBusy && connected) {
-                    // Show skeleton when connected but fetching presentations
-                    items(2) { PresentationSkeleton() }
-                } else {
-                    item { 
-                        EmptyStateCard(
-                            connected = connected,
-                            isFiltered = state.searchQuery.isNotEmpty()
-                        ) 
-                    }
-                }
-            } else {
-                items(filteredPresentations, key = { it.id }) { presentation ->
-                    PresentationCard(
-                        presentation = presentation,
-                        selected = presentation.id == state.selectedPresentationId,
-                        onClick = { onPresentationSelect(presentation.id) }
-                    )
-                }
-            }
-
-            // ── Bottom hint ──────────────────────────────────────────────────
-            item {
-                Text(
-                    "Volume ▲ = Previous  •  Volume ▼ = Next  •  Works with screen off via notification",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.textMuted,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                )
             }
         }
-    }
-
-    // Floating Settings Button
-    FloatingActionButton(
-        onClick = onShowSettings,
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = Color.White,
-        modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .padding(16.dp)
-            .padding(bottom = 12.dp) // extra padding to avoid linear progress indicator
     ) {
-        Icon(Icons.Default.Settings, contentDescription = "Settings")
-    }
-
-    // Global busy indicator fixed at the bottom edge
-    AnimatedVisibility(
-        visible = state.isBusy,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = Modifier.align(Alignment.BottomCenter)
-    ) {
-        LinearProgressIndicator(
-            modifier = Modifier.fillMaxWidth().height(4.dp),
-            color = Accent,
-            trackColor = MaterialTheme.colorScheme.screenBg,
-        )
-    }
-    }
-}
-
-// ─── Connection card ──────────────────────────────────────────────────────────
-
-@Composable
-private fun ConnectionCard(
-    bridgeUrl: String,
-    statusMessage: String,
-    connected: Boolean,
-    discoveredBridges: List<BridgeInfo>,
-    selectedBridgeId: String?,
-    onBridgeUrlChange: (String) -> Unit,
-    onSelectBridge: (BridgeInfo) -> Unit,
-) {
-    var showBridges by remember { mutableStateOf(false) }
-
-    AppCard {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-
-            // Status row
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
-                    contentDescription = null,
-                    tint = if (connected) Green else MaterialTheme.colorScheme.textSecondary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = statusMessage,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (connected) Green else MaterialTheme.colorScheme.textSecondary,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f)
-                )
-                
-                IconButton(
-                    onClick = { showBridges = !showBridges },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        if (showBridges) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.textSecondary
-                    )
-                }
-            }
-
-            if (showBridges || discoveredBridges.size > 1) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        "Available PCs",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.textSecondary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    if (discoveredBridges.isEmpty()) {
-                        Text(
-                            "No PCs found yet. Ensure the bridge is running on your PC.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.textMuted,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
-                    }
-                    discoveredBridges.forEach { bridge ->
-                        val isSelected = bridge.id == selectedBridgeId
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(
-                                    if (isSelected) Accent.copy(alpha = 0.12f)
-                                    else MaterialTheme.colorScheme.cardBgSelected
-                                )
-                                .border(
-                                    1.dp,
-                                    if (isSelected) Accent.copy(alpha = 0.4f)
-                                    else MaterialTheme.colorScheme.divider,
-                                    RoundedCornerShape(6.dp)
-                                )
-                                .clickable { onSelectBridge(bridge) }
-                                .padding(horizontal = 10.dp, vertical = 8.dp)
-                        ) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.Computer,
+                                Icons.Default.SettingsRemote,
                                 contentDescription = null,
-                                tint = if (isSelected) Accent else MaterialTheme.colorScheme.textSecondary,
-                                modifier = Modifier.size(16.dp)
+                                tint = Accent,
+                                modifier = Modifier.size(24.dp)
                             )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    bridge.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (isSelected) Accent else MaterialTheme.colorScheme.textPrimary
+                            Spacer(Modifier.width(8.dp))
+                            Text("PPT Remote", fontWeight = FontWeight.ExtraBold)
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onRefresh) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.screenBg,
+                        titleContentColor = MaterialTheme.colorScheme.textPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.textPrimary,
+                        actionIconContentColor = MaterialTheme.colorScheme.textPrimary
+                    )
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.screenBg
+        ) { paddingValues ->
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+            ) {
+                SwipeRefresh(
+                    state = rememberSwipeRefreshState(state.isRefreshing),
+                    onRefresh = onRefresh,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectHorizontalDragGestures(
+                                    onDragStart = { swipeHapticFired = false },
+                                    onDragEnd = { swipeHapticFired = false }
+                                ) { _, dragAmount ->
+                                    val threshold = 80f
+                                    if (dragAmount > threshold) {
+                                        performGestureHapticFeedback()
+                                        onPrevious()
+                                    } else if (dragAmount < -threshold) {
+                                        performGestureHapticFeedback()
+                                        onNext()
+                                    }
+                                }
+                            },
+                        contentPadding = PaddingValues(
+                            horizontal = if (useWideLayout) 32.dp else 16.dp, 
+                            vertical = 12.dp
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(if (useWideLayout) 16.dp else 12.dp)
+                    ) {
+                        // ── Warning banners ──────────────────────────────────────────────
+                        if (!state.networkWarning.isNullOrBlank()) {
+                            item { WarningBanner(message = state.networkWarning) }
+                        }
+                        if (!state.bridgeNetworkWarning.isNullOrBlank()) {
+                            item { WarningBanner(message = "Desktop: ${state.bridgeNetworkWarning}") }
+                        }
+
+                        // ── Slide controls ───────────────────────────────────────────────
+                        item {
+                            SlideControlsCard(
+                                isBusy = state.isBusy,
+                                hasPresentation = state.selectedPresentationId != null,
+                                useWideLayout = useWideLayout,
+                                onPrevious = onPrevious,
+                                onNext = onNext,
+                                onStart = onStartSlideshow,
+                                onStop = onStopSlideshow,
+                            )
+                        }
+
+                        // ── FTP Server card ──────────────────────────────────────────────
+                        item {
+                            AppCard {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(if (state.isFtpEnabled) Green.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Folder,
+                                                    contentDescription = null,
+                                                    tint = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                            Column {
+                                                Text(
+                                                    "FTP Server",
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.textPrimary
+                                                )
+                                                Text(
+                                                    if (state.isFtpEnabled) "Running on port 2121" else "Offline",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary
+                                                )
+                                            }
+                                        }
+                                        Switch(
+                                            checked = state.isFtpEnabled,
+                                            onCheckedChange = { onToggleFtp() },
+                                            enabled = !state.isFtpAutoStart,
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = Color.White,
+                                                checkedTrackColor = Green,
+                                                disabledCheckedThumbColor = Color.White.copy(alpha = 0.6f),
+                                                disabledCheckedTrackColor = Green.copy(alpha = 0.5f)
+                                            )
+                                        )
+                                    }
+
+                                    if (state.isFtpEnabled) {
+                                        Button(
+                                            onClick = onOpenFtpOnPc,
+                                            enabled = connected,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (connected) Accent else MaterialTheme.colorScheme.cardBgSelected,
+                                                contentColor = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
+                                            ),
+                                            contentPadding = PaddingValues(vertical = 12.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Devices, 
+                                                contentDescription = null, 
+                                                modifier = Modifier.size(20.dp),
+                                                tint = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
+                                            )
+                                            Spacer(Modifier.width(10.dp))
+                                            Text("Open on PC", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Presentations header & Search ───────────────────────────────────────
+                        if (state.presentations.size > 5 || state.searchQuery.isNotEmpty()) {
+                            item {
+                                OutlinedTextField(
+                                    value = state.searchQuery,
+                                    onValueChange = onSearchQueryChange,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                    placeholder = { Text("Search presentations...") },
+                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                    trailingIcon = if (state.searchQuery.isNotEmpty()) {
+                                        {
+                                            IconButton(onClick = { onSearchQueryChange("") }) {
+                                                Icon(Icons.Default.Close, contentDescription = "Clear")
+                                            }
+                                        }
+                                    } else null,
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = MaterialTheme.colorScheme.cardBg,
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.cardBg,
+                                        focusedBorderColor = Accent,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.divider,
+                                    )
                                 )
+                            }
+                        } else {
+                            item {
                                 Text(
-                                    bridge.url,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.textSecondary
+                                    "Presentations",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.textSecondary,
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                                 )
                             }
                         }
+
+                        // ── Empty state / Skeleton ──────────────────────────────────────────
+                        if (filteredPresentations.isEmpty()) {
+                            if (state.isBusy && !connected) {
+                                items(3) { PresentationSkeleton() }
+                            } else if (state.isBusy && connected) {
+                                items(2) { PresentationSkeleton() }
+                            } else {
+                                item { 
+                                    EmptyStateCard(
+                                        connected = connected,
+                                        isFiltered = state.searchQuery.isNotEmpty()
+                                    ) 
+                                }
+                            }
+                        } else {
+                            items(filteredPresentations, key = { it.id }) { presentation ->
+                                PresentationCard(
+                                    presentation = presentation,
+                                    selected = presentation.id == state.selectedPresentationId,
+                                    onClick = { onPresentationSelect(presentation.id) }
+                                )
+                            }
+                        }
+
+                        // ── Bottom hint ──────────────────────────────────────────────────
+                        item {
+                            Text(
+                                "Volume ▲ = Previous  •  Volume ▼ = Next  •  Works with screen off via notification",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.textMuted,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                            )
+                        }
                     }
+                }
+
+                // Global busy indicator fixed at the bottom edge
+                AnimatedVisibility(
+                    visible = state.isBusy,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                ) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().height(4.dp),
+                        color = Accent,
+                        trackColor = MaterialTheme.colorScheme.screenBg,
+                    )
                 }
             }
         }
@@ -1312,7 +1341,7 @@ private fun SettingsScreen(
 
             Spacer(Modifier.height(40.dp))
             Text(
-                "Version 2.0.0 • Antigravity AI",
+                "Version 2.0.2 • Antigravity AI",
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
