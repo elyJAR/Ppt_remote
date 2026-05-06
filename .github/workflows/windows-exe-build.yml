@@ -10,6 +10,8 @@ on:
   push:
     tags:
       - "pre-v*"
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -59,7 +61,7 @@ jobs:
         with:
           name: PptRemoteBridge-windows-exe
           path: desktop_bridge/dist/PptRemoteBridge.exe
-          retention-days: 30
+          retention-days: 7
 
       - name: Resolve release tag
         id: tag
@@ -82,3 +84,7 @@ jobs:
           replacesArtifacts: true
           artifacts: desktop_bridge/dist/PptRemoteBridge.exe
           artifactErrorsFailBuild: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit: ${{ github.sha }}
+          omitBodyDuringUpdate: true
+          omitNameDuringUpdate: true
