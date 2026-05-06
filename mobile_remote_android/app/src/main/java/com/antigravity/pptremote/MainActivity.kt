@@ -280,7 +280,7 @@ private fun RemoteScreen(
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
-    val connected = state.statusMessage == "Connected"
+    val connected = state.bridgeReachable
     
     // Determine if we're on a tablet or in landscape
     val isTablet = configuration.screenWidthDp >= 600
