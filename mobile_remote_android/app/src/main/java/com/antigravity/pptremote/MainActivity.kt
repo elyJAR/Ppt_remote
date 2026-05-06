@@ -424,17 +424,23 @@ private fun RemoteScreen(
                             )
                         }
 
-                        if (state.isFtpEnabled && connected) {
+                        if (state.isFtpEnabled) {
                             Button(
                                 onClick = onOpenFtpOnPc,
+                                enabled = connected,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Accent,
-                                    contentColor = Color.White
+                                    containerColor = if (connected) Accent else MaterialTheme.colorScheme.cardBgSelected,
+                                    contentColor = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
                                 )
                             ) {
-                                Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(
+                                    Icons.Default.OpenInNew, 
+                                    contentDescription = null, 
+                                    modifier = Modifier.size(18.dp),
+                                    tint = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
+                                )
                                 Spacer(Modifier.width(8.dp))
                                 Text("Open on PC", fontWeight = FontWeight.SemiBold)
                             }
