@@ -610,7 +610,7 @@ private fun RemoteScreen(
                                         checked = state.isFtpEnabled || state.isFtpAutoStart,
                                         onCheckedChange = { onToggleFtp() },
                                         enabled = !state.isFtpAutoStart,
-                                        scale = 0.8f
+                                        modifier = Modifier.scale(0.8f)
                                     )
                                 }
                             }
@@ -854,23 +854,6 @@ private fun RemoteScreen(
                                 onStart = onStartSlideshow,
                                 onStop = onStopSlideshow,
                             )
-                        }
-                                                contentColor = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
-                                            ),
-                                            contentPadding = PaddingValues(vertical = 12.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Devices, 
-                                                contentDescription = null, 
-                                                modifier = Modifier.size(20.dp),
-                                                tint = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
-                                            )
-                                            Spacer(Modifier.width(10.dp))
-                                            Text("Open on PC", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                        }
-                                    }
-                                }
-                            }
                         }
 
                         // ── Presentations header & Search ───────────────────────────────────────
@@ -1828,9 +1811,9 @@ private fun PresentationHero(
                     .clip(iOSSquircleSmall)
                     .background(Color.Black)
             ) {
-                if (presentation.thumbnail != null) {
-                    val bitmap = remember(presentation.thumbnail) {
-                        BitmapFactory.decodeByteArray(presentation.thumbnail, 0, presentation.thumbnail.size)
+                if (presentation.currentThumbnail != null) {
+                    val bitmap = remember(presentation.currentThumbnail) {
+                        BitmapFactory.decodeByteArray(presentation.currentThumbnail, 0, presentation.currentThumbnail.size)
                     }
                     if (bitmap != null) {
                         Image(
@@ -1882,7 +1865,7 @@ private fun PresentationHero(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "Slide ${presentation.currentSlide} of ${presentation.slideCount}",
+                        "Slide ${presentation.currentSlide ?: 0} of ${presentation.totalSlides}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = iOSAccent
                     )
