@@ -19,6 +19,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
 import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -111,9 +112,27 @@ private val androidx.compose.material3.ColorScheme.cardBgSelected inline get() =
 private val androidx.compose.material3.ColorScheme.screenBg       inline get() = background
 private val androidx.compose.material3.ColorScheme.divider        inline get() = outline.copy(alpha = 0.3f)
 
-// iOS Squircle helper
-private val iOSSquircle = RoundedCornerShape(22.dp)
-private val iOSSquircleSmall = RoundedCornerShape(12.dp)
+// iOS Squircle helper - Increased radii for "Maximum iOS" look
+private val iOSSquircle = RoundedCornerShape(32.dp)
+private val iOSSquircleSmall = RoundedCornerShape(16.dp)
+
+@Composable
+private fun PPTLogo(size: androidx.compose.ui.unit.Dp = 44.dp, tint: Color = iOSAccent) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(iOSSquircleSmall)
+            .background(tint.copy(alpha = 0.15f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.SettingsRemote, 
+            contentDescription = "PPT Remote Logo", 
+            tint = tint,
+            modifier = Modifier.size(size * 0.6f)
+        )
+    }
+}
 
 class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<MainViewModel>()
@@ -350,8 +369,12 @@ private fun RemoteScreen(
                     ),
                 drawerShape = RoundedCornerShape(topEnd = 32.dp, bottomEnd = 32.dp)
             ) {
-                // Glassmorphism effect overlay
-                Box(modifier = Modifier.fillMaxSize()) {
+                // Glassmorphism effect overlay with blur (Android 12+)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.7f))
+                ) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -363,15 +386,7 @@ private fun RemoteScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(iOSSquircleSmall)
-                                    .background(iOSAccent.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.SettingsRemote, contentDescription = null, tint = iOSAccent)
-                            }
+                            PPTLogo(size = 48.dp)
                             Text(
                                 "PPT Remote",
                                 style = MaterialTheme.typography.headlineSmall,
@@ -433,27 +448,30 @@ private fun RemoteScreen(
                             ) {
                                 items(state.discoveredBridges) { bridge ->
                                     val isSelected = bridge.id == state.selectedBridgeId
+                                    var expanded by remember { mutableStateOf(isSelected) }
                                     val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                                     
-                                    Box(
+                                    Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(iOSSquircleSmall)
-                                            .background(if (isSelected) iOSAccent.copy(alpha = 0.15f) else Color.Transparent)
+                                            .background(if (isSelected) iOSAccent.copy(alpha = 0.1f) else Color.Transparent)
                                             .border(
                                                 1.dp,
-                                                if (isSelected) iOSAccent.copy(alpha = 0.5f) else Color.Transparent,
+                                                if (isSelected) iOSAccent.copy(alpha = 0.3f) else Color.Transparent,
                                                 iOSSquircleSmall
                                             )
-                                            .clickable(interactionSource = interactionSource, indication = ripple()) {
-                                                onSelectBridge(bridge)
-                                                scope.launch { drawerState.close() }
-                                            }
-                                            .padding(12.dp)
                                     ) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable(interactionSource = interactionSource, indication = ripple()) {
+                                                    onSelectBridge(bridge)
+                                                    if (isSelected) expanded = !expanded else expanded = true
+                                                }
+                                                .padding(12.dp)
                                         ) {
                                             Icon(
                                                 Icons.Default.Computer, 
@@ -461,7 +479,7 @@ private fun RemoteScreen(
                                                 tint = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textSecondary,
                                                 modifier = Modifier.size(24.dp)
                                             )
-                                            Column {
+                                            Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     bridge.name, 
                                                     style = MaterialTheme.typography.bodyLarge,
@@ -474,29 +492,111 @@ private fun RemoteScreen(
                                                     color = MaterialTheme.colorScheme.textSecondary
                                                 )
                                             }
+                                            if (isSelected) {
+                                                Icon(
+                                                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                    contentDescription = null,
+                                                    tint = iOSAccent,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+
+                                        // Dropdown for presentations
+                                        AnimatedVisibility(visible = isSelected && expanded) {
+                                            Column(
+                                                modifier = Modifier.padding(start = 44.dp, end = 12.dp, bottom = 8.dp),
+                                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                state.presentations.forEach { presentation ->
+                                                    val isPresSelected = presentation.id == state.selectedPresentationId
+                                                    Surface(
+                                                        onClick = { 
+                                                            onPresentationSelect(presentation.id)
+                                                            scope.launch { drawerState.close() }
+                                                        },
+                                                        color = if (isPresSelected) iOSAccent.copy(alpha = 0.15f) else Color.Transparent,
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Text(
+                                                            presentation.name,
+                                                            modifier = Modifier.padding(8.dp),
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            color = if (isPresSelected) iOSAccent else MaterialTheme.colorScheme.textPrimary
+                                                        )
+                                                    }
+                                                }
+                                                if (state.presentations.isEmpty()) {
+                                                    Text(
+                                                        "No open presentations",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.textMuted,
+                                                        modifier = Modifier.padding(8.dp)
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
 
-                        // Bottom Settings
-                        NavigationDrawerItem(
-                            label = { Text("App Settings", fontWeight = FontWeight.Bold) },
-                            selected = false,
-                            onClick = { 
-                                onShowSettings()
-                                scope.launch { drawerState.close() }
-                            },
-                            icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                            colors = NavigationDrawerItemDefaults.colors(
-                                unselectedContainerColor = Color.Transparent,
-                                unselectedTextColor = MaterialTheme.colorScheme.textPrimary,
-                                unselectedIconColor = MaterialTheme.colorScheme.textSecondary
-                            ),
-                            shape = iOSSquircleSmall,
-                            modifier = Modifier.padding(horizontal = 0.dp)
-                        )
+                        // Bottom Dock
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // FTP Quick Toggle in Sidebar
+                            Surface(
+                                onClick = { onToggleFtp() },
+                                color = if (state.isFtpEnabled) iOSGreen.copy(alpha = 0.1f) else Color.Transparent,
+                                shape = iOSSquircleSmall,
+                                border = BorderStroke(1.dp, if (state.isFtpEnabled) iOSGreen.copy(alpha = 0.3f) else MaterialTheme.colorScheme.divider),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Folder, 
+                                        contentDescription = null, 
+                                        tint = if (state.isFtpEnabled) iOSGreen else MaterialTheme.colorScheme.textSecondary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Text(
+                                        "FTP Server", 
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (state.isFtpEnabled) iOSGreen else MaterialTheme.colorScheme.textPrimary,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Switch(
+                                        checked = state.isFtpEnabled || state.isFtpAutoStart,
+                                        onCheckedChange = { onToggleFtp() },
+                                        enabled = !state.isFtpAutoStart,
+                                        scale = 0.8f
+                                    )
+                                }
+                            }
+
+                            NavigationDrawerItem(
+                                label = { Text("App Settings", fontWeight = FontWeight.Bold) },
+                                selected = false,
+                                onClick = { 
+                                    onShowSettings()
+                                    scope.launch { drawerState.close() }
+                                },
+                                icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    unselectedContainerColor = Color.Transparent,
+                                    unselectedTextColor = MaterialTheme.colorScheme.textPrimary,
+                                    unselectedIconColor = MaterialTheme.colorScheme.textSecondary
+                                ),
+                                shape = iOSSquircleSmall,
+                                modifier = Modifier.padding(horizontal = 0.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -578,21 +678,64 @@ private fun RemoteScreen(
                             item { WarningBanner(message = "Desktop: ${state.bridgeNetworkWarning}") }
                         }
 
-                        // ── Slide controls ───────────────────────────────────────────────
+                        // ── 1. Hero: Active Presentation Thumbnail ───────────────────────────────
+                        val activePres = state.presentations.find { it.id == state.selectedPresentationId }
                         item {
-                            SlideControlsCard(
-                                isBusy = state.isBusy,
-                                hasPresentation = state.selectedPresentationId != null,
-                                useWideLayout = useWideLayout,
-                                onPrevious = onPrevious,
-                                onNext = onNext,
-                                onStart = onStartSlideshow,
-                                onStop = onStopSlideshow,
-                            )
+                            if (activePres != null) {
+                                PresentationHero(
+                                    presentation = activePres,
+                                    onNotesClick = onShowNotes
+                                )
+                            }
                         }
 
-                        // ── FTP Server card ──────────────────────────────────────────────
+                        // ── 2. Other Presentations List ───────────────────────────────────
+                        val filteredPresentations = state.presentations.filter {
+                            it.name.contains(state.searchQuery, ignoreCase = true)
+                        }
+                        
+                        if (state.searchQuery.isNotEmpty()) {
+                            item {
+                                OutlinedTextField(
+                                    value = state.searchQuery,
+                                    onValueChange = onSearchQueryChange,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                    placeholder = { Text("Search presentations...") },
+                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                    singleLine = true,
+                                    shape = iOSSquircleSmall,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = iOSAccent,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.divider,
+                                    )
+                                )
+                            }
+                        } else {
+                            item {
+                                Text(
+                                    "Other Presentations",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.textSecondary,
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                                )
+                            }
+                        }
+
+                        if (filteredPresentations.isEmpty()) {
+                            item { EmptyStateCard(connected = connected, isFiltered = state.searchQuery.isNotEmpty()) }
+                        } else {
+                            items(filteredPresentations, key = { it.id }) { presentation ->
+                                PresentationCard(
+                                    presentation = presentation,
+                                    selected = presentation.id == state.selectedPresentationId,
+                                    onClick = { onPresentationSelect(presentation.id) }
+                                )
+                            }
+                        }
+
+                        // ── 3. FTP Server Quick Access ───────────────────────────────────
                         item {
+                            val ftpActive = state.isFtpEnabled || state.isFtpAutoStart
                             AppCard {
                                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Row(
@@ -606,16 +749,16 @@ private fun RemoteScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(36.dp)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(if (state.isFtpEnabled) iOSGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
+                                                    .size(40.dp)
+                                                    .clip(iOSSquircleSmall)
+                                                    .background(if (ftpActive) iOSGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Folder,
                                                     contentDescription = null,
-                                                    tint = if (state.isFtpEnabled) iOSGreen else MaterialTheme.colorScheme.textSecondary,
-                                                    modifier = Modifier.size(20.dp)
+                                                    tint = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary,
+                                                    modifier = Modifier.size(22.dp)
                                                 )
                                             }
                                             Column {
@@ -626,33 +769,53 @@ private fun RemoteScreen(
                                                     color = MaterialTheme.colorScheme.textPrimary
                                                 )
                                                 Text(
-                                                    if (state.isFtpEnabled) "Running on port 2121" else "Offline",
+                                                    if (ftpActive) "Running (Port 2121)" else "Offline",
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = if (state.isFtpEnabled) iOSGreen else MaterialTheme.colorScheme.textSecondary
+                                                    color = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary
                                                 )
                                             }
                                         }
                                         Switch(
-                                            checked = state.isFtpEnabled,
+                                            checked = ftpActive,
                                             onCheckedChange = { onToggleFtp() },
-                                            enabled = !state.isFtpAutoStart,
-                                            colors = SwitchDefaults.colors(
-                                                checkedThumbColor = Color.White,
-                                                checkedTrackColor = iOSGreen,
-                                                disabledCheckedThumbColor = Color.White.copy(alpha = 0.6f),
-                                                disabledCheckedTrackColor = iOSGreen.copy(alpha = 0.5f)
-                                            )
+                                            enabled = !state.isFtpAutoStart
                                         )
                                     }
 
-                                    if (state.isFtpEnabled) {
+                                    if (ftpActive) {
                                         Button(
                                             onClick = onOpenFtpOnPc,
                                             enabled = connected,
                                             modifier = Modifier.fillMaxWidth(),
-                                            shape = RoundedCornerShape(12.dp),
+                                            shape = iOSSquircleSmall,
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = if (connected) iOSAccent else MaterialTheme.colorScheme.cardBgSelected,
+                                                contentColor = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
+                                            ),
+                                            contentPadding = PaddingValues(vertical = 12.dp)
+                                        ) {
+                                            Icon(Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("Open Files on PC", fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── 4. Slide Controls (Bottom) ────────────────────────────────────
+                        item {
+                            Spacer(Modifier.height(16.dp))
+                            SlideControlsCard(
+                                isBusy = state.isBusy,
+                                hasPresentation = state.selectedPresentationId != null,
+                                useWideLayout = useWideLayout,
+                                onPrevious = onPrevious,
+                                onNext = onNext,
+                                onStart = onStartSlideshow,
+                                onStop = onStopSlideshow,
+                            )
+                        }
                                                 contentColor = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
                                             ),
                                             contentPadding = PaddingValues(vertical = 12.dp)
@@ -1303,8 +1466,10 @@ private fun SettingsScreen(
     onUpdateTheme: (Boolean) -> Unit,
     onUpdateNotificationText: (String) -> Unit,
     onUpdateApiKey: (String) -> Unit,
+    onUpdateApiKey: (String) -> Unit,
     onUpdateFtpAutoStart: (Boolean) -> Unit,
 ) {
+    BackHandler(onBack = onBack)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -1475,6 +1640,7 @@ private fun NotesScreen(
     state: RemoteState,
     onBack: () -> Unit
 ) {
+    BackHandler(onBack = onBack)
     val pres = state.presentations.find { it.id == state.selectedPresentationId }
     val notes = state.speakerNotes
 
@@ -1596,12 +1762,107 @@ private fun AppCard(
     Surface(
         modifier = modifier.then(clickableModifier).fillMaxWidth(),
         color = backgroundColor,
-        shape = RoundedCornerShape(12.dp),
+        shape = iOSSquircle,
         border = BorderStroke(borderWidth, borderColor),
         shadowElevation = elevation
     ) {
-        Box(modifier = Modifier.padding(16.dp)) {
+        Box(modifier = Modifier.padding(20.dp)) {
             content()
+        }
+    }
+}
+
+@Composable
+private fun PresentationHero(
+    presentation: Presentation,
+    onNotesClick: () -> Unit
+) {
+    AppCard(
+        backgroundColor = iOSGray900,
+        borderColor = iOSAccent.copy(alpha = 0.4f),
+        borderWidth = 2.dp
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .clip(iOSSquircleSmall)
+                    .background(Color.Black)
+            ) {
+                if (presentation.thumbnail != null) {
+                    val bitmap = remember(presentation.thumbnail) {
+                        BitmapFactory.decodeByteArray(presentation.thumbnail, 0, presentation.thumbnail.size)
+                    }
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "Current Slide",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Default.Slideshow, contentDescription = null, tint = iOSGray, modifier = Modifier.size(48.dp))
+                        Text("No Preview Available", color = iOSGray, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+                
+                // Overlay badge
+                Surface(
+                    color = iOSAccent,
+                    shape = RoundedCornerShape(topStart = 0.dp, bottomEnd = 16.dp, topEnd = 0.dp, bottomStart = 16.dp),
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Text(
+                        "LIVE",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    presentation.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Slide ${presentation.currentSlide} of ${presentation.slideCount}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = iOSAccent
+                    )
+                    
+                    FilledTonalButton(
+                        onClick = onNotesClick,
+                        shape = iOSSquircleSmall,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = iOSAccent.copy(alpha = 0.2f),
+                            contentColor = iOSAccent
+                        )
+                    ) {
+                        Icon(Icons.Default.Notes, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Notes")
+                    }
+                }
+            }
         }
     }
 }
