@@ -68,21 +68,25 @@ object NetworkDetector {
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
             
             try {
-                // Primary method: getTetheredIfaces (standard but hidden)
+                // Primary method: getTetheredIfaces (returns currently active tethering interfaces)
                 val method = connectivityManager.javaClass.getMethod("getTetheredIfaces")
                 val result = method.invoke(connectivityManager)
-                if (result is Array<*>) {
-                    if (result.isNotEmpty()) return true
-                } else if (result is List<*>) {
-                    if (result.isNotEmpty()) return true
+                val activeIfaces = when (result) {
+                    is Array<*> -> result.filterIsInstance<String>()
+                    is List<*> -> result.filterIsInstance<String>()
+                    else -> emptyList()
                 }
+
+                // Check for common WiFi hotspot interface names to avoid false positives from USB/BT
+                val hasWifiHotspot = activeIfaces.any { it.contains("wlan") || it.contains("ap") || it.contains("softap") }
+                if (hasWifiHotspot) return true
+
+                // Fallback to legacy reflection check
+                val wifiMethod = wifiManager.javaClass.getDeclaredMethod("isWifiApEnabled")
+                wifiMethod.isAccessible = true
+                val res = wifiMethod.invoke(wifiManager)
+                if (res is Boolean) return res
                 
-                // Fallback for some versions/vendors
-                val method2 = connectivityManager.javaClass.getMethod("getTetherableIfaces")
-                val result2 = method2.invoke(connectivityManager)
-                if (result2 is Array<*>) {
-                    if (result2.isNotEmpty()) return true
-                }
                 false
             } catch (e: Exception) {
                 // Secondary fallback: check via wifiManager reflection
