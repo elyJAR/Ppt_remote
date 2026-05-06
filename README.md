@@ -68,8 +68,9 @@ Steps:
 - `POST /api/presentations/{presentation_id}/stop`
 - `POST /api/presentations/{presentation_id}/next`
 - `POST /api/presentations/{presentation_id}/previous`
-- `GET /api/presentations/{presentation_id}/notes`
-- `GET /api/presentations/{presentation_id}/current-notes`
+- GET /api/presentations/{presentation_id}/notes
+- GET /api/presentations/{presentation_id}/current-notes
+- POST /api/ftp/open
 
 `presentation_id` is the full PowerPoint file path and is URL-encoded by the Android app automatically.
 
@@ -117,8 +118,8 @@ You can access your phone's files (like new presentations) directly from Windows
 - The app will start a secure background server on port **2121**.
 
 ### 2. Open on Windows
-- Right-click the **PPT Remote Bridge** icon in your system tray.
-- Select **📁 Open Android Files (Port 2121)**.
+- **From Phone**: Click the **"Open on PC"** button inside the **FTP Server** card in the Android app.
+- **From PC**: Right-click the **PPT Remote Bridge** icon in your system tray and select **📁 Open Android Files (Port 2121)**.
 - Windows File Explorer will open directly to your phone's storage. You can now drag and drop files as if the phone were a USB drive.
 
 *Note: The tray option only appears once the phone has connected to the bridge at least once.*
