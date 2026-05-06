@@ -689,51 +689,55 @@ private fun RemoteScreen(
                             }
                         }
 
-                        // ── 2. Other Presentations List ───────────────────────────────────
-                        val filteredPresentations = state.presentations.filter {
-                            it.name.contains(state.searchQuery, ignoreCase = true)
-                        }
-                        
-                        if (state.searchQuery.isNotEmpty()) {
-                            item {
-                                OutlinedTextField(
-                                    value = state.searchQuery,
-                                    onValueChange = onSearchQueryChange,
-                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                    placeholder = { Text("Search presentations...") },
-                                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                                    singleLine = true,
-                                    shape = iOSSquircleSmall,
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = iOSAccent,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.divider,
-                                    )
-                                )
-                            }
-                        } else {
-                            item {
-                                Text(
-                                    "Other Presentations",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.textSecondary,
-                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                                )
+                        // ── 2. Middle Section: Current Slide Notes ───────────────────────────
+                        item {
+                            val currentNotes = state.speakerNotes?.getOrNull((activePres?.currentSlide ?: 1) - 1)
+                            AppCard(
+                                borderColor = if (currentNotes != null) iOSAccent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.divider
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Notes, contentDescription = null, tint = iOSAccent, modifier = Modifier.size(20.dp))
+                                        Text(
+                                            "Speaker Notes",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.textSecondary
+                                        )
+                                    }
+                                    
+                                    if (currentNotes != null) {
+                                        Text(
+                                            text = if (currentNotes.isBlank()) "(No notes for this slide)" else currentNotes,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = if (currentNotes.isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
+                                            lineHeight = 24.sp
+                                        )
+                                    } else {
+                                        Text(
+                                            "Notes not available. Pull to refresh or check connection.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.textMuted
+                                        )
+                                    }
+
+                                    if (activePres != null) {
+                                        TextButton(
+                                            onClick = onShowNotes,
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text("View all slides", style = MaterialTheme.typography.labelMedium, color = iOSAccent)
+                                        }
+                                    }
+                                }
                             }
                         }
 
-                        if (filteredPresentations.isEmpty()) {
-                            item { EmptyStateCard(connected = connected, isFiltered = state.searchQuery.isNotEmpty()) }
-                        } else {
-                            items(filteredPresentations, key = { it.id }) { presentation ->
-                                PresentationCard(
-                                    presentation = presentation,
-                                    selected = presentation.id == state.selectedPresentationId,
-                                    onClick = { onPresentationSelect(presentation.id) }
-                                )
-                            }
-                        }
-
-                        // ── 3. FTP Server Quick Access ───────────────────────────────────
+                        // ── 3. FTP Server Quick Access (Moved slightly down) ─────────────
                         item {
                             val ftpActive = state.isFtpEnabled || state.isFtpAutoStart
                             AppCard {
@@ -1848,19 +1852,6 @@ private fun PresentationHero(
                         style = MaterialTheme.typography.bodyMedium,
                         color = iOSAccent
                     )
-                    
-                    FilledTonalButton(
-                        onClick = onNotesClick,
-                        shape = iOSSquircleSmall,
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = iOSAccent.copy(alpha = 0.2f),
-                            contentColor = iOSAccent
-                        )
-                    ) {
-                        Icon(Icons.Default.Notes, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Notes")
-                    }
                 }
             }
         }
