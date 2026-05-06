@@ -134,6 +134,31 @@ private fun PPTLogo(size: androidx.compose.ui.unit.Dp = 44.dp, tint: Color = iOS
     }
 }
 
+@Composable
+private fun iOSIcon(
+    imageVector: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.textSecondary,
+    backgroundColor: Color = Color.Transparent,
+    size: androidx.compose.ui.unit.Dp = 24.dp
+) {
+    Box(
+        modifier = Modifier
+            .size(size + 12.dp)
+            .clip(RoundedCornerShape(size * 0.4f))
+            .background(backgroundColor),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = modifier.size(size)
+        )
+    }
+}
+
 class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<MainViewModel>()
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -369,11 +394,20 @@ private fun RemoteScreen(
                     ),
                 drawerShape = RoundedCornerShape(topEnd = 32.dp, bottomEnd = 32.dp)
             ) {
-                // Glassmorphism effect overlay with blur (Android 12+)
+                // Glassmorphism effect overlay with native blur (Android 12+)
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.7f))
+                        .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.6f))
+                        .then(
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                Modifier.graphicsLayer {
+                                    renderEffect = android.graphics.RenderEffect.createBlurEffect(
+                                        50f, 50f, android.graphics.Shader.TileMode.CLAMP
+                                    ).asComposeRenderEffect()
+                                }
+                            } else Modifier
+                        )
                 ) {
                     Column(
                         modifier = Modifier
@@ -406,20 +440,19 @@ private fun RemoteScreen(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp
                             )
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(
-                                    imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
-                                    contentDescription = null,
-                                    tint = if (connected) iOSGreen else MaterialTheme.colorScheme.textSecondary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Text(
-                                    text = if (connected) "Connected" else state.statusMessage,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = if (connected) iOSGreen else MaterialTheme.colorScheme.textPrimary,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+                            iOSIcon(
+                                imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
+                                contentDescription = null,
+                                tint = if (connected) iOSGreen else MaterialTheme.colorScheme.textSecondary,
+                                backgroundColor = if (connected) iOSGreen.copy(alpha = 0.1f) else MaterialTheme.colorScheme.cardBgSelected,
+                                size = 20.dp
+                            )
+                            Text(
+                                text = if (connected) "Connected" else state.statusMessage,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (connected) iOSGreen else MaterialTheme.colorScheme.textPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
 
                         Divider(color = MaterialTheme.colorScheme.divider)
@@ -473,11 +506,12 @@ private fun RemoteScreen(
                                                 }
                                                 .padding(12.dp)
                                         ) {
-                                            Icon(
-                                                Icons.Default.Computer, 
+                                            iOSIcon(
+                                                imageVector = Icons.Default.Computer, 
                                                 contentDescription = null,
                                                 tint = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textSecondary,
-                                                modifier = Modifier.size(24.dp)
+                                                backgroundColor = if (isSelected) iOSAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
+                                                size = 20.dp
                                             )
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
@@ -559,11 +593,12 @@ private fun RemoteScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Default.Folder, 
+                                    iOSIcon(
+                                        imageVector = Icons.Default.Folder, 
                                         contentDescription = null, 
                                         tint = if (state.isFtpEnabled) iOSGreen else MaterialTheme.colorScheme.textSecondary,
-                                        modifier = Modifier.size(22.dp)
+                                        backgroundColor = if (state.isFtpEnabled) iOSGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
+                                        size = 20.dp
                                     )
                                     Text(
                                         "FTP Server", 
