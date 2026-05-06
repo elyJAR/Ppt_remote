@@ -140,8 +140,11 @@ class TrayIconManager:
 
     def _build_menu_items(self) -> list["pystray.MenuItem"]:
         """Construct the list of menu items based on current state."""
+        import main
+        bridge_name = main.get_bridge_name()
+
         menu_items = [
-            pystray.MenuItem("PPT Remote Bridge", None, enabled=False),
+            pystray.MenuItem(f"Bridge: {bridge_name}", None, enabled=False),
             pystray.MenuItem(f"  {self._bridge_url}", None, enabled=False),
             pystray.Menu.SEPARATOR,
         ]
@@ -158,17 +161,25 @@ class TrayIconManager:
                 menu_items.append(pystray.MenuItem("⏹  Stop Slideshow", self._handle_stop_slideshow))
             menu_items.append(pystray.Menu.SEPARATOR)
 
-        # FTP Feature - Open Android Files
-        import main
-        client_ip = main.STATE.get("last_client_ip")
-        if client_ip:
-            menu_items.append(pystray.MenuItem(f"📁 Open Android Files (Port 2121)", self._handle_open_ftp))
-            menu_items.append(pystray.MenuItem("🔄 Refresh Client Info", lambda i, m: self.update_menu()))
+        # FTP Feature - Multi-Client Support
+        active_clients = main.client_registry.get_active_clients()
+        if active_clients:
+            client_subitems = []
+            for client in active_clients:
+                # Capture client in a closure for the handler
+                def _make_handler(c=client):
+                    return lambda i, m: main.open_ftp_explorer(c.ip_address)
+                
+                client_subitems.append(
+                    pystray.MenuItem(f"📁 {client.device_name} ({client.ip_address})", _make_handler())
+                )
+            
+            menu_items.append(pystray.MenuItem("Open Mobile Files", pystray.Menu(*client_subitems)))
+            menu_items.append(pystray.MenuItem("🔄 Refresh Client List", lambda i, m: self.update_menu()))
             menu_items.append(pystray.Menu.SEPARATOR)
         else:
             # Show a placeholder to confirm the bridge is watching
-            menu_items.append(pystray.MenuItem("⌛ Waiting for Mobile...", lambda i, m: None, enabled=False))
-            menu_items.append(pystray.MenuItem("🔄 Refresh", lambda i, m: self.update_menu()))
+            menu_items.append(pystray.MenuItem("⌛ Waiting for Mobile...", lambda i, m: self.update_menu(), enabled=True))
             menu_items.append(pystray.Menu.SEPARATOR)
 
         menu_items.append(pystray.MenuItem("Quit", self._handle_quit))

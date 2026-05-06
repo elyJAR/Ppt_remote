@@ -274,10 +274,16 @@ class RemoteControlService : Service() {
         // Multi-bridge: use the active bridge URL
         val stored = RemotePrefs.getActiveBridgeUrl(this).trim()
         if (stored.isNotBlank()) return stored
-        val discovered = client.discoverBridge(3000, RemotePrefs.getBridgePort(this) + 1)
-        if (!discovered.isNullOrBlank()) {
-            RemotePrefs.setBridgeUrl(this, discovered)
-            return discovered
+        
+        val discovered = client.discoverBridge(
+            timeoutMs = 3000,
+            discoveryPort = RemotePrefs.getBridgePort(this) + 1
+        )
+        val first = discovered.firstOrNull()
+        if (first != null) {
+            RemotePrefs.setBridgeUrl(this, first.url)
+            RemotePrefs.setSelectedBridgeId(this, first.id)
+            return first.url
         }
         return null
     }

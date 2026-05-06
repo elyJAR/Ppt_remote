@@ -116,7 +116,26 @@ class BridgeClient {
     fun stopSlideshow(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/stop")
     fun next(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/next")
     fun previous(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/previous")
-    fun openFtpOnPc(url: String) = post(url, "/api/ftp/open")
+    fun openFtpOnPc(url: String, clientIp: String? = null) {
+        val path = if (clientIp != null) "/api/ftp/open?client_ip=$clientIp" else "/api/ftp/open"
+        post(url, path)
+    }
+
+    fun registerClient(url: String, deviceId: String, deviceName: String, ftpPort: Int = 2121) {
+        if (url.isBlank()) return
+        val client = createClient(timeoutSeconds = 5)
+        val json = JSONObject().apply {
+            put("device_id", deviceId)
+            put("device_name", deviceName)
+            put("ftp_port", ftpPort)
+        }
+        val request = Request.Builder()
+            .url("${baseUrl(url)}/api/clients/register")
+            .withApiKey()
+            .post(json.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        client.newCall(request).execute().use { if (!it.isSuccessful) throw BridgeHttpException(it.code, "Registration failed") }
+    }
 
     fun fetchCurrentThumbnail(url: String, presentationId: String, width: Int = 720): ByteArray? {
         return try {
@@ -167,17 +186,19 @@ class BridgeClient {
         discoveryPort: Int = 8788,
         bridgePort: Int = 8787,
         networkType: NetworkType = NetworkType.UNKNOWN
-    ): String? {
+    ): List<BridgeInfo> {
         return try {
+            val bridges = mutableListOf<BridgeInfo>()
             if (networkType == NetworkType.HOTSPOT_PROVIDING) {
-                val found = discoverViaHotspotSubnet(bridgePort)
-                if (found != null) return found
+                bridges += discoverViaHotspotSubnet(bridgePort)
             }
-            discoverViaBroadcast(timeoutMs, discoveryPort)
-        } catch (e: Exception) { null }
+            bridges += discoverViaBroadcast(timeoutMs, discoveryPort)
+            // Deduplicate by ID
+            bridges.distinctBy { it.id }
+        } catch (e: Exception) { emptyList() }
     }
 
-    private fun discoverViaHotspotSubnet(bridgePort: Int): String? {
+    private fun discoverViaHotspotSubnet(bridgePort: Int): List<BridgeInfo> {
         val hotspotSubnets = listOf("192.168.43", "192.168.1", "192.168.0", "10.0.0")
         val scanRangeEnd = 20
         val probeClient = OkHttpClient.Builder()
@@ -186,16 +207,20 @@ class BridgeClient {
             .build()
 
         val executor = Executors.newFixedThreadPool(16)
-        val futures = mutableListOf<Future<String?>>()
+        val futures = mutableListOf<Future<BridgeInfo?>>()
 
         for (subnet in hotspotSubnets) {
             for (host in 2..scanRangeEnd) {
                 val candidate = "http://$subnet.$host:$bridgePort"
-                futures += executor.submit<String?> {
+                futures += executor.submit<BridgeInfo?> {
                     try {
                         val req = Request.Builder().url("$candidate/api/health").get().build()
                         probeClient.newCall(req).execute().use { resp ->
-                            if (resp.isSuccessful) candidate else null
+                            if (resp.isSuccessful) {
+                                // Since legacy health doesn't have ID, we use URL as ID fallback
+                                // Real multi-device environment will mostly use Broadcast
+                                BridgeInfo(id = candidate, name = "Bridge at $subnet.$host", url = candidate, isAutoDiscovered = true)
+                            } else null
                         }
                     } catch (_: Exception) { null }
                 }
@@ -205,18 +230,19 @@ class BridgeClient {
         executor.shutdown()
         try { executor.awaitTermination(1500, TimeUnit.MILLISECONDS) } catch (_: Exception) {}
 
-        val result = futures.firstNotNullOfOrNull { f ->
+        val result = futures.mapNotNull { f ->
             try { if (f.isDone) f.get() else null } catch (_: Exception) { null }
         }
         executor.shutdownNow()
         return result
     }
 
-    private fun discoverViaBroadcast(timeoutMs: Int, discoveryPort: Int): String? {
+    private fun discoverViaBroadcast(timeoutMs: Int, discoveryPort: Int): List<BridgeInfo> {
         val payload = discoveryToken.toByteArray(StandardCharsets.UTF_8)
         val receiveBuffer = ByteArray(1024)
+        val bridges = mutableListOf<BridgeInfo>()
 
-        return try {
+        try {
             DatagramSocket().use { socket ->
                 socket.broadcast = true
                 socket.soTimeout = timeoutMs
@@ -250,14 +276,22 @@ class BridgeClient {
                         if (!body.trim().startsWith("{")) continue
                         val json = JSONObject(body)
                         val url = json.optString("bridge_url", "")
-                        if (url.isNotBlank()) return url
+                        if (url.isNotBlank()) {
+                            bridges += BridgeInfo(
+                                id = json.optString("bridge_id", url),
+                                name = json.optString("bridge_name", "Bridge at ${response.address.hostAddress}"),
+                                url = url,
+                                version = json.optString("version", "unknown"),
+                                isAutoDiscovered = true
+                            )
+                        }
                     } catch (_: SocketTimeoutException) { break }
                     catch (e: org.json.JSONException) { continue }
                     catch (e: Exception) { break }
                 }
-                null
             }
-        } catch (e: Exception) { null }
+        } catch (e: Exception) { }
+        return bridges
     }
 
     private fun post(url: String, path: String) {

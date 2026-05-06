@@ -1,9 +1,12 @@
 package com.antigravity.pptremote
 
-/** A saved bridge entry with a user-friendly display name and connection URL. */
-data class SavedBridge(
+/** Represents a discovered or saved bridge with identity and connection metadata. */
+data class BridgeInfo(
+    val id: String,
     val name: String,
-    val url: String
+    val url: String,
+    val version: String = "unknown",
+    val isAutoDiscovered: Boolean = false
 )
 
 /**
@@ -81,9 +84,9 @@ data class RemoteState(
     val speakerNotes: List<String>? = null,
     // Track last thumbnail slide to avoid re-fetching the same slide
     val lastThumbnailSlide: Int? = null,
-    // Multi-bridge
-    val bridges: List<SavedBridge> = emptyList(),
-    val activeBridgeIndex: Int = 0,
+    // Multi-bridge support
+    val discoveredBridges: List<BridgeInfo> = emptyList(),
+    val selectedBridgeId: String? = null,
     // Connection tracking
     val failureCount: Int = 0,
     // FTP Feature

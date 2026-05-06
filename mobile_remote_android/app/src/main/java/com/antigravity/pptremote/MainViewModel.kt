@@ -38,8 +38,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             connectionHistory = RemotePrefs.getConnectionHistory(appContext),
             notificationText = RemotePrefs.getNotificationText(appContext),
             apiKey = RemotePrefs.getApiKey(appContext),
-            bridges = RemotePrefs.getBridges(appContext),
-            activeBridgeIndex = RemotePrefs.getActiveBridgeIndex(appContext),
+            discoveredBridges = RemotePrefs.getSavedBridges(appContext),
+            selectedBridgeId = RemotePrefs.getSelectedBridgeId(appContext),
             isFtpEnabled = RemotePrefs.isFtpEnabled(appContext),
             isFtpAutoStart = RemotePrefs.isFtpAutoStart(appContext)
         )
@@ -53,6 +53,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Sync API key into client on startup
         client.apiKey = RemotePrefs.getApiKey(appContext)
         startPolling()
+        startDiscovery()
+        startRegistrationLoop()
     }
 
     fun updateSearchQuery(query: String) {
@@ -132,14 +134,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             trimmedUrl
         }
         
+        val newBridge = BridgeInfo(
+            id = urlWithPort,
+            name = "Manual: $trimmedUrl",
+            url = urlWithPort
+        )
+
         RemotePrefs.setBridgeUrl(appContext, urlWithPort)
+        RemotePrefs.setSelectedBridgeId(appContext, newBridge.id)
         if (urlWithPort.isNotBlank()) {
             RemotePrefs.addToConnectionHistory(appContext, urlWithPort)
+            // Add to saved bridges if manual
+            val saved = RemotePrefs.getSavedBridges(appContext).toMutableList()
+            if (saved.none { it.id == newBridge.id }) {
+                saved.add(newBridge)
+                RemotePrefs.saveBridges(appContext, saved)
+            }
         }
         _state.value = _state.value.copy(
             bridgeUrl = urlWithPort,
+            selectedBridgeId = newBridge.id,
+            discoveredBridges = RemotePrefs.getSavedBridges(appContext),
             connectionHistory = RemotePrefs.getConnectionHistory(appContext)
         )
+    }
+
+    fun selectBridge(bridge: BridgeInfo) {
+        RemotePrefs.setSelectedBridgeId(appContext, bridge.id)
+        _state.value = _state.value.copy(
+            selectedBridgeId = bridge.id,
+            bridgeUrl = bridge.url
+        )
+        // Immediately trigger a poll
+        viewModelScope.launch(Dispatchers.IO) {
+            refreshPresentations()
+        }
     }
 
     fun selectPresentation(id: String) {
@@ -272,49 +301,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(isFtpAutoStart = enabled)
     }
 
-    // ── Multi-bridge ──────────────────────────────────────────────────────────
-
-    fun addBridge(name: String, url: String) {
-        val trimmedUrl = buildBridgeUrl(url.trim(), _state.value.bridgePort)
-        val newBridge = SavedBridge(name = name.trim().ifBlank { trimmedUrl }, url = trimmedUrl)
-        val updated = _state.value.bridges.toMutableList().also { it.add(newBridge) }
-        RemotePrefs.saveBridges(appContext, updated)
-        _state.value = _state.value.copy(bridges = updated)
-    }
-
-    fun removeBridge(index: Int) {
-        val updated = _state.value.bridges.toMutableList().also { it.removeAt(index) }
-        RemotePrefs.saveBridges(appContext, updated)
-        val newActive = if (_state.value.activeBridgeIndex >= updated.size)
-            maxOf(0, updated.size - 1) else _state.value.activeBridgeIndex
-        RemotePrefs.setActiveBridgeIndex(appContext, newActive)
-        val newUrl = updated.getOrNull(newActive)?.url ?: ""
-        // Persist newUrl (empty string re-enables auto-discovery on next poll)
-        RemotePrefs.setBridgeUrl(appContext, newUrl)
-        _state.value = _state.value.copy(
-            bridges = updated,
-            activeBridgeIndex = newActive,
-            bridgeUrl = newUrl
-        )
-    }
-
-    fun selectBridge(index: Int) {
-        val bridges = _state.value.bridges
-        if (index !in bridges.indices) return
-        RemotePrefs.setActiveBridgeIndex(appContext, index)
-        val url = bridges[index].url
-        RemotePrefs.setBridgeUrl(appContext, url)
-        _state.value = _state.value.copy(
-            activeBridgeIndex = index,
-            bridgeUrl = url,
-            // Reset connection state when switching bridges
-            presentations = emptyList(),
-            statusMessage = "Connecting...",
-            isBusy = true,
-            lastThumbnailSlide = null,
-            currentSlideNotes = null
-        )
-    }
 
     private fun cacheKey(bridgeUrl: String, presentationId: String): String {
         return "${bridgeUrl.trimEnd('/')} $presentationId"
@@ -483,13 +469,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 else -> 1500
             }
 
-            val detectedUrl = client.discoverBridge(
+            val detectedBridges = client.discoverBridge(
                 timeoutMs = discoveryTimeoutMs,
                 discoveryPort = current.bridgePort + 1,
                 bridgePort = current.bridgePort,
                 networkType = current.networkType
             )
-            if (detectedUrl == null) {
+            _state.value = _state.value.copy(discoveredBridges = detectedBridges)
+            
+            if (detectedBridges.isEmpty()) {
                 _state.value = _state.value.copy(
                     presentations = emptyList(),
                     isBusy = true,
@@ -498,12 +486,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return
             }
 
-            RemotePrefs.setBridgeUrl(appContext, detectedUrl)
+            val bestMatch = detectedBridges.find { it.id == current.selectedBridgeId } ?: detectedBridges.first()
+            if (bestMatch.id != current.selectedBridgeId) {
+                RemotePrefs.setSelectedBridgeId(appContext, bestMatch.id)
+                RemotePrefs.setBridgeUrl(appContext, bestMatch.url)
+            }
+            
             _state.value = _state.value.copy(
-                bridgeUrl = detectedUrl,
-                statusMessage = "Bridge detected at $detectedUrl"
+                bridgeUrl = bestMatch.url,
+                selectedBridgeId = bestMatch.id,
+                statusMessage = "Bridge detected: ${bestMatch.name}"
             )
-            detectedUrl
+            bestMatch.url
         } else {
             current.bridgeUrl
         }
@@ -640,7 +634,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Network / IO error — bridge may have moved. Increment failure counter
             // and clear URL after 2 consecutive failures to trigger re-discovery.
             val newFailCount = nowState.failureCount + 1
-            if (newFailCount >= 2) {
+            if (newFailCount >= 3) {
                 _state.value = nowState.copy(
                     bridgeUrl = "",
                     failureCount = 0,
@@ -648,7 +642,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isBusy = true,
                     statusMessage = "Connection lost. Searching for bridge..."
                 )
-                RemotePrefs.setBridgeUrl(appContext, "")
+                // We don't clear RemotePrefs.setSelectedBridgeId here, 
+                // just the runtime URL to trigger re-discovery.
             } else {
                 _state.value = nowState.copy(
                     failureCount = newFailCount,
@@ -656,6 +651,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isBusy = false,
                     statusMessage = ex.message ?: "Unable to reach bridge"
                 )
+                // Trigger background discovery on first failure
+                if (newFailCount == 1) {
+                    startDiscovery()
+                }
+            }
+        }
+    }
+
+    private fun startDiscovery() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val bridges = client.discoverBridge(
+                discoveryPort = _state.value.bridgePort + 1,
+                bridgePort = _state.value.bridgePort,
+                networkType = _state.value.networkType
+            )
+            _state.value = _state.value.copy(discoveredBridges = bridges)
+            
+            // If we have a selected ID, update its URL if it changed in discovery
+            val selectedId = _state.value.selectedBridgeId
+            if (selectedId != null) {
+                bridges.find { it.id == selectedId }?.let {
+                    if (it.url != _state.value.bridgeUrl) {
+                        _state.value = _state.value.copy(bridgeUrl = it.url)
+                        RemotePrefs.setBridgeUrl(appContext, it.url)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun startRegistrationLoop() {
+        viewModelScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                val url = _state.value.bridgeUrl
+                if (url.isNotBlank() && _state.value.bridgeReachable) {
+                    try {
+                        client.registerClient(
+                            url = url,
+                            deviceId = RemotePrefs.getDeviceId(appContext),
+                            deviceName = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
+                        )
+                    } catch (_: Exception) {}
+                }
+                delay(60000) // Register once a minute
             }
         }
     }

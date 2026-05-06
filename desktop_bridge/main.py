@@ -7,6 +7,7 @@ import os
 import pathlib
 import socket
 import threading
+import time
 import urllib.parse
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -53,16 +54,91 @@ STATE = {
     "last_client_ip": None
 }
 
-def open_ftp_explorer() -> bool:
-    """Launch Windows Explorer pointed at the mobile device's FTP server."""
-    client_ip = STATE.get("last_client_ip")
-    if not client_ip:
-        _logger.warning("open_ftp_explorer: No mobile client IP known.")
+# ---------------------------------------------------------------------------
+# Bridge Identity & Custom Naming
+# ---------------------------------------------------------------------------
+def get_bridge_id() -> str:
+    """Get a unique, persistent ID for this bridge instance."""
+    app_data = pathlib.Path(os.getenv("APPDATA", "")) / "PptRemoteBridge"
+    app_data.mkdir(parents=True, exist_ok=True)
+    id_file = app_data / ".bridge_id"
+    if id_file.exists():
+        return id_file.read_text().strip()
+    
+    import uuid
+    new_id = str(uuid.uuid4())
+    id_file.write_text(new_id)
+    return new_id
+
+def get_bridge_name() -> str:
+    """Get the friendly name of this bridge (custom or hostname)."""
+    app_data = pathlib.Path(os.getenv("APPDATA", "")) / "PptRemoteBridge"
+    name_file = app_data / ".bridge_name"
+    if name_file.exists():
+        try:
+            name = name_file.read_text(encoding="utf-8").strip()
+            if name: return name
+        except Exception:
+            pass
+    
+    return socket.gethostname()
+
+def set_bridge_name(name: str) -> None:
+    """Persist a custom name for this bridge."""
+    app_data = pathlib.Path(os.getenv("APPDATA", "")) / "PptRemoteBridge"
+    app_data.mkdir(parents=True, exist_ok=True)
+    name_file = app_data / ".bridge_name"
+    name_file.write_text(name.strip(), encoding="utf-8")
+
+# ---------------------------------------------------------------------------
+# Client Registry (Tracks multiple mobile devices)
+# ---------------------------------------------------------------------------
+class ClientInfo(BaseModel):
+    device_id: str
+    device_name: str
+    ip_address: str
+    ftp_port: int = 2121
+    last_seen: float
+
+class ClientRegistry:
+    def __init__(self, ttl: int = 120) -> None:
+        self._clients: dict[str, ClientInfo] = {}
+        self._lock = threading.Lock()
+        self._ttl = ttl
+
+    def register(self, device_id: str, device_name: str, ip_address: str, ftp_port: int = 2121) -> None:
+        with self._lock:
+            self._clients[device_id] = ClientInfo(
+                device_id=device_id,
+                device_name=device_name,
+                ip_address=ip_address,
+                ftp_port=ftp_port,
+                last_seen=time.time()
+            )
+            # Update legacy single-client state
+            STATE["last_client_ip"] = ip_address
+
+    def get_active_clients(self) -> list[ClientInfo]:
+        now = time.time()
+        with self._lock:
+            # Remove expired clients
+            expired = [k for k, v in self._clients.items() if now - v.last_seen > self._ttl]
+            for k in expired:
+                del self._clients[k]
+            return list(self._clients.values())
+
+client_registry = ClientRegistry()
+
+def open_ftp_explorer(client_ip: str | None = None) -> bool:
+    """Launch Windows Explorer pointed at a specific mobile device's FTP server."""
+    target_ip = client_ip or STATE.get("last_client_ip")
+    if not target_ip:
+        _logger.warning("open_ftp_explorer: No mobile client IP specified or known.")
         return False
 
     import subprocess
     # Force the trailing slash and ensure port 2121
-    ftp_url = f"ftp://{client_ip}:2121/"
+    ftp_url = f"ftp://{target_ip}:2121/"
     _logger.info("Opening Android files in Explorer: %s", ftp_url)
     try:
         # Force Windows File Explorer by using explorer.exe explicitly.
@@ -149,6 +225,12 @@ class SlideNotesDto(BaseModel):
     notes: str
 
 
+class ClientRegistrationDto(BaseModel):
+    device_id: str
+    device_name: str
+    ftp_port: int = 2121
+
+
 # ---------------------------------------------------------------------------
 # Discovery helpers
 # ---------------------------------------------------------------------------
@@ -203,9 +285,12 @@ class DiscoveryResponder:
                     continue
 
                 local_ip = _local_ip_for_peer(addr[0])
-                payload = json.dumps(
-                    {"bridge_url": f"http://{local_ip}:{self._bridge_port}"}
-                )
+                payload = json.dumps({
+                    "bridge_id": get_bridge_id(),
+                    "bridge_name": get_bridge_name(),
+                    "bridge_url": f"http://{local_ip}:{self._bridge_port}",
+                    "version": "2.0.0"
+                })
                 sock.sendto(payload.encode("utf-8"), addr)
         finally:
             sock.close()
@@ -227,7 +312,7 @@ async def lifespan(_app: FastAPI):
 # ---------------------------------------------------------------------------
 # FastAPI application
 # ---------------------------------------------------------------------------
-app = FastAPI(title="PowerPoint Bridge API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="PowerPoint Bridge API", version="2.0.0", lifespan=lifespan)
 controller = PowerPointController()
 
 app.add_middleware(
@@ -501,10 +586,37 @@ def get_current_slide_thumbnail(
     summary="Open Android FTP server in Windows File Explorer",
     dependencies=[Depends(verify_api_key)],
 )
-def open_ftp_on_pc():
-    if not open_ftp_explorer():
+def open_ftp_on_pc(client_ip: str | None = None):
+    if not open_ftp_explorer(client_ip):
         raise HTTPException(
             status_code=400,
-            detail="No mobile client detected yet or failed to launch Explorer.",
+            detail="Client not detected or failed to launch Explorer.",
         )
     return {"ok": True}
+
+
+@app.post(
+    "/api/clients/register",
+    summary="Register a mobile device with this bridge",
+    dependencies=[Depends(verify_api_key)],
+)
+def register_client(request: Request, registration: ClientRegistrationDto):
+    client_registry.register(
+        device_id=registration.device_id,
+        device_name=registration.device_name,
+        ip_address=request.client.host if request.client else "unknown",
+        ftp_port=registration.ftp_port
+    )
+    return {"ok": True}
+
+
+@app.post(
+    "/api/bridge/rename",
+    summary="Rename this bridge",
+    dependencies=[Depends(verify_api_key)],
+)
+def rename_bridge(name: str):
+    if not name.strip():
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+    set_bridge_name(name)
+    return {"ok": True, "new_name": get_bridge_name()}

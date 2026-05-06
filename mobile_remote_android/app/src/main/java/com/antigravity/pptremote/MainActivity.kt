@@ -164,8 +164,6 @@ class MainActivity : ComponentActivity() {
                             onToggleService = viewModel::toggleService,
                             onShowSettings = viewModel::showSettings,
                             onShowNotes = viewModel::showNotes,
-                            onAddBridge = viewModel::addBridge,
-                            onRemoveBridge = viewModel::removeBridge,
                             onSelectBridge = viewModel::selectBridge,
                             onSearchQueryChange = viewModel::updateSearchQuery,
                             onToggleFtp = viewModel::toggleFtp,
@@ -271,9 +269,7 @@ private fun RemoteScreen(
     onToggleService: () -> Unit,
     onShowSettings: () -> Unit,
     onShowNotes: () -> Unit,
-    onAddBridge: (String, String) -> Unit,
-    onRemoveBridge: (Int) -> Unit,
-    onSelectBridge: (Int) -> Unit,
+    onSelectBridge: (BridgeInfo) -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onToggleFtp: () -> Unit,
     onOpenFtpOnPc: () -> Unit,
@@ -360,12 +356,9 @@ private fun RemoteScreen(
                     bridgeUrl = state.bridgeUrl,
                     statusMessage = state.statusMessage,
                     connected = connected,
-                    connectionHistory = state.connectionHistory,
-                    bridges = state.bridges,
-                    activeBridgeIndex = state.activeBridgeIndex,
+                    discoveredBridges = state.discoveredBridges,
+                    selectedBridgeId = state.selectedBridgeId,
                     onBridgeUrlChange = onBridgeUrlChange,
-                    onAddBridge = onAddBridge,
-                    onRemoveBridge = onRemoveBridge,
                     onSelectBridge = onSelectBridge,
                 )
             }
@@ -584,18 +577,12 @@ private fun ConnectionCard(
     bridgeUrl: String,
     statusMessage: String,
     connected: Boolean,
-    connectionHistory: List<String>,
-    bridges: List<SavedBridge>,
-    activeBridgeIndex: Int,
+    discoveredBridges: List<BridgeInfo>,
+    selectedBridgeId: String?,
     onBridgeUrlChange: (String) -> Unit,
-    onAddBridge: (String, String) -> Unit,
-    onRemoveBridge: (Int) -> Unit,
-    onSelectBridge: (Int) -> Unit,
+    onSelectBridge: (BridgeInfo) -> Unit,
 ) {
-    var showHistory by remember { mutableStateOf(false) }
-    var showAddBridge by remember { mutableStateOf(false) }
-    var newBridgeName by remember { mutableStateOf("") }
-    var newBridgeUrl by remember { mutableStateOf("") }
+    var showBridges by remember { mutableStateOf(false) }
 
     AppCard {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -620,134 +607,74 @@ private fun ConnectionCard(
                 )
                 
                 IconButton(
-                    onClick = { showHistory = !showHistory },
+                    onClick = { showBridges = !showBridges },
                     modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
-                        if (showHistory) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        if (showBridges) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.textSecondary
                     )
                 }
             }
 
-            if (showHistory) {
-                // Saved bridges list (shown when more than 0 saved)
-                if (bridges.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (showBridges || discoveredBridges.size > 1) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "Available PCs",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.textSecondary,
+                        fontWeight = FontWeight.Medium
+                    )
+                    if (discoveredBridges.isEmpty()) {
                         Text(
-                            "Saved Bridges",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.textSecondary,
-                            fontWeight = FontWeight.Medium
+                            "No PCs found yet. Ensure the bridge is running on your PC.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.textMuted,
+                            modifier = Modifier.padding(vertical = 4.dp)
                         )
-                        bridges.forEachIndexed { index, bridge ->
-                            val isActive = index == activeBridgeIndex
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(
-                                        if (isActive) Accent.copy(alpha = 0.12f)
-                                        else MaterialTheme.colorScheme.cardBgSelected
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isActive) Accent.copy(alpha = 0.4f)
-                                        else MaterialTheme.colorScheme.divider,
-                                        RoundedCornerShape(6.dp)
-                                    )
-                                    .clickable { onSelectBridge(index) }
-                                    .padding(horizontal = 10.dp, vertical = 8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = if (isActive) Icons.Default.CheckCircle else Icons.Default.Computer,
-                                    contentDescription = null,
-                                    tint = if (isActive) Accent else MaterialTheme.colorScheme.textSecondary,
-                                    modifier = Modifier.size(16.dp)
+                    }
+                    discoveredBridges.forEach { bridge ->
+                        val isSelected = bridge.id == selectedBridgeId
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(
+                                    if (isSelected) Accent.copy(alpha = 0.12f)
+                                    else MaterialTheme.colorScheme.cardBgSelected
                                 )
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        bridge.name,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (isActive) Accent else MaterialTheme.colorScheme.textPrimary
-                                    )
-                                    Text(
-                                        bridge.url,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.textSecondary
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { onRemoveBridge(index) },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(14.dp), tint = Red.copy(alpha = 0.6f))
-                                }
+                                .border(
+                                    1.dp,
+                                    if (isSelected) Accent.copy(alpha = 0.4f)
+                                    else MaterialTheme.colorScheme.divider,
+                                    RoundedCornerShape(6.dp)
+                                )
+                                .clickable { onSelectBridge(bridge) }
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.Computer,
+                                contentDescription = null,
+                                tint = if (isSelected) Accent else MaterialTheme.colorScheme.textSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    bridge.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isSelected) Accent else MaterialTheme.colorScheme.textPrimary
+                                )
+                                Text(
+                                    bridge.url,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.textSecondary
+                                )
                             }
                         }
-                    }
-                }
-
-                if (showAddBridge) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                        OutlinedTextField(
-                            value = newBridgeName,
-                            onValueChange = { newBridgeName = it },
-                            label = { Text("Bridge Name (e.g. Office PC)", color = MaterialTheme.colorScheme.textSecondary) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Accent,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.divider,
-                                focusedTextColor = MaterialTheme.colorScheme.textPrimary,
-                                unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
-                            )
-                        )
-                        OutlinedTextField(
-                            value = newBridgeUrl,
-                            onValueChange = { newBridgeUrl = it },
-                            label = { Text("URL (e.g. 192.168.1.5)", color = MaterialTheme.colorScheme.textSecondary) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Accent,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.divider,
-                                focusedTextColor = MaterialTheme.colorScheme.textPrimary,
-                                unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
-                            )
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilledTonalButton(
-                                onClick = {
-                                    if (newBridgeUrl.isNotBlank()) {
-                                        onAddBridge(newBridgeName, newBridgeUrl)
-                                        newBridgeName = ""
-                                        newBridgeUrl = ""
-                                        showAddBridge = false
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.filledTonalButtonColors(containerColor = Accent.copy(alpha = 0.15f), contentColor = Accent)
-                            ) { Text("Save", fontWeight = FontWeight.SemiBold) }
-                            FilledTonalButton(
-                                onClick = { showAddBridge = false; newBridgeName = ""; newBridgeUrl = "" },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.cardBgSelected, contentColor = MaterialTheme.colorScheme.textSecondary)
-                            ) { Text("Cancel") }
-                        }
-                    }
-                } else {
-                    TextButton(
-                        onClick = { showAddBridge = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Add Bridge", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -1363,7 +1290,7 @@ private fun SettingsScreen(
 
             Spacer(Modifier.height(40.dp))
             Text(
-                "Version 1.7.0 • Antigravity AI",
+                "Version 2.0.0 • Antigravity AI",
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
