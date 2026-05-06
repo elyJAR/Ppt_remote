@@ -23,6 +23,8 @@ import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -432,7 +434,7 @@ private fun RemoteScreen(
                             ) {
                                 items(state.discoveredBridges) { bridge ->
                                     val isSelected = bridge.id == state.selectedBridgeId
-                                    val interactionSource = remember { MutableInteractionSource() }
+                                    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                                     
                                     Box(
                                         modifier = Modifier
@@ -444,7 +446,7 @@ private fun RemoteScreen(
                                                 if (isSelected) iOSAccent.copy(alpha = 0.5f) else Color.Transparent,
                                                 iOSSquircleSmall
                                             )
-                                            .clickable(interactionSource = interactionSource, indication = rememberRipple()) {
+                                            .clickable(interactionSource = interactionSource, indication = androidx.compose.material.ripple.rememberRipple()) {
                                                 onSelectBridge(bridge)
                                                 scope.launch { drawerState.close() }
                                             }
@@ -607,13 +609,13 @@ private fun RemoteScreen(
                                                 modifier = Modifier
                                                     .size(36.dp)
                                                     .clip(RoundedCornerShape(8.dp))
-                                                    .background(if (state.isFtpEnabled) Green.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
+                                                    .background(if (state.isFtpEnabled) iOSGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.Folder,
                                                     contentDescription = null,
-                                                    tint = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary,
+                                                    tint = if (state.isFtpEnabled) iOSGreen else MaterialTheme.colorScheme.textSecondary,
                                                     modifier = Modifier.size(20.dp)
                                                 )
                                             }
@@ -627,7 +629,7 @@ private fun RemoteScreen(
                                                 Text(
                                                     if (state.isFtpEnabled) "Running on port 2121" else "Offline",
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = if (state.isFtpEnabled) Green else MaterialTheme.colorScheme.textSecondary
+                                                    color = if (state.isFtpEnabled) iOSGreen else MaterialTheme.colorScheme.textSecondary
                                                 )
                                             }
                                         }
@@ -637,9 +639,9 @@ private fun RemoteScreen(
                                             enabled = !state.isFtpAutoStart,
                                             colors = SwitchDefaults.colors(
                                                 checkedThumbColor = Color.White,
-                                                checkedTrackColor = Green,
+                                                checkedTrackColor = iOSGreen,
                                                 disabledCheckedThumbColor = Color.White.copy(alpha = 0.6f),
-                                                disabledCheckedTrackColor = Green.copy(alpha = 0.5f)
+                                                disabledCheckedTrackColor = iOSGreen.copy(alpha = 0.5f)
                                             )
                                         )
                                     }
@@ -651,7 +653,7 @@ private fun RemoteScreen(
                                             modifier = Modifier.fillMaxWidth(),
                                             shape = RoundedCornerShape(12.dp),
                                             colors = ButtonDefaults.buttonColors(
-                                                containerColor = if (connected) Accent else MaterialTheme.colorScheme.cardBgSelected,
+                                                containerColor = if (connected) iOSAccent else MaterialTheme.colorScheme.cardBgSelected,
                                                 contentColor = if (connected) Color.White else MaterialTheme.colorScheme.textMuted
                                             ),
                                             contentPadding = PaddingValues(vertical = 12.dp)
@@ -691,7 +693,7 @@ private fun RemoteScreen(
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedContainerColor = MaterialTheme.colorScheme.cardBg,
                                         unfocusedContainerColor = MaterialTheme.colorScheme.cardBg,
-                                        focusedBorderColor = Accent,
+                                        focusedBorderColor = iOSAccent,
                                         unfocusedBorderColor = MaterialTheme.colorScheme.divider,
                                     )
                                 )
@@ -755,7 +757,7 @@ private fun RemoteScreen(
                 ) {
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth().height(4.dp),
-                        color = Accent,
+                        color = iOSAccent,
                         trackColor = MaterialTheme.colorScheme.screenBg,
                     )
                 }
@@ -803,8 +805,8 @@ private fun SlideControlsCard(
                     enabled = hasPresentation,
                     modifier = Modifier.weight(0.8f),
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = Green.copy(alpha = 0.2f),
-                        contentColor = Green
+                        containerColor = iOSGreen.copy(alpha = 0.2f),
+                        contentColor = iOSGreen
                     )
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -816,8 +818,8 @@ private fun SlideControlsCard(
                     enabled = hasPresentation,
                     modifier = Modifier.weight(0.8f),
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = Red.copy(alpha = 0.2f),
-                        contentColor = Red
+                        containerColor = iOSRed.copy(alpha = 0.2f),
+                        contentColor = iOSRed
                     )
                 ) {
                     Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -1208,7 +1210,7 @@ private fun OnboardingScreen(onComplete: () -> Unit) {
                     onClick = onComplete,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Accent,
+                        containerColor = iOSAccent,
                         contentColor = Color.White
                     )
                 ) {
@@ -1237,7 +1239,7 @@ private fun OnboardingStep(
             modifier = Modifier
                 .size(24.dp)
                 .clip(CircleShape)
-                .background(Accent),
+                .background(iOSAccent),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -1279,7 +1281,7 @@ private fun ControlItem(key: String, action: String) {
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = Accent
+                color = iOSAccent
             )
         }
         Text(
@@ -1394,7 +1396,7 @@ private fun SettingsSection(title: String, content: @Composable () -> Unit) {
         Text(
             title.uppercase(),
             style = MaterialTheme.typography.labelMedium,
-            color = Accent,
+            color = iOSAccent,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 4.dp)
         )
@@ -1430,7 +1432,7 @@ private fun SettingsSwitchRow(
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = Accent,
+                checkedTrackColor = iOSAccent,
                 uncheckedThumbColor = MaterialTheme.colorScheme.textSecondary,
                 uncheckedTrackColor = MaterialTheme.colorScheme.cardBgSelected
             )
@@ -1457,7 +1459,7 @@ private fun SettingsInputRow(
             visualTransformation = if (isPassword) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
             shape = RoundedCornerShape(8.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Accent,
+                focusedBorderColor = iOSAccent,
                 unfocusedBorderColor = MaterialTheme.colorScheme.divider,
                 focusedTextColor = MaterialTheme.colorScheme.textPrimary,
                 unfocusedTextColor = MaterialTheme.colorScheme.textPrimary
@@ -1502,7 +1504,7 @@ private fun NotesScreen(
     ) { padding ->
         if (notes == null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Accent)
+                CircularProgressIndicator(color = iOSAccent)
             }
         } else {
             LazyColumn(
@@ -1513,9 +1515,9 @@ private fun NotesScreen(
                 items(count = notes.size) { index ->
                     val isCurrent = pres?.currentSlide == (index + 1)
                     AppCard(
-                        borderColor = if (isCurrent) Accent else MaterialTheme.colorScheme.divider,
+                        borderColor = if (isCurrent) iOSAccent else MaterialTheme.colorScheme.divider,
                         borderWidth = if (isCurrent) 2.dp else 1.dp,
-                        backgroundColor = if (isCurrent) Accent.copy(alpha = 0.05f) else MaterialTheme.colorScheme.cardBg
+                        backgroundColor = if (isCurrent) iOSAccent.copy(alpha = 0.05f) else MaterialTheme.colorScheme.cardBg
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(
@@ -1527,11 +1529,11 @@ private fun NotesScreen(
                                     "Slide ${index + 1}",
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isCurrent) Accent else MaterialTheme.colorScheme.textSecondary
+                                    color = if (isCurrent) iOSAccent else MaterialTheme.colorScheme.textSecondary
                                 )
                                 if (isCurrent) {
                                     Surface(
-                                        color = Accent,
+                                        color = iOSAccent,
                                         shape = CircleShape
                                     ) {
                                         Text(
@@ -1564,18 +1566,18 @@ private fun NotesScreen(
 @Composable
 private fun WarningBanner(message: String) {
     Surface(
-        color = Amber.copy(alpha = 0.15f),
+        color = iOSAmber.copy(alpha = 0.15f),
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth(),
-        border = BorderStroke(1.dp, Amber.copy(alpha = 0.4f))
+        border = BorderStroke(1.dp, iOSAmber.copy(alpha = 0.4f))
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Icon(Icons.Default.Warning, contentDescription = null, tint = Amber, modifier = Modifier.size(20.dp))
-            Text(message, style = MaterialTheme.typography.bodySmall, color = Amber, fontWeight = FontWeight.Medium)
+            Icon(Icons.Default.Warning, contentDescription = null, tint = iOSAmber, modifier = Modifier.size(20.dp))
+            Text(message, style = MaterialTheme.typography.bodySmall, color = iOSAmber, fontWeight = FontWeight.Medium)
         }
     }
 }
