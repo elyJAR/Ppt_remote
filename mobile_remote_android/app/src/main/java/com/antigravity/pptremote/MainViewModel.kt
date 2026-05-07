@@ -299,6 +299,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateFtpAutoStart(enabled: Boolean) {
         RemotePrefs.setFtpAutoStart(appContext, enabled)
         _state.value = _state.value.copy(isFtpAutoStart = enabled)
+        
+        // If enabling auto-start, also ensure it's running now
+        if (enabled && !_state.value.isFtpEnabled) {
+            toggleFtp()
+        }
     }
 
 

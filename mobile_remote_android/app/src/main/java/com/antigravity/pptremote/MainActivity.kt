@@ -566,7 +566,8 @@ private fun RemoteScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.divider)
                             
-                            val ftpActive = state.isFtpEnabled || state.isFtpAutoStart
+                            val ftpActive = state.isFtpEnabled
+                            val autoStartEnabled = state.isFtpAutoStart
                             AppCard(
                                 backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.05f) else MaterialTheme.colorScheme.cardBg,
                                 borderColor = if (ftpActive) iOSGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.divider
@@ -586,7 +587,7 @@ private fun RemoteScreen(
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text("Mobile Files", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                             Text(
-                                                if (ftpActive) "Active" else "FTP Server", 
+                                                (if (ftpActive) "Active" else "FTP Server") + (if (autoStartEnabled) " (Auto)" else ""), 
                                                 fontSize = 11.sp, 
                                                 color = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary
                                             )
