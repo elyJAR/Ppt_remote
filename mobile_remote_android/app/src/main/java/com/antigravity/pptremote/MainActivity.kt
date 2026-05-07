@@ -15,12 +15,15 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.Settings
 import android.view.KeyEvent
+import android.app.Activity
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.activity.viewModels
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -176,11 +179,20 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         requestBatteryOptimizationExemption()
         ensureNotificationPermissionAndStartService()
+        
         setContent {
             val state by viewModel.state.collectAsState()
             val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
 
             MaterialTheme(colorScheme = colorScheme) {
+                val view = LocalView.current
+                if (!view.isInEditMode) {
+                    SideEffect {
+                        val window = (view.context as Activity).window
+                        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !state.isDarkTheme
+                        WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !state.isDarkTheme
+                    }
+                }
                 
                 when {
                     state.showOnboarding -> {
@@ -575,34 +587,49 @@ private fun RemoteScreen(
                             
                             val ftpActive = state.isFtpEnabled
                             val autoStartEnabled = state.isFtpAutoStart
+                            
                             AppCard(
-                                backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.05f) else MaterialTheme.colorScheme.cardBg,
-                                borderColor = if (ftpActive) iOSGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.divider
+                                backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+                                borderColor = if (ftpActive) iOSGreen.copy(alpha = 0.3f) else MaterialTheme.colorScheme.divider,
+                                borderWidth = if (ftpActive) 1.5.dp else 1.dp
                             ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
                                         iOSIcon(
                                             imageVector = Icons.Default.Folder, 
                                             contentDescription = null,
                                             tint = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary,
-                                            backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
+                                            backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.12f) else MaterialTheme.colorScheme.cardBgSelected,
                                             size = 20.dp
                                         )
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("Mobile Files", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Text(
+                                                "Mobile Files", 
+                                                fontWeight = FontWeight.Bold, 
+                                                fontSize = 14.sp,
+                                                color = MaterialTheme.colorScheme.textPrimary
+                                            )
                                             Text(
                                                 (if (ftpActive) "Active" else "FTP Server") + (if (autoStartEnabled) " (Auto)" else ""), 
                                                 fontSize = 11.sp, 
-                                                color = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary
+                                                color = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary,
+                                                fontWeight = if (ftpActive) FontWeight.Medium else FontWeight.Normal
                                             )
                                         }
                                         Switch(
                                             checked = ftpActive,
                                             onCheckedChange = { onToggleFtp() },
-                                            modifier = Modifier.scale(0.7f)
+                                            modifier = Modifier.scale(0.8f),
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = Color.White,
+                                                checkedTrackColor = iOSGreen,
+                                                uncheckedThumbColor = Color.White,
+                                                uncheckedTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                            )
                                         )
                                     }
                                     
@@ -610,16 +637,18 @@ private fun RemoteScreen(
                                         Button(
                                             onClick = onOpenFtpOnPc,
                                             enabled = connected,
-                                            modifier = Modifier.fillMaxWidth().height(40.dp),
+                                            modifier = Modifier.fillMaxWidth().height(42.dp),
                                             shape = iOSSquircleSmall,
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = iOSAccent,
-                                                contentColor = Color.White
+                                                contentColor = Color.White,
+                                                disabledContainerColor = iOSAccent.copy(alpha = 0.3f)
                                             ),
-                                            contentPadding = PaddingValues(0.dp)
+                                            contentPadding = PaddingValues(0.dp),
+                                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                                         ) {
                                             Icon(Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(14.dp))
-                                            Spacer(Modifier.width(6.dp))
+                                            Spacer(Modifier.width(8.dp))
                                             Text("Open on PC", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
