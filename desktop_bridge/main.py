@@ -514,6 +514,19 @@ def previous_slide(request: Request, presentation_id: str):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.post(
+    "/api/presentations/{presentation_id}/goto/{slide_index}",
+    dependencies=[Depends(verify_api_key)],
+)
+@_limiter.limit("30/minute")
+def goto_slide(request: Request, presentation_id: str, slide_index: int):
+    try:
+        controller.goto_slide(_resolve_id(presentation_id), slide_index)
+        return {"ok": True}
+    except PowerPointControllerError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.get(
     "/api/presentations/{presentation_id}/notes",
     response_model=list[SlideNotesDto],

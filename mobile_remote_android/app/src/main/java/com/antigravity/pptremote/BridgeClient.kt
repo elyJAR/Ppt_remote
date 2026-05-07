@@ -116,6 +116,7 @@ class BridgeClient {
     fun stopSlideshow(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/stop")
     fun next(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/next")
     fun previous(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/previous")
+    fun gotoSlide(url: String, presentationId: String, slideIndex: Int) = post(url, "/api/presentations/${encodedId(presentationId)}/goto/$slideIndex")
     fun openFtpOnPc(url: String, clientIp: String? = null) {
         val path = if (clientIp != null) "/api/ftp/open?client_ip=$clientIp" else "/api/ftp/open"
         post(url, path)

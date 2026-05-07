@@ -306,6 +306,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun getCachedThumbnail(presentationId: String, slideIndex: Int): ByteArray? {
+        val bridgeUrl = _state.value.bridgeUrl
+        if (bridgeUrl.isBlank()) return null
+        return cachedThumbnail(bridgeUrl, presentationId, slideIndex)
+    }
+
+    fun jumpToSlide(slideIndex: Int) {
+        val selected = ensureSelectedPresentation() ?: return
+        runBridgeAction("Jumped to slide $slideIndex", showBusy = false) { url -> 
+            client.gotoSlide(url, selected, slideIndex)
+        }
+    }
+
 
     private fun cacheKey(bridgeUrl: String, presentationId: String): String {
         return "${bridgeUrl.trimEnd('/')} $presentationId"

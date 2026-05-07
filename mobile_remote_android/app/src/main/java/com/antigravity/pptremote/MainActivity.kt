@@ -199,7 +199,12 @@ class MainActivity : ComponentActivity() {
                     state.showNotes -> {
                         NotesScreen(
                             state = state,
-                            onBack = viewModel::hideNotes
+                            onBack = viewModel::hideNotes,
+                            onGetThumbnail = viewModel::getCachedThumbnail,
+                            onSelectSlide = { 
+                                viewModel.jumpToSlide(it)
+                                viewModel.hideNotes()
+                            }
                         )
                     }
                     else -> {
@@ -1531,7 +1536,9 @@ private fun SettingsInputRow(
 @Composable
 private fun NotesScreen(
     state: RemoteState,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onGetThumbnail: (String, Int) -> ByteArray?,
+    onSelectSlide: (Int) -> Unit
 ) {
     BackHandler(onBack = onBack)
     val pres = state.presentations.find { it.id == state.selectedPresentationId }
@@ -1542,7 +1549,7 @@ private fun NotesScreen(
             TopAppBar(
                 title = { 
                     Column {
-                        Text("Speaker Notes", style = MaterialTheme.typography.titleMedium)
+                        Text("All Slides & Notes", style = MaterialTheme.typography.titleMedium)
                         Text(pres?.name ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.textSecondary)
                     }
                 },
@@ -1560,9 +1567,16 @@ private fun NotesScreen(
         },
         containerColor = MaterialTheme.colorScheme.screenBg
     ) { padding ->
-        if (notes == null) {
+        if (notes == null && pres != null) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = iOSAccent)
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    CircularProgressIndicator(color = iOSAccent)
+                    Text("Fetching presentation notes...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.textSecondary)
+                }
+            }
+        } else if (pres == null) {
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Text("No active presentation", color = MaterialTheme.colorScheme.textMuted)
             }
         } else {
             LazyColumn(
@@ -1570,21 +1584,26 @@ private fun NotesScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(count = notes.size) { index ->
-                    val isCurrent = pres?.currentSlide == (index + 1)
+                items(count = pres.totalSlides) { index ->
+                    val slideIndex = index + 1
+                    val isCurrent = pres.currentSlide == slideIndex
+                    val slideNote = notes?.getOrNull(index) ?: ""
+                    val thumbnail = onGetThumbnail(pres.id, slideIndex)
+                    
                     AppCard(
                         borderColor = if (isCurrent) iOSAccent else MaterialTheme.colorScheme.divider,
                         borderWidth = if (isCurrent) 2.dp else 1.dp,
-                        backgroundColor = if (isCurrent) iOSAccent.copy(alpha = 0.05f) else MaterialTheme.colorScheme.cardBg
+                        backgroundColor = if (isCurrent) iOSAccent.copy(alpha = 0.05f) else MaterialTheme.colorScheme.cardBg,
+                        onClick = { onSelectSlide(slideIndex) }
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "Slide ${index + 1}",
+                                    "Slide $slideIndex",
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isCurrent) iOSAccent else MaterialTheme.colorScheme.textSecondary
@@ -1595,7 +1614,7 @@ private fun NotesScreen(
                                         shape = CircleShape
                                     ) {
                                         Text(
-                                            "ACTIVE",
+                                            "CURRENT",
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = Color.White,
@@ -1604,13 +1623,54 @@ private fun NotesScreen(
                                     }
                                 }
                             }
-                            val rawNote = notes[index]
-                            Text(
-                                text = if (rawNote.isBlank()) "(No notes for this slide)" else rawNote,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (rawNote.isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
-                                lineHeight = 22.sp
-                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                // Thumbnail
+                                Box(
+                                    modifier = Modifier
+                                        .width(120.dp)
+                                        .aspectRatio(16f / 9f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color.Black.copy(alpha = 0.05f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (thumbnail != null) {
+                                        val bitmap = remember(thumbnail) {
+                                            BitmapFactory.decodeByteArray(thumbnail, 0, thumbnail.size)
+                                        }
+                                        if (bitmap != null) {
+                                            Image(
+                                                bitmap = bitmap.asImageBitmap(),
+                                                contentDescription = "Slide $slideIndex",
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                        }
+                                    } else {
+                                        Icon(
+                                            Icons.Default.Slideshow, 
+                                            contentDescription = null, 
+                                            tint = MaterialTheme.colorScheme.textMuted,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+
+                                // Notes
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (slideNote.isBlank()) "(No notes)" else slideNote,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (slideNote.isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
+                                        maxLines = 4,
+                                        overflow = TextOverflow.Ellipsis,
+                                        lineHeight = 18.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 }

@@ -541,6 +541,24 @@ class PowerPointController:
                 )
             window.View.Previous()
 
+    @_on_com_thread
+    def goto_slide(self, presentation_id: str, slide_index: int) -> None:
+        with com_context():
+            app = self._get_app()
+            window = self._find_slideshow_window(app, presentation_id)
+            if window is None:
+                pres = self._find_presentation(app, presentation_id)
+                try:
+                    pres.Slides(slide_index).Select()
+                except Exception as exc:
+                    raise PowerPointControllerError(f"Could not select slide: {exc}") from exc
+                return
+            
+            try:
+                window.View.GotoSlide(slide_index)
+            except Exception as exc:
+                raise PowerPointControllerError(f"Could not jump to slide: {exc}") from exc
+
     def _schedule_thumbnail_warmup(self, presentation_id: str, total_slides: int, width: int = 720) -> None:
         cache_key = (presentation_id, total_slides, width)
         with self._thumbnail_warmup_lock:
