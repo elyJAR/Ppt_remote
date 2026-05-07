@@ -854,14 +854,14 @@ private fun SlideControlsCard(
                 SlideNavButton(
                     label = "Prev",
                     icon = Icons.Default.NavigateBefore,
-                    enabled = hasPresentation,
+                    enabled = hasPresentation && inSlideshow,
                     modifier = Modifier.weight(1f),
                     onClick = onPrevious,
                 )
                 SlideNavButton(
                     label = "Next",
                     icon = Icons.Default.NavigateNext,
-                    enabled = hasPresentation,
+                    enabled = hasPresentation && inSlideshow,
                     modifier = Modifier.weight(1f),
                     onClick = onNext,
                 )
@@ -903,14 +903,14 @@ private fun SlideControlsCard(
                 SlideNavButton(
                     label = "Prev",
                     icon = Icons.Default.ArrowBackIosNew,
-                    enabled = hasPresentation,
+                    enabled = hasPresentation && inSlideshow,
                     modifier = Modifier.weight(1f),
                     onClick = onPrevious,
                 )
                 SlideNavButton(
                     label = "Next",
                     icon = Icons.Default.ArrowForwardIos,
-                    enabled = hasPresentation,
+                    enabled = hasPresentation && inSlideshow,
                     modifier = Modifier.weight(1f),
                     onClick = onNext,
                 )

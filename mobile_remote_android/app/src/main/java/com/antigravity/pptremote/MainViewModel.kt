@@ -213,12 +213,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun nextSlide() {
+        val current = _state.value
+        val pres = current.presentations.find { it.id == current.selectedPresentationId }
+        if (pres?.inSlideshow != true) return
+
         val selected = ensureSelectedPresentation() ?: return
         optimisticUpdate(selected, 1)
         runBridgeAction("Next slide", showBusy = false) { url -> client.next(url, selected) }
     }
 
     fun previousSlide() {
+        val current = _state.value
+        val pres = current.presentations.find { it.id == current.selectedPresentationId }
+        if (pres?.inSlideshow != true) return
+
         val selected = ensureSelectedPresentation() ?: return
         optimisticUpdate(selected, -1)
         runBridgeAction("Previous slide", showBusy = false) { url -> client.previous(url, selected) }
