@@ -589,11 +589,14 @@ private fun RemoteScreen(
                             val autoStartEnabled = state.isFtpAutoStart
                             
                             AppCard(
-                                backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
-                                borderColor = if (ftpActive) iOSGreen.copy(alpha = 0.3f) else MaterialTheme.colorScheme.divider,
-                                borderWidth = if (ftpActive) 1.5.dp else 1.dp
+                                backgroundColor = MaterialTheme.colorScheme.surface,
+                                borderColor = if (ftpActive) iOSGreen.copy(alpha = 0.5f) else MaterialTheme.colorScheme.divider,
+                                borderWidth = if (ftpActive) 2.dp else 1.dp
                             ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                    modifier = Modifier.padding(16.dp)
+                                ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -876,7 +879,7 @@ private fun SlideControlsCard(
         if (useWideLayout) {
             // Wide layout: all controls in a single row
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -923,7 +926,10 @@ private fun SlideControlsCard(
             }
         } else {
             // Compact layout: original two-row design
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
             // Large Prev / Next buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1752,7 +1758,7 @@ private fun AppCard(
         border = BorderStroke(borderWidth, borderColor),
         shadowElevation = elevation
     ) {
-        Box(modifier = Modifier.padding(20.dp)) {
+        Box {
             content()
         }
     }
@@ -1771,7 +1777,10 @@ private fun PresentationHero(
         borderColor = if (isDark) iOSAccent.copy(alpha = 0.4f) else iOSAccent.copy(alpha = 0.2f),
         borderWidth = 2.dp
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(16.dp)
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
