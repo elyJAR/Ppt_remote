@@ -584,6 +584,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Pair(_state.value.currentSlideNotes, _state.value.currentSlideNotesIndex)
             }
 
+            // Fetch FULL speaker notes if missing for active presentation
+            val currentSpeakerNotes = if (activePres != null && (_state.value.speakerNotes == null || activePres.id != _state.value.presentations.firstOrNull { it.inSlideshow }?.id)) {
+                try {
+                    client.fetchFullNotes(effectiveUrl, activePres.id)
+                } catch (e: Exception) { null }
+            } else if (activePres == null) {
+                null
+            } else {
+                _state.value.speakerNotes
+            }
+
             // Read current state at write-time to avoid clobbering showSettings/showOnboarding
             val nowState = _state.value
             val selected = when {
@@ -602,6 +613,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 failureCount = 0, // Reset failures on success
                 currentSlideNotes = newNotes,
                 currentSlideNotesIndex = newNotesIndex,
+                speakerNotes = currentSpeakerNotes,
                 lastThumbnailSlide = if (activePres != null) activeSlide else null,
                 statusMessage = if (presentationsWithThumbnails.isEmpty()) {
                     "No open PowerPoint files detected"

@@ -181,6 +181,27 @@ class BridgeClient {
         } catch (e: Exception) { null }
     }
 
+    fun fetchFullNotes(url: String, presentationId: String): List<String>? {
+        return try {
+            val client = createClient(timeoutSeconds = 15)
+            val request = Request.Builder()
+                .url("${baseUrl(url)}/api/presentations/${encodedId(presentationId)}/notes")
+                .withApiKey()
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                val body = response.body?.string().orEmpty().trim()
+                val arr = JSONArray(body)
+                val notes = mutableListOf<String>()
+                for (i in 0 until arr.length()) {
+                    notes.add(arr.getJSONObject(i).optString("notes", ""))
+                }
+                notes
+            }
+        } catch (e: Exception) { null }
+    }
+
     fun discoverBridge(
         timeoutMs: Int = 1500,
         discoveryPort: Int = 8788,

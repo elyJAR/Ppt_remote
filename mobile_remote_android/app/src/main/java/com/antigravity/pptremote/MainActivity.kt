@@ -392,169 +392,180 @@ private fun RemoteScreen(
                     }
 
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(28.dp)
+                        modifier = Modifier.fillMaxSize().padding(24.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        // Top part (Logo + Presentations) - Scrollable
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(28.dp)
                         ) {
-                            PPTLogo(size = 48.dp)
-                            Text(
-                                "PPT Remote",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.textPrimary
-                            )
-                        }
-                        
-                        HorizontalDivider(color = MaterialTheme.colorScheme.divider)
-
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                "CONNECTION STATUS",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.textSecondary,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                iOSIcon(
-                                    imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
-                                    contentDescription = null,
-                                    tint = if (connected) iOSGreen else MaterialTheme.colorScheme.textSecondary,
-                                    backgroundColor = if (connected) iOSGreen.copy(alpha = 0.1f) else MaterialTheme.colorScheme.cardBgSelected,
-                                    size = 20.dp
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                PPTLogo(size = 48.dp)
                                 Text(
-                                    text = if (connected) "Connected" else state.statusMessage,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = if (connected) iOSGreen else MaterialTheme.colorScheme.textPrimary,
-                                    fontWeight = FontWeight.SemiBold
+                                    "PPT Remote",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.textPrimary
                                 )
                             }
-                        }
-
-                        HorizontalDivider(color = MaterialTheme.colorScheme.divider)
-
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                "AVAILABLE PCS",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.textSecondary,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
                             
-                            if (state.discoveredBridges.isEmpty()) {
-                                Text(
-                                    "No PCs found. Scanning network...",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.textMuted
-                                )
-                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.divider)
 
-                            state.discoveredBridges.forEach { bridge ->
-                                val isSelected = bridge.id == state.selectedBridgeId
-                                var expanded by remember { mutableStateOf(isSelected) }
-                                
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(iOSSquircleSmall)
-                                        .background(if (isSelected) iOSAccent.copy(alpha = 0.1f) else Color.Transparent)
-                                        .border(
-                                            1.dp,
-                                            if (isSelected) iOSAccent.copy(alpha = 0.3f) else Color.Transparent,
-                                            iOSSquircleSmall
-                                        )
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                onSelectBridge(bridge)
-                                                if (isSelected) expanded = !expanded else expanded = true
-                                            }
-                                            .padding(12.dp)
-                                    ) {
+                            Column(
+                                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(28.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text(
+                                        "CONNECTION STATUS",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.textSecondary,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                         iOSIcon(
-                                            imageVector = Icons.Default.Computer, 
+                                            imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
                                             contentDescription = null,
-                                            tint = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textSecondary,
-                                            backgroundColor = if (isSelected) iOSAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
+                                            tint = if (connected) iOSGreen else MaterialTheme.colorScheme.textSecondary,
+                                            backgroundColor = if (connected) iOSGreen.copy(alpha = 0.1f) else MaterialTheme.colorScheme.cardBgSelected,
                                             size = 20.dp
                                         )
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                bridge.name, 
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textPrimary
-                                            )
-                                            Text(
-                                                bridge.url.substringAfter("://").substringBefore(":"),
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = MaterialTheme.colorScheme.textSecondary
-                                            )
-                                        }
-                                        if (isSelected) {
-                                            Icon(
-                                                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                                contentDescription = null,
-                                                tint = iOSAccent,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
+                                        Text(
+                                            text = if (connected) "Connected" else state.statusMessage,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = if (connected) iOSGreen else MaterialTheme.colorScheme.textPrimary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+
+                                HorizontalDivider(color = MaterialTheme.colorScheme.divider)
+
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text(
+                                        "AVAILABLE PCS",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.textSecondary,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    )
+                                    
+                                    if (state.discoveredBridges.isEmpty()) {
+                                        Text(
+                                            "No PCs found. Scanning network...",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.textMuted
+                                        )
                                     }
 
-                                    AnimatedVisibility(visible = isSelected && expanded) {
+                                    state.discoveredBridges.forEach { bridge ->
+                                        val isSelected = bridge.id == state.selectedBridgeId
+                                        var expanded by remember { mutableStateOf(isSelected) }
+                                        
                                         Column(
-                                            modifier = Modifier.padding(start = 44.dp, end = 12.dp, bottom = 8.dp),
-                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(iOSSquircleSmall)
+                                                .background(if (isSelected) iOSAccent.copy(alpha = 0.1f) else Color.Transparent)
+                                                .border(
+                                                    1.dp,
+                                                    if (isSelected) iOSAccent.copy(alpha = 0.3f) else Color.Transparent,
+                                                    iOSSquircleSmall
+                                                )
                                         ) {
-                                            state.presentations.forEach { presentation ->
-                                                val isPresSelected = presentation.id == state.selectedPresentationId
-                                                Surface(
-                                                    onClick = { 
-                                                        onPresentationSelect(presentation.id)
-                                                        scope.launch { drawerState.close() }
-                                                    },
-                                                    color = if (isPresSelected) iOSAccent.copy(alpha = 0.15f) else Color.Transparent,
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    modifier = Modifier.fillMaxWidth()
-                                                ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        onSelectBridge(bridge)
+                                                        if (isSelected) expanded = !expanded else expanded = true
+                                                    }
+                                                    .padding(12.dp)
+                                            ) {
+                                                iOSIcon(
+                                                    imageVector = Icons.Default.Computer, 
+                                                    contentDescription = null,
+                                                    tint = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textSecondary,
+                                                    backgroundColor = if (isSelected) iOSAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
+                                                    size = 20.dp
+                                                )
+                                                Column(modifier = Modifier.weight(1f)) {
                                                     Text(
-                                                        presentation.name,
-                                                        modifier = Modifier.padding(8.dp),
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                        color = if (isPresSelected) iOSAccent else MaterialTheme.colorScheme.textPrimary
+                                                        bridge.name, 
+                                                        style = MaterialTheme.typography.bodyLarge,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textPrimary
+                                                    )
+                                                    Text(
+                                                        bridge.url.substringAfter("://").substringBefore(":"),
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        color = MaterialTheme.colorScheme.textSecondary
+                                                    )
+                                                }
+                                                if (isSelected) {
+                                                    Icon(
+                                                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                        contentDescription = null,
+                                                        tint = iOSAccent,
+                                                        modifier = Modifier.size(20.dp)
                                                     )
                                                 }
                                             }
-                                            if (state.presentations.isEmpty()) {
-                                                Text(
-                                                    "No open presentations",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.textMuted,
-                                                    modifier = Modifier.padding(8.dp)
-                                                )
+
+                                            AnimatedVisibility(visible = isSelected && expanded) {
+                                                Column(
+                                                    modifier = Modifier.padding(start = 44.dp, end = 12.dp, bottom = 8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    state.presentations.forEach { presentation ->
+                                                        val isPresSelected = presentation.id == state.selectedPresentationId
+                                                        Surface(
+                                                            onClick = { 
+                                                                onPresentationSelect(presentation.id)
+                                                                scope.launch { drawerState.close() }
+                                                            },
+                                                            color = if (isPresSelected) iOSAccent.copy(alpha = 0.15f) else Color.Transparent,
+                                                            shape = RoundedCornerShape(8.dp),
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        ) {
+                                                            Text(
+                                                                presentation.name,
+                                                                modifier = Modifier.padding(8.dp),
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                                color = if (isPresSelected) iOSAccent else MaterialTheme.colorScheme.textPrimary
+                                                            )
+                                                        }
+                                                    }
+                                                    if (state.presentations.isEmpty()) {
+                                                        Text(
+                                                            "No open presentations",
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = MaterialTheme.colorScheme.textMuted,
+                                                            modifier = Modifier.padding(8.dp)
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
+                                        Spacer(Modifier.height(8.dp))
                                     }
                                 }
-                                Spacer(Modifier.height(8.dp))
                             }
                         }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        // Fixed Bottom Part (FTP + Settings)
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.divider)
+                            
                             val ftpActive = state.isFtpEnabled || state.isFtpAutoStart
                             AppCard(
                                 backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.05f) else MaterialTheme.colorScheme.cardBg,
@@ -677,19 +688,26 @@ private fun RemoteScreen(
                             .fillMaxSize()
                             .padding(horizontal = if (useWideLayout) 32.dp else 16.dp, vertical = 12.dp)
                             .pointerInput(Unit) {
-                                detectHorizontalDragGestures(
-                                    onDragStart = { swipeHapticFired = false },
-                                    onDragEnd = { swipeHapticFired = false }
-                                ) { _, dragAmount ->
-                                    val threshold = 80f
-                                    if (dragAmount > threshold) {
+                            var totalDrag = 0f
+                            detectHorizontalDragGestures(
+                                onDragStart = { 
+                                    swipeHapticFired = false
+                                    totalDrag = 0f
+                                },
+                                onDragEnd = { 
+                                    swipeHapticFired = false
+                                    val threshold = 150f // Accumulative threshold for trigger
+                                    if (totalDrag > threshold) {
                                         performGestureHapticFeedback()
                                         onPrevious()
-                                    } else if (dragAmount < -threshold) {
+                                    } else if (totalDrag < -threshold) {
                                         performGestureHapticFeedback()
                                         onNext()
                                     }
                                 }
+                            ) { _, dragAmount ->
+                                totalDrag += dragAmount
+                            }
                             }
                     ) {
                         Column {
@@ -734,11 +752,13 @@ private fun RemoteScreen(
                                             )
                                         }
                                         
-                                        if (currentNotes != null) {
+                                        val noteText = state.currentSlideNotes ?: state.speakerNotes?.getOrNull((activePres?.currentSlide ?: 1) - 1)
+                                        
+                                        if (noteText != null) {
                                             Text(
-                                                text = if (currentNotes.isBlank()) "(No notes for this slide)" else currentNotes,
+                                                text = if (noteText.isBlank()) "(No notes for this slide)" else noteText,
                                                 style = MaterialTheme.typography.bodyLarge,
-                                                color = if (currentNotes.isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
+                                                color = if (noteText.isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
                                                 lineHeight = 24.sp
                                             )
                                         } else {
@@ -748,7 +768,7 @@ private fun RemoteScreen(
                                                 color = MaterialTheme.colorScheme.textMuted
                                             )
                                         }
-
+                                        
                                         if (activePres != null) {
                                             TextButton(
                                                 onClick = onShowNotes,
