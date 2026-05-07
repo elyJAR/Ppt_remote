@@ -9,4 +9,5 @@
     <color name="accent_green">#4CAF50</color>
     <color name="white">#FFFFFF</color>
     <color name="light_gray">#F5F5F5</color>
+    <color name="ios_accent">#0A84FF</color>
 </resources>

@@ -367,6 +367,7 @@ class RemoteControlService : Service() {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(openApp)
             .setOngoing(true)
+            .setColor(ContextCompat.getColor(this, R.color.ios_accent))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(R.drawable.ic_previous, "⏮ Prev",  pendingServiceIntent(ACTION_PREVIOUS, 10))

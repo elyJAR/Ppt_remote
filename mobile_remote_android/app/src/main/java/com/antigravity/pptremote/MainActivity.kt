@@ -75,8 +75,8 @@ private val DarkTextMuted     = Color(0xFFEBEBF5).copy(alpha = 0.3f)
 
 // ---  Colour palette — light ──────────────────────────────────────────────────
 private val LightTextPrimary   = Color(0xFF000000)
-private val LightTextSecondary = Color(0xFF3C3C43).copy(alpha = 0.6f)
-private val LightTextMuted     = Color(0xFF3C3C43).copy(alpha = 0.3f)
+private val LightTextSecondary = Color(0xFF3C3C43).copy(alpha = 0.85f)
+private val LightTextMuted     = Color(0xFF3C3C43).copy(alpha = 0.6f)
 
 private val DarkColorScheme = darkColorScheme(
     primary          = iOSAccent,
@@ -112,6 +112,8 @@ private val androidx.compose.material3.ColorScheme.cardBg         inline get() =
 private val androidx.compose.material3.ColorScheme.cardBgSelected inline get() = surfaceVariant
 private val androidx.compose.material3.ColorScheme.screenBg       inline get() = background
 private val androidx.compose.material3.ColorScheme.divider        inline get() = outline.copy(alpha = 0.3f)
+
+private fun Color.isLight() = (0.299 * red + 0.587 * green + 0.114 * blue) > 0.5
 
 // iOS Squircle helper - Increased radii for "Maximum iOS" look
 private val iOSSquircle = RoundedCornerShape(32.dp)
@@ -1733,10 +1735,11 @@ private fun PresentationHero(
     onNotesClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isDark = !MaterialTheme.colorScheme.surface.isLight()
     AppCard(
         modifier = modifier,
-        backgroundColor = iOSGray900,
-        borderColor = iOSAccent.copy(alpha = 0.4f),
+        backgroundColor = if (isDark) iOSGray900 else MaterialTheme.colorScheme.surfaceVariant,
+        borderColor = if (isDark) iOSAccent.copy(alpha = 0.4f) else iOSAccent.copy(alpha = 0.2f),
         borderWidth = 2.dp
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
