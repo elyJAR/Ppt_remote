@@ -1,4 +1,4 @@
-﻿package com.antigravity.pptremote
+package com.antigravity.pptremote
 
 import android.Manifest
 import android.content.Context
@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
@@ -484,6 +485,7 @@ private fun RemoteScreen(
                                     ) {
                                         iOSIcon(
                                             imageVector = Icons.Default.Computer, 
+                                            contentDescription = null,
                                             tint = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textSecondary,
                                             backgroundColor = if (isSelected) iOSAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
                                             size = 20.dp
@@ -565,6 +567,7 @@ private fun RemoteScreen(
                                     ) {
                                         iOSIcon(
                                             imageVector = Icons.Default.Folder, 
+                                            contentDescription = null,
                                             tint = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary,
                                             backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
                                             size = 20.dp
@@ -625,7 +628,7 @@ private fun RemoteScreen(
                 }
             }
         }
-    ) { paddingValues ->
+    ) {
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
@@ -665,133 +668,135 @@ private fun RemoteScreen(
                 onRefresh = onRefresh,
                 modifier = Modifier.fillMaxSize().padding(innerPadding)
             ) {
-                val activePres = state.presentations.find { it.id == state.selectedPresentationId }
-                val currentNotes = state.speakerNotes?.getOrNull((activePres?.currentSlide ?: 1) - 1)
-                
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = if (useWideLayout) 32.dp else 16.dp, vertical = 12.dp)
-                        .pointerInput(Unit) {
-                            detectHorizontalDragGestures(
-                                onDragStart = { swipeHapticFired = false },
-                                onDragEnd = { swipeHapticFired = false }
-                            ) { _, dragAmount ->
-                                val threshold = 80f
-                                if (dragAmount > threshold) {
-                                    performGestureHapticFeedback()
-                                    onPrevious()
-                                } else if (dragAmount < -threshold) {
-                                    performGestureHapticFeedback()
-                                    onNext()
+                Box(modifier = Modifier.fillMaxSize()) {
+                    val activePres = state.presentations.find { it.id == state.selectedPresentationId }
+                    val currentNotes = state.speakerNotes?.getOrNull((activePres?.currentSlide ?: 1) - 1)
+                    
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = if (useWideLayout) 32.dp else 16.dp, vertical = 12.dp)
+                            .pointerInput(Unit) {
+                                detectHorizontalDragGestures(
+                                    onDragStart = { swipeHapticFired = false },
+                                    onDragEnd = { swipeHapticFired = false }
+                                ) { _, dragAmount ->
+                                    val threshold = 80f
+                                    if (dragAmount > threshold) {
+                                        performGestureHapticFeedback()
+                                        onPrevious()
+                                    } else if (dragAmount < -threshold) {
+                                        performGestureHapticFeedback()
+                                        onNext()
+                                    }
                                 }
                             }
-                        }
-                ) {
-                    Column {
-                        if (!state.networkWarning.isNullOrBlank() || !state.bridgeNetworkWarning.isNullOrBlank()) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                if (!state.networkWarning.isNullOrBlank()) WarningBanner(message = state.networkWarning)
-                                if (!state.bridgeNetworkWarning.isNullOrBlank()) WarningBanner(message = "Desktop: ${state.bridgeNetworkWarning}")
-                            }
-                            Spacer(Modifier.height(12.dp))
-                        }
-
-                        if (activePres != null) {
-                            PresentationHero(
-                                presentation = activePres,
-                                onNotesClick = onShowNotes
-                            )
-                            Spacer(Modifier.height(16.dp))
-                        }
-                    }
-
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            AppCard(
-                                borderColor = if (currentNotes != null) iOSAccent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.divider
-                            ) {
+                    ) {
+                        Column {
+                            if (!state.networkWarning.isNullOrBlank() || !state.bridgeNetworkWarning.isNullOrBlank()) {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.Notes, contentDescription = null, tint = iOSAccent, modifier = Modifier.size(20.dp))
-                                        Text(
-                                            "Speaker Notes",
-                                            style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.textSecondary
-                                        )
-                                    }
-                                    
-                                    if (currentNotes != null) {
-                                        Text(
-                                            text = if (currentNotes.isBlank()) "(No notes for this slide)" else currentNotes,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = if (currentNotes.isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
-                                            lineHeight = 24.sp
-                                        )
-                                    } else {
-                                        Text(
-                                            "Notes not available. Pull to refresh or check connection.",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.textMuted
-                                        )
-                                    }
+                                    if (!state.networkWarning.isNullOrBlank()) WarningBanner(message = state.networkWarning)
+                                    if (!state.bridgeNetworkWarning.isNullOrBlank()) WarningBanner(message = "Desktop: ${state.bridgeNetworkWarning}")
+                                }
+                                Spacer(Modifier.height(12.dp))
+                            }
 
-                                    if (activePres != null) {
-                                        TextButton(
-                                            onClick = onShowNotes,
-                                            contentPadding = PaddingValues(0.dp),
-                                            modifier = Modifier.height(32.dp)
+                            if (activePres != null) {
+                                PresentationHero(
+                                    presentation = activePres,
+                                    onNotesClick = onShowNotes
+                                )
+                                Spacer(Modifier.height(16.dp))
+                            }
+                        }
+
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                AppCard(
+                                    borderColor = if (currentNotes != null) iOSAccent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.divider
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text("View all slides", style = MaterialTheme.typography.labelMedium, color = iOSAccent)
+                                            Icon(Icons.Default.Notes, contentDescription = null, tint = iOSAccent, modifier = Modifier.size(20.dp))
+                                            Text(
+                                                "Speaker Notes",
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.textSecondary
+                                            )
+                                        }
+                                        
+                                        if (currentNotes != null) {
+                                            Text(
+                                                text = if (currentNotes.isBlank()) "(No notes for this slide)" else currentNotes,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = if (currentNotes.isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
+                                                lineHeight = 24.sp
+                                            )
+                                        } else {
+                                            Text(
+                                                "Notes not available. Pull to refresh or check connection.",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.textMuted
+                                            )
+                                        }
+
+                                        if (activePres != null) {
+                                            TextButton(
+                                                onClick = onShowNotes,
+                                                contentPadding = PaddingValues(0.dp),
+                                                modifier = Modifier.height(32.dp)
+                                            ) {
+                                                Text("View all slides", style = MaterialTheme.typography.labelMedium, color = iOSAccent)
+                                            }
                                         }
                                     }
                                 }
+                                
+                                Text(
+                                    "Volume Buttons / Swipe to Navigate",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.textMuted,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                )
                             }
-                            
-                            Text(
-                                "Volume Buttons / Swipe to Navigate",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.textMuted,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        }
+
+                        Column {
+                            Spacer(Modifier.height(16.dp))
+                            SlideControlsCard(
+                                isBusy = state.isBusy,
+                                hasPresentation = state.selectedPresentationId != null,
+                                useWideLayout = useWideLayout,
+                                onPrevious = onPrevious,
+                                onNext = onNext,
+                                onStart = onStartSlideshow,
+                                onStop = onStopSlideshow,
                             )
                         }
                     }
 
-                    Column {
-                        Spacer(Modifier.height(16.dp))
-                        SlideControlsCard(
-                            isBusy = state.isBusy,
-                            hasPresentation = state.selectedPresentationId != null,
-                            useWideLayout = useWideLayout,
-                            onPrevious = onPrevious,
-                            onNext = onNext,
-                            onStart = onStartSlideshow,
-                            onStop = onStopSlideshow,
+                    AnimatedVisibility(
+                        visible = state.isBusy,
+                        enter = fadeIn(),
+                        exit = fadeOut(),
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    ) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().height(4.dp),
+                            color = iOSAccent,
+                            trackColor = MaterialTheme.colorScheme.screenBg,
                         )
                     }
-                }
-
-                AnimatedVisibility(
-                    visible = state.isBusy,
-                    enter = fadeIn(),
-                    exit = fadeOut(),
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                ) {
-                    LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth().height(4.dp),
-                        color = iOSAccent,
-                        trackColor = MaterialTheme.colorScheme.screenBg,
-                    )
                 }
             }
         }
