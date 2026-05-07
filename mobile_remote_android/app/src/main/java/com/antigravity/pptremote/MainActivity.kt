@@ -1,4 +1,4 @@
-package com.antigravity.pptremote
+﻿package com.antigravity.pptremote
 
 import android.Manifest
 import android.content.Context
@@ -55,7 +55,7 @@ import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.launch
 
-// ─── Colour palette — iOS Dark Inspired ───────────────────────────────────────
+// ---  Colour palette — iOS Dark Inspired ───────────────────────────────────────
 private val iOSBlack     = Color(0xFF000000)
 private val iOSGray900   = Color(0xFF1C1C1E)
 private val iOSGray800   = Color(0xFF2C2C2E)
@@ -72,7 +72,7 @@ private val DarkTextPrimary   = Color(0xFFFFFFFF)
 private val DarkTextSecondary = Color(0xFFEBEBF5).copy(alpha = 0.6f)
 private val DarkTextMuted     = Color(0xFFEBEBF5).copy(alpha = 0.3f)
 
-// ─── Colour palette — light ──────────────────────────────────────────────────
+// ---  Colour palette — light ──────────────────────────────────────────────────
 private val LightTextPrimary   = Color(0xFF000000)
 private val LightTextSecondary = Color(0xFF3C3C43).copy(alpha = 0.6f)
 private val LightTextMuted     = Color(0xFF3C3C43).copy(alpha = 0.3f)
@@ -103,7 +103,7 @@ private val LightColorScheme = lightColorScheme(
     outline          = Color(0xFFC7C7CC),
 )
 
-// ─── Theme-aware color shorthand ────────
+// ---  Theme-aware color shorthand ────────
 private val androidx.compose.material3.ColorScheme.textPrimary    inline get() = onBackground
 private val androidx.compose.material3.ColorScheme.textSecondary  inline get() = onSurfaceVariant
 private val androidx.compose.material3.ColorScheme.textMuted      inline get() = onSurfaceVariant.copy(alpha = 0.5f)
@@ -314,7 +314,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() { super.onDestroy() }
 }
 
-// ─── Root screen ─────────────────────────────────────────────────────────────
+// ---  Root screen ─────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -341,22 +341,10 @@ private fun RemoteScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     
-    // Determine if we're on a tablet or in landscape
     val isTablet = configuration.screenWidthDp >= 600
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val useWideLayout = isTablet || isLandscape
 
-    val filteredPresentations = remember(state.presentations, state.searchQuery) {
-        val base = if (state.searchQuery.isBlank()) state.presentations
-        else state.presentations.filter { 
-            it.name.contains(state.searchQuery, ignoreCase = true) || 
-            it.path.contains(state.searchQuery, ignoreCase = true)
-        }
-        // Move in-slideshow presentations to the top
-        base.sortedByDescending { it.inSlideshow }
-    }
-
-    // Helper function for haptic feedback in gestures — fires only once per swipe
     var swipeHapticFired = false
     fun performGestureHapticFeedback() {
         if (swipeHapticFired) return
@@ -364,16 +352,10 @@ private fun RemoteScreen(
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                val vibrator = vibratorManager?.defaultVibrator
-                vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                vibratorManager?.defaultVibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
                 vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                @Suppress("DEPRECATION")
-                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                @Suppress("DEPRECATION")
-                vibrator?.vibrate(50)
             }
         } catch (_: Exception) {}
     }
@@ -382,7 +364,7 @@ private fun RemoteScreen(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = MaterialTheme.colorScheme.screenBg.copy(alpha = 0.85f),
+                drawerContainerColor = MaterialTheme.colorScheme.screenBg.copy(alpha = 0.98f),
                 drawerTonalElevation = 0.dp,
                 modifier = Modifier
                     .fillMaxHeight()
@@ -394,49 +376,27 @@ private fun RemoteScreen(
                     ),
                 drawerShape = RoundedCornerShape(topEnd = 32.dp, bottomEnd = 32.dp)
             ) {
-                // Glassmorphism effect overlay with native blur (Android 12+)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                renderEffect = android.graphics.RenderEffect.createBlurEffect(
-                                    60f, 60f, android.graphics.Shader.TileMode.CLAMP
-                                ).asComposeRenderEffect()
-                            }
-                    ) {
-                        // Background glow for the glass effect
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            iOSAccent.copy(alpha = 0.15f),
-                                            MaterialTheme.colorScheme.screenBg.copy(alpha = 0.8f)
-                                        )
-                                    )
-                                )
+                                .graphicsLayer {
+                                    renderEffect = android.graphics.RenderEffect.createBlurEffect(
+                                        50f, 50f, android.graphics.Shader.TileMode.CLAMP
+                                    ).asComposeRenderEffect()
+                                }
+                                .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.4f))
                         )
                     }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.95f))
-                    )
-                }
-
-                // Content on top of blur
-                Box(modifier = Modifier.fillMaxSize()) {
 
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(24.dp),
+                            .padding(24.dp)
+                            .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(28.dp)
                     ) {
-                        // Header
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -450,9 +410,8 @@ private fun RemoteScreen(
                             )
                         }
                         
-                        Divider(color = MaterialTheme.colorScheme.divider)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.divider)
 
-                        // Connection Status
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(
                                 "CONNECTION STATUS",
@@ -461,25 +420,26 @@ private fun RemoteScreen(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp
                             )
-                            iOSIcon(
-                                imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
-                                contentDescription = null,
-                                tint = if (connected) iOSGreen else MaterialTheme.colorScheme.textSecondary,
-                                backgroundColor = if (connected) iOSGreen.copy(alpha = 0.1f) else MaterialTheme.colorScheme.cardBgSelected,
-                                size = 20.dp
-                            )
-                            Text(
-                                text = if (connected) "Connected" else state.statusMessage,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (connected) iOSGreen else MaterialTheme.colorScheme.textPrimary,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                iOSIcon(
+                                    imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = if (connected) iOSGreen else MaterialTheme.colorScheme.textSecondary,
+                                    backgroundColor = if (connected) iOSGreen.copy(alpha = 0.1f) else MaterialTheme.colorScheme.cardBgSelected,
+                                    size = 20.dp
+                                )
+                                Text(
+                                    text = if (connected) "Connected" else state.statusMessage,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = if (connected) iOSGreen else MaterialTheme.colorScheme.textPrimary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
 
-                        Divider(color = MaterialTheme.colorScheme.divider)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.divider)
 
-                        // Bridges List
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(
                                 "AVAILABLE PCS",
                                 style = MaterialTheme.typography.labelSmall,
@@ -496,112 +456,103 @@ private fun RemoteScreen(
                                 )
                             }
 
-                            LazyColumn(
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                items(state.discoveredBridges) { bridge ->
-                                    val isSelected = bridge.id == state.selectedBridgeId
-                                    var expanded by remember { mutableStateOf(isSelected) }
-                                    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-                                    
-                                    Column(
+                            state.discoveredBridges.forEach { bridge ->
+                                val isSelected = bridge.id == state.selectedBridgeId
+                                var expanded by remember { mutableStateOf(isSelected) }
+                                
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(iOSSquircleSmall)
+                                        .background(if (isSelected) iOSAccent.copy(alpha = 0.1f) else Color.Transparent)
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) iOSAccent.copy(alpha = 0.3f) else Color.Transparent,
+                                            iOSSquircleSmall
+                                        )
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clip(iOSSquircleSmall)
-                                            .background(if (isSelected) iOSAccent.copy(alpha = 0.1f) else Color.Transparent)
-                                            .border(
-                                                1.dp,
-                                                if (isSelected) iOSAccent.copy(alpha = 0.3f) else Color.Transparent,
-                                                iOSSquircleSmall
-                                            )
+                                            .clickable {
+                                                onSelectBridge(bridge)
+                                                if (isSelected) expanded = !expanded else expanded = true
+                                            }
+                                            .padding(12.dp)
                                     ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable(interactionSource = interactionSource, indication = ripple()) {
-                                                    onSelectBridge(bridge)
-                                                    if (isSelected) expanded = !expanded else expanded = true
-                                                }
-                                                .padding(12.dp)
-                                        ) {
-                                            iOSIcon(
-                                                imageVector = Icons.Default.Computer, 
-                                                contentDescription = null,
-                                                tint = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textSecondary,
-                                                backgroundColor = if (isSelected) iOSAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
-                                                size = 20.dp
+                                        iOSIcon(
+                                            imageVector = Icons.Default.Computer, 
+                                            tint = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textSecondary,
+                                            backgroundColor = if (isSelected) iOSAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
+                                            size = 20.dp
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                bridge.name, 
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textPrimary
                                             )
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    bridge.name, 
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textPrimary
-                                                )
-                                                Text(
-                                                    bridge.url.substringAfter("://").substringBefore(":"),
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    color = MaterialTheme.colorScheme.textSecondary
-                                                )
-                                            }
-                                            if (isSelected) {
-                                                Icon(
-                                                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                                    contentDescription = null,
-                                                    tint = iOSAccent,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
+                                            Text(
+                                                bridge.url.substringAfter("://").substringBefore(":"),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.textSecondary
+                                            )
                                         }
+                                        if (isSelected) {
+                                            Icon(
+                                                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                contentDescription = null,
+                                                tint = iOSAccent,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
 
-                                        // Dropdown for presentations
-                                        AnimatedVisibility(visible = isSelected && expanded) {
-                                            Column(
-                                                modifier = Modifier.padding(start = 44.dp, end = 12.dp, bottom = 8.dp),
-                                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
-                                                state.presentations.forEach { presentation ->
-                                                    val isPresSelected = presentation.id == state.selectedPresentationId
-                                                    Surface(
-                                                        onClick = { 
-                                                            onPresentationSelect(presentation.id)
-                                                            scope.launch { drawerState.close() }
-                                                        },
-                                                        color = if (isPresSelected) iOSAccent.copy(alpha = 0.15f) else Color.Transparent,
-                                                        shape = RoundedCornerShape(8.dp),
-                                                        modifier = Modifier.fillMaxWidth()
-                                                    ) {
-                                                        Text(
-                                                            presentation.name,
-                                                            modifier = Modifier.padding(8.dp),
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis,
-                                                            color = if (isPresSelected) iOSAccent else MaterialTheme.colorScheme.textPrimary
-                                                        )
-                                                    }
-                                                }
-                                                if (state.presentations.isEmpty()) {
+                                    AnimatedVisibility(visible = isSelected && expanded) {
+                                        Column(
+                                            modifier = Modifier.padding(start = 44.dp, end = 12.dp, bottom = 8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            state.presentations.forEach { presentation ->
+                                                val isPresSelected = presentation.id == state.selectedPresentationId
+                                                Surface(
+                                                    onClick = { 
+                                                        onPresentationSelect(presentation.id)
+                                                        scope.launch { drawerState.close() }
+                                                    },
+                                                    color = if (isPresSelected) iOSAccent.copy(alpha = 0.15f) else Color.Transparent,
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
                                                     Text(
-                                                        "No open presentations",
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = MaterialTheme.colorScheme.textMuted,
-                                                        modifier = Modifier.padding(8.dp)
+                                                        presentation.name,
+                                                        modifier = Modifier.padding(8.dp),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        color = if (isPresSelected) iOSAccent else MaterialTheme.colorScheme.textPrimary
                                                     )
                                                 }
+                                            }
+                                            if (state.presentations.isEmpty()) {
+                                                Text(
+                                                    "No open presentations",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.textMuted,
+                                                    modifier = Modifier.padding(8.dp)
+                                                )
                                             }
                                         }
                                     }
                                 }
+                                Spacer(Modifier.height(8.dp))
                             }
                         }
 
-                        // Bottom Dock
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            // FTP Server Full Card in Sidebar
                             val ftpActive = state.isFtpEnabled || state.isFtpAutoStart
                             AppCard(
                                 backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.05f) else MaterialTheme.colorScheme.cardBg,
@@ -614,15 +565,14 @@ private fun RemoteScreen(
                                     ) {
                                         iOSIcon(
                                             imageVector = Icons.Default.Folder, 
-                                            contentDescription = null, 
                                             tint = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary,
                                             backgroundColor = if (ftpActive) iOSGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.cardBgSelected,
                                             size = 20.dp
                                         )
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("FTP Server", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Text("Mobile Files", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                             Text(
-                                                if (ftpActive) "Running" else "Offline", 
+                                                if (ftpActive) "Active" else "FTP Server", 
                                                 fontSize = 11.sp, 
                                                 color = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary
                                             )
@@ -675,7 +625,7 @@ private fun RemoteScreen(
                 }
             }
         }
-    ) {
+    ) { paddingValues ->
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
@@ -705,67 +655,64 @@ private fun RemoteScreen(
                         containerColor = MaterialTheme.colorScheme.screenBg,
                         titleContentColor = MaterialTheme.colorScheme.textPrimary,
                         navigationIconContentColor = MaterialTheme.colorScheme.textPrimary,
-                        actionIconContentColor = MaterialTheme.colorScheme.textPrimary
                     )
                 )
             },
             containerColor = MaterialTheme.colorScheme.screenBg
-        ) { paddingValues ->
-            Box(modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+        ) { innerPadding ->
+            SwipeRefresh(
+                state = rememberSwipeRefreshState(state.isRefreshing),
+                onRefresh = onRefresh,
+                modifier = Modifier.fillMaxSize().padding(innerPadding)
             ) {
-                SwipeRefresh(
-                    state = rememberSwipeRefreshState(state.isRefreshing),
-                    onRefresh = onRefresh,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectHorizontalDragGestures(
-                                    onDragStart = { swipeHapticFired = false },
-                                    onDragEnd = { swipeHapticFired = false }
-                                ) { _, dragAmount ->
-                                    val threshold = 80f
-                                    if (dragAmount > threshold) {
-                                        performGestureHapticFeedback()
-                                        onPrevious()
-                                    } else if (dragAmount < -threshold) {
-                                        performGestureHapticFeedback()
-                                        onNext()
-                                    }
+                val activePres = state.presentations.find { it.id == state.selectedPresentationId }
+                val currentNotes = state.speakerNotes?.getOrNull((activePres?.currentSlide ?: 1) - 1)
+                
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = if (useWideLayout) 32.dp else 16.dp, vertical = 12.dp)
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures(
+                                onDragStart = { swipeHapticFired = false },
+                                onDragEnd = { swipeHapticFired = false }
+                            ) { _, dragAmount ->
+                                val threshold = 80f
+                                if (dragAmount > threshold) {
+                                    performGestureHapticFeedback()
+                                    onPrevious()
+                                } else if (dragAmount < -threshold) {
+                                    performGestureHapticFeedback()
+                                    onNext()
                                 }
-                            },
-                        contentPadding = PaddingValues(
-                            horizontal = if (useWideLayout) 32.dp else 16.dp, 
-                            vertical = 12.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(if (useWideLayout) 16.dp else 12.dp)
-                    ) {
-                        // ── Warning banners ──────────────────────────────────────────────
-                        if (!state.networkWarning.isNullOrBlank()) {
-                            item { WarningBanner(message = state.networkWarning) }
-                        }
-                        if (!state.bridgeNetworkWarning.isNullOrBlank()) {
-                            item { WarningBanner(message = "Desktop: ${state.bridgeNetworkWarning}") }
-                        }
-
-                        // ── 1. Hero: Active Presentation Thumbnail ───────────────────────────────
-                        val activePres = state.presentations.find { it.id == state.selectedPresentationId }
-                        item {
-                            if (activePres != null) {
-                                PresentationHero(
-                                    presentation = activePres,
-                                    onNotesClick = onShowNotes
-                                )
                             }
                         }
+                ) {
+                    Column {
+                        if (!state.networkWarning.isNullOrBlank() || !state.bridgeNetworkWarning.isNullOrBlank()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (!state.networkWarning.isNullOrBlank()) WarningBanner(message = state.networkWarning)
+                                if (!state.bridgeNetworkWarning.isNullOrBlank()) WarningBanner(message = "Desktop: ${state.bridgeNetworkWarning}")
+                            }
+                            Spacer(Modifier.height(12.dp))
+                        }
 
-                        // ── 2. Middle Section: Current Slide Notes ───────────────────────────
-                        item {
-                            val currentNotes = state.speakerNotes?.getOrNull((activePres?.currentSlide ?: 1) - 1)
+                        if (activePres != null) {
+                            PresentationHero(
+                                presentation = activePres,
+                                onNotesClick = onShowNotes
+                            )
+                            Spacer(Modifier.height(16.dp))
+                        }
+                    }
+
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
                             AppCard(
                                 borderColor = if (currentNotes != null) iOSAccent.copy(alpha = 0.2f) else MaterialTheme.colorScheme.divider
                             ) {
@@ -809,42 +756,31 @@ private fun RemoteScreen(
                                     }
                                 }
                             }
-                        }
-
-                        // FTP card removed from dashboard as it is now in the sidebar
-
-                        // ── 4. Slide Controls (Bottom) ────────────────────────────────────
-                        item {
-                            Spacer(Modifier.height(16.dp))
-                            SlideControlsCard(
-                                isBusy = state.isBusy,
-                                hasPresentation = state.selectedPresentationId != null,
-                                useWideLayout = useWideLayout,
-                                onPrevious = onPrevious,
-                                onNext = onNext,
-                                onStart = onStartSlideshow,
-                                onStop = onStopSlideshow,
-                            )
-                        }
-
-                        // Presentations list removed from dashboard as it is now in the sidebar
-
-                        // ── Bottom hint ──────────────────────────────────────────────────
-                        item {
+                            
                             Text(
-                                "Volume ▲ = Previous  •  Volume ▼ = Next  •  Works with screen off via notification",
+                                "Volume Buttons / Swipe to Navigate",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.textMuted,
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp)
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                             )
                         }
                     }
+
+                    Column {
+                        Spacer(Modifier.height(16.dp))
+                        SlideControlsCard(
+                            isBusy = state.isBusy,
+                            hasPresentation = state.selectedPresentationId != null,
+                            useWideLayout = useWideLayout,
+                            onPrevious = onPrevious,
+                            onNext = onNext,
+                            onStart = onStartSlideshow,
+                            onStop = onStopSlideshow,
+                        )
+                    }
                 }
 
-                // Global busy indicator fixed at the bottom edge
                 AnimatedVisibility(
                     visible = state.isBusy,
                     enter = fadeIn(),
@@ -861,8 +797,6 @@ private fun RemoteScreen(
         }
     }
 }
-
-// ─── Slide controls card ──────────────────────────────────────────────────────
 
 @Composable
 private fun SlideControlsCard(
@@ -1022,7 +956,7 @@ private fun SlideNavButton(
     }
 }
 
-// ─── Presentation card ────────────────────────────────────────────────────────
+// ---  Presentation card ────────────────────────────────────────────────────────
 
 @Composable
 private fun PresentationCard(
@@ -1118,7 +1052,7 @@ private fun PresentationCard(
     }
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
+// ---  Empty state ──────────────────────────────────────────────────────────────
 
 @Composable
 private fun EmptyStateCard(connected: Boolean, isFiltered: Boolean = false) {
@@ -1155,7 +1089,7 @@ private fun EmptyStateCard(connected: Boolean, isFiltered: Boolean = false) {
     }
 }
 
-// ─── Shimmer / Skeleton ──────────────────────────────────────────────────────
+// ---  Shimmer / Skeleton ──────────────────────────────────────────────────────
 
 @Composable
 fun ShimmerBrush(): Brush {
@@ -1223,7 +1157,7 @@ private fun PresentationSkeleton() {
     }
 }
 
-// ─── Onboarding screen ───────────────────────────────────────────────────────
+// ---  Onboarding screen ───────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1388,7 +1322,7 @@ private fun ControlItem(key: String, action: String) {
     }
 }
 
-// ─── Settings screen ─────────────────────────────────────────────────────────
+// ---  Settings screen ─────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1565,7 +1499,7 @@ private fun SettingsInputRow(
     }
 }
 
-// ─── Speaker notes screen ───────────────────────────────────────────────────
+// ---  Speaker notes screen ───────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1659,7 +1593,7 @@ private fun NotesScreen(
     }
 }
 
-// ─── Shared UI components ────────────────────────────────────────────────────
+// ---  Shared UI components ────────────────────────────────────────────────────
 
 @Composable
 private fun WarningBanner(message: String) {
