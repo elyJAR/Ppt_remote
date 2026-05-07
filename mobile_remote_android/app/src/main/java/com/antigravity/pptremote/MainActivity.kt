@@ -1823,7 +1823,7 @@ private fun PresentationHero(
                     presentation.name,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
