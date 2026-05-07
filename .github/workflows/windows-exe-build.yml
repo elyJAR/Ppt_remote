@@ -10,8 +10,6 @@ on:
   push:
     tags:
       - "pre-v*"
-    branches:
-      - main
 
 permissions:
   contents: write
