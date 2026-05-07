@@ -591,7 +591,8 @@ private fun RemoteScreen(
                             AppCard(
                                 backgroundColor = MaterialTheme.colorScheme.surface,
                                 borderColor = if (ftpActive) iOSGreen.copy(alpha = 0.5f) else MaterialTheme.colorScheme.divider,
-                                borderWidth = if (ftpActive) 2.dp else 1.dp
+                                borderWidth = if (ftpActive) 2.dp else 1.dp,
+                                contentPadding = 0.dp
                             ) {
                                 Column(
                                     verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -879,7 +880,7 @@ private fun SlideControlsCard(
         if (useWideLayout) {
             // Wide layout: all controls in a single row
             Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -927,8 +928,7 @@ private fun SlideControlsCard(
         } else {
             // Compact layout: original two-row design
             Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.padding(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
             // Large Prev / Next buttons
             Row(
@@ -1747,6 +1747,7 @@ private fun AppCard(
     borderColor: Color = MaterialTheme.colorScheme.divider,
     borderWidth: androidx.compose.ui.unit.Dp = 1.dp,
     elevation: androidx.compose.ui.unit.Dp = 1.dp,
+    contentPadding: androidx.compose.ui.unit.Dp = 16.dp,
     content: @Composable () -> Unit
 ) {
     val clickableModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
@@ -1758,7 +1759,7 @@ private fun AppCard(
         border = BorderStroke(borderWidth, borderColor),
         shadowElevation = elevation
     ) {
-        Box {
+        Box(modifier = Modifier.padding(contentPadding)) {
             content()
         }
     }
@@ -1777,10 +1778,7 @@ private fun PresentationHero(
         borderColor = if (isDark) iOSAccent.copy(alpha = 0.4f) else iOSAccent.copy(alpha = 0.2f),
         borderWidth = 2.dp
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(16.dp)
-        ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
