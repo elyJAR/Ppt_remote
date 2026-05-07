@@ -693,28 +693,6 @@ private fun RemoteScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = if (useWideLayout) 32.dp else 16.dp, vertical = 12.dp)
-                            .pointerInput(Unit) {
-                            var totalDrag = 0f
-                            detectHorizontalDragGestures(
-                                onDragStart = { 
-                                    swipeHapticFired = false
-                                    totalDrag = 0f
-                                },
-                                onDragEnd = { 
-                                    swipeHapticFired = false
-                                    val threshold = 150f // Accumulative threshold for trigger
-                                    if (totalDrag > threshold) {
-                                        performGestureHapticFeedback()
-                                        onPrevious()
-                                    } else if (totalDrag < -threshold) {
-                                        performGestureHapticFeedback()
-                                        onNext()
-                                    }
-                                }
-                            ) { _, dragAmount ->
-                                totalDrag += dragAmount
-                            }
-                            }
                     ) {
                         Column {
                             if (!state.networkWarning.isNullOrBlank() || !state.bridgeNetworkWarning.isNullOrBlank()) {
@@ -728,7 +706,29 @@ private fun RemoteScreen(
                             if (activePres != null) {
                                 PresentationHero(
                                     presentation = activePres,
-                                    onNotesClick = onShowNotes
+                                    onNotesClick = onShowNotes,
+                                    modifier = Modifier.pointerInput(Unit) {
+                                        var totalDrag = 0f
+                                        detectHorizontalDragGestures(
+                                            onDragStart = { 
+                                                swipeHapticFired = false
+                                                totalDrag = 0f
+                                            },
+                                            onDragEnd = { 
+                                                swipeHapticFired = false
+                                                val threshold = 150f
+                                                if (totalDrag > threshold) {
+                                                    performGestureHapticFeedback()
+                                                    onPrevious()
+                                                } else if (totalDrag < -threshold) {
+                                                    performGestureHapticFeedback()
+                                                    onNext()
+                                                }
+                                            }
+                                        ) { _, dragAmount ->
+                                            totalDrag += dragAmount
+                                        }
+                                    }
                                 )
                                 Spacer(Modifier.height(16.dp))
                             }
@@ -802,6 +802,7 @@ private fun RemoteScreen(
                             SlideControlsCard(
                                 isBusy = state.isBusy,
                                 hasPresentation = state.selectedPresentationId != null,
+                                inSlideshow = activePres?.inSlideshow == true,
                                 useWideLayout = useWideLayout,
                                 onPrevious = onPrevious,
                                 onNext = onNext,
@@ -833,6 +834,7 @@ private fun RemoteScreen(
 private fun SlideControlsCard(
     isBusy: Boolean,
     hasPresentation: Boolean,
+    inSlideshow: Boolean,
     useWideLayout: Boolean,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
@@ -866,26 +868,26 @@ private fun SlideControlsCard(
                     enabled = hasPresentation,
                     modifier = Modifier.weight(0.8f),
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = iOSGreen.copy(alpha = 0.2f),
-                        contentColor = iOSGreen
+                        containerColor = if (!inSlideshow) iOSGreen.copy(alpha = 0.3f) else iOSGreen.copy(alpha = 0.1f),
+                        contentColor = if (!inSlideshow) iOSGreen else iOSGreen.copy(alpha = 0.6f)
                     )
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Start", fontWeight = FontWeight.SemiBold)
+                    Text("Start", fontWeight = if (!inSlideshow) FontWeight.Bold else FontWeight.SemiBold)
                 }
                 FilledTonalButton(
                     onClick = onStop,
                     enabled = hasPresentation,
                     modifier = Modifier.weight(0.8f),
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = iOSRed.copy(alpha = 0.2f),
-                        contentColor = iOSRed
+                        containerColor = if (inSlideshow) iOSRed.copy(alpha = 0.3f) else iOSRed.copy(alpha = 0.1f),
+                        contentColor = if (inSlideshow) iOSRed else iOSRed.copy(alpha = 0.6f)
                     )
                 ) {
                     Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Stop", fontWeight = FontWeight.SemiBold)
+                    Text("Stop", fontWeight = if (inSlideshow) FontWeight.Bold else FontWeight.SemiBold)
                 }
             }
         } else {
@@ -923,8 +925,8 @@ private fun SlideControlsCard(
                     modifier = Modifier.weight(1f).height(60.dp),
                     shape = iOSSquircle,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = iOSGreen,
-                        contentColor = Color.White
+                        containerColor = if (!inSlideshow) iOSGreen else iOSGreen.copy(alpha = 0.3f),
+                        contentColor = if (!inSlideshow) Color.White else iOSGreen
                     )
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(24.dp))
@@ -938,10 +940,10 @@ private fun SlideControlsCard(
                     modifier = Modifier.weight(1f).height(60.dp),
                     shape = iOSSquircle,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = iOSRed.copy(alpha = 0.15f),
-                        contentColor = iOSRed
+                        containerColor = if (inSlideshow) iOSRed else iOSRed.copy(alpha = 0.15f),
+                        contentColor = if (inSlideshow) Color.White else iOSRed
                     ),
-                    border = BorderStroke(1.dp, iOSRed.copy(alpha = 0.3f))
+                    border = if (inSlideshow) null else BorderStroke(1.dp, iOSRed.copy(alpha = 0.3f))
                 ) {
                     Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(24.dp))
                     Spacer(Modifier.width(8.dp))
@@ -1728,9 +1730,11 @@ private fun AppCard(
 @Composable
 private fun PresentationHero(
     presentation: Presentation,
-    onNotesClick: () -> Unit
+    onNotesClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     AppCard(
+        modifier = modifier,
         backgroundColor = iOSGray900,
         borderColor = iOSAccent.copy(alpha = 0.4f),
         borderWidth = 2.dp
