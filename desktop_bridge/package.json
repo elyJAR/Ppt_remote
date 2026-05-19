@@ -1,0 +1,13 @@
+{
+  "name": "ppt-remote-bridge",
+  "version": "1.0.0",
+  "description": "Desktop bridge for PPT Remote",
+  "scripts": {
+    "start": "python bridge_service.py",
+    "test": "pytest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

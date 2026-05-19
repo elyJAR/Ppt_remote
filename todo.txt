@@ -12,6 +12,10 @@
   CATEGORY A — BUG FIXES
 --------------------------------------------------------------------------------
 
+  [x] Fix: FTP server only shows internal storage, ignores SD card
+        File: FtpServerManager.kt
+        Fix: Added multi-volume detection; uses /storage as root when SD card is present
+
   [x] isBusy never reset to false on successful bridge action
         File: MainViewModel.kt :: runBridgeAction()
         Fix:  Added isBusy = false to the success-path copy() call

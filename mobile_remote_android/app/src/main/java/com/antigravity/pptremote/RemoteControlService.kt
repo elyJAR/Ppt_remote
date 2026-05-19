@@ -116,7 +116,7 @@ class RemoteControlService : Service() {
 
                 // Auto-start FTP if enabled
                 if (RemotePrefs.isFtpAutoStart(this)) {
-                    ftpManager.start()
+                    ftpManager.start(this)
                     RemotePrefs.setFtpEnabled(this, true)
                 }
             } catch (e: Exception) {
@@ -137,7 +137,7 @@ class RemoteControlService : Service() {
                     ftpManager.stop()
                     RemotePrefs.setFtpEnabled(this, false)
                 } else {
-                    ftpManager.start()
+                    ftpManager.start(this)
                     RemotePrefs.setFtpEnabled(this, true)
                 }
             }
