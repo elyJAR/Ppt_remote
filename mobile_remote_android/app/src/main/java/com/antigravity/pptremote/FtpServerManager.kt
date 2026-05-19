@@ -39,16 +39,30 @@ class FtpServerManager {
             // If we have an SD card, we want to show both internal and SD card.
             // On modern Android, /storage usually contains both.
             val internalStorage = Environment.getExternalStorageDirectory().absolutePath
-            val hasExternalSd = volumes.any { it != internalStorage && !it.contains("emulated") }
             
-            if (hasExternalSd) {
-                val storageRoot = File("/storage")
-                if (storageRoot.exists() && storageRoot.canRead()) {
-                    user.homeDirectory = "/storage"
-                    Log.i("FtpServerManager", "Multiple volumes detected, using /storage as root")
+            // Check for real SD cards (exclude emulated internal storage)
+            val externalVolumes = volumes.filter { it != internalStorage && !it.contains("emulated") }
+            
+            if (externalVolumes.isNotEmpty()) {
+                // We found an SD card!
+                // Instead of /storage (which can be restricted), we serve the parent of internal storage
+                // which usually contains all mount points like /storage/emulated/0 and /storage/SD_CARD_ID
+                val internalFile = File(internalStorage)
+                val storageParent = internalFile.parentFile?.parentFile // e.g. /storage from /storage/emulated/0
+                
+                if (storageParent != null && storageParent.exists() && storageParent.canRead()) {
+                    user.homeDirectory = storageParent.absolutePath
+                    Log.i("FtpServerManager", "Serving storage root: ${storageParent.absolutePath}")
                 } else {
-                    user.homeDirectory = internalStorage
-                    Log.i("FtpServerManager", "/storage not accessible, falling back to internal storage")
+                    // Fallback: Use /storage directly if parent traversal failed
+                    val storageRoot = File("/storage")
+                    if (storageRoot.exists() && storageRoot.canRead()) {
+                        user.homeDirectory = "/storage"
+                        Log.i("FtpServerManager", "Multiple volumes detected, using /storage as root")
+                    } else {
+                        user.homeDirectory = internalStorage
+                        Log.i("FtpServerManager", "/storage not accessible, falling back to internal storage")
+                    }
                 }
             } else {
                 user.homeDirectory = internalStorage
