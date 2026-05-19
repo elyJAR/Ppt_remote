@@ -139,7 +139,9 @@ class RemoteControlService : Service() {
             ACTION_STOP_SHOW     -> executeBridgeAction("stop")
             ACTION_TOGGLE_FTP    -> {
                 val homeDir = intent.getStringExtra(EXTRA_FTP_HOME_DIR)
-                if (ftpManager.isRunning() && homeDir == ftpManager.activePath) {
+                // If the server is already running and the requested path is the same, stop it.
+                // If it's running but path is different, start() will handle restarting on the new path.
+                if (ftpManager.isRunning() && (homeDir == null || homeDir == ftpManager.activePath)) {
                     ftpManager.stop()
                     RemotePrefs.setFtpEnabled(this, false)
                 } else {
