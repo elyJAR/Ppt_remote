@@ -44,24 +44,32 @@ class FtpServerManager {
             val externalVolumes = volumes.filter { it != internalStorage && !it.contains("emulated") }
             
             if (externalVolumes.isNotEmpty()) {
-                // We found an SD card!
-                // Instead of /storage (which can be restricted), we serve the root of all storage
-                // On most Android devices, this is "/storage"
-                val storageRoot = File("/storage")
-                
-                // Detailed debug info for logcat
+                // We found an SD card! 
+                // We'll try to find a root that shows both, but verify it's readable first.
                 Log.i("FtpServerManager", "External volumes found: $externalVolumes")
                 
-                if (storageRoot.exists()) {
-                    // Force using /storage if it exists, even if canRead() returns false initially
-                    // (The FTP user will have permissions once the server starts)
-                    user.homeDirectory = "/storage"
-                    Log.i("FtpServerManager", "Multiple volumes detected, serving /storage as root")
-                } else {
-                    // Fallback to internal storage if /storage doesn't exist
-                    user.homeDirectory = internalStorage
-                    Log.e("FtpServerManager", "/storage root NOT found, falling back to internal storage")
+                val storageRoot = File("/storage")
+                val internalFile = File(internalStorage)
+                val storageParent = internalFile.parentFile?.parentFile // e.g. /storage from /storage/emulated/0
+                
+                val bestRoot = when {
+                    // 1. Try the physical /storage root
+                    storageRoot.exists() && storageRoot.canRead() && (storageRoot.list()?.isNotEmpty() == true) -> {
+                        Log.i("FtpServerManager", "Serving /storage root (verified readable)")
+                        "/storage"
+                    }
+                    // 2. Try the parent of internal storage (traversal)
+                    storageParent != null && storageParent.exists() && storageParent.canRead() && (storageParent.list()?.isNotEmpty() == true) -> {
+                        Log.i("FtpServerManager", "Serving storage parent: ${storageParent.absolutePath}")
+                        storageParent.absolutePath
+                    }
+                    // 3. Safety fallback to internal storage so the user doesn't see an empty folder
+                    else -> {
+                        Log.w("FtpServerManager", "Root access restricted, falling back to internal storage for safety")
+                        internalStorage
+                    }
                 }
+                user.homeDirectory = bestRoot
             } else {
                 user.homeDirectory = internalStorage
                 Log.i("FtpServerManager", "Using internal storage as root: $internalStorage")
