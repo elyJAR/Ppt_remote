@@ -91,5 +91,14 @@ data class RemoteState(
     val failureCount: Int = 0,
     // FTP Feature
     val isFtpEnabled: Boolean = false,
-    val isFtpAutoStart: Boolean = false
+    val isFtpAutoStart: Boolean = false,
+    val availableStorages: List<StorageVolume> = emptyList(),
+    val activeFtpPath: String? = null
+)
+
+/** Represents a detected storage volume (Internal or SD Card). */
+data class StorageVolume(
+    val name: String,
+    val path: String,
+    val isSdCard: Boolean
 )

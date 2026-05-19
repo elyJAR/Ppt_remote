@@ -16,9 +16,16 @@ import java.io.File
 
 class FtpServerManager {
     private var server: FtpServer? = null
+    var activePath: String? = null
+        private set
 
-    fun start(context: Context, port: Int = 2121) {
-        if (server != null) return
+    fun start(context: Context, port: Int = 2121, homeDir: String? = null) {
+        if (server != null) {
+            // If already running on the same path, ignore
+            if (homeDir == activePath) return
+            // If running on different path, stop first to restart on new path
+            stop()
+        }
 
         try {
             val serverFactory = FtpServerFactory()
@@ -27,53 +34,41 @@ class FtpServerManager {
 
             serverFactory.addListener("default", listenerFactory.createListener())
 
-            // Detect all available storage volumes
-            val volumes = getStorageVolumes(context)
-            Log.i("FtpServerManager", "Detected storage volumes: $volumes")
-
-            // Anonymous user with write access to external storage
+            // Anonymous user with write access
             val user = BaseUser()
             user.name = "anonymous"
             
-            // Determine the best home directory
-            // If we have an SD card, we want to show both internal and SD card.
-            // On modern Android, /storage usually contains both.
             val internalStorage = Environment.getExternalStorageDirectory().absolutePath
             
-            // Check for real SD cards (exclude emulated internal storage)
-            val externalVolumes = volumes.filter { it != internalStorage && !it.contains("emulated") }
-            
-            if (externalVolumes.isNotEmpty()) {
-                // We found an SD card! 
-                // We'll try to find a root that shows both, but verify it's readable first.
-                Log.i("FtpServerManager", "External volumes found: $externalVolumes")
+            // 1. If a specific directory is requested, use it
+            if (homeDir != null) {
+                user.homeDirectory = homeDir
+                Log.i("FtpServerManager", "Starting FTP on requested path: $homeDir")
+            } 
+            // 2. Otherwise, use the best-guess automatic logic
+            else {
+                val volumes = getStorageVolumes(context)
+                val externalVolumes = volumes.filter { it != internalStorage && !it.contains("emulated") }
                 
-                val storageRoot = File("/storage")
-                val internalFile = File(internalStorage)
-                val storageParent = internalFile.parentFile?.parentFile // e.g. /storage from /storage/emulated/0
-                
-                val bestRoot = when {
-                    // 1. Try the physical /storage root
-                    storageRoot.exists() && storageRoot.canRead() && (storageRoot.list()?.isNotEmpty() == true) -> {
-                        Log.i("FtpServerManager", "Serving /storage root (verified readable)")
-                        "/storage"
+                if (externalVolumes.isNotEmpty()) {
+                    val storageRoot = File("/storage")
+                    val internalFile = File(internalStorage)
+                    val storageParent = internalFile.parentFile?.parentFile
+                    
+                    val bestRoot = when {
+                        storageRoot.exists() && storageRoot.canRead() && (storageRoot.list()?.isNotEmpty() == true) -> "/storage"
+                        storageParent != null && storageParent.exists() && storageParent.canRead() && (storageParent.list()?.isNotEmpty() == true) -> storageParent.absolutePath
+                        else -> internalStorage
                     }
-                    // 2. Try the parent of internal storage (traversal)
-                    storageParent != null && storageParent.exists() && storageParent.canRead() && (storageParent.list()?.isNotEmpty() == true) -> {
-                        Log.i("FtpServerManager", "Serving storage parent: ${storageParent.absolutePath}")
-                        storageParent.absolutePath
-                    }
-                    // 3. Safety fallback to internal storage so the user doesn't see an empty folder
-                    else -> {
-                        Log.w("FtpServerManager", "Root access restricted, falling back to internal storage for safety")
-                        internalStorage
-                    }
+                    user.homeDirectory = bestRoot
+                    Log.i("FtpServerManager", "Starting FTP on auto-detected root: $bestRoot")
+                } else {
+                    user.homeDirectory = internalStorage
+                    Log.i("FtpServerManager", "Starting FTP on internal storage: $internalStorage")
                 }
-                user.homeDirectory = bestRoot
-            } else {
-                user.homeDirectory = internalStorage
-                Log.i("FtpServerManager", "Using internal storage as root: $internalStorage")
             }
+            
+            activePath = user.homeDirectory
             
             val authorities = mutableListOf<Authority>()
             authorities.add(WritePermission())
@@ -87,58 +82,60 @@ class FtpServerManager {
         } catch (e: Exception) {
             Log.e("FtpServerManager", "Failed to start FTP server", e)
             server = null
+            activePath = null
         }
     }
 
-    private fun getStorageVolumes(context: Context): List<String> {
-        val paths = mutableListOf<String>()
+    fun getStorageVolumes(context: Context): List<StorageVolume> {
+        val volumes = mutableListOf<StorageVolume>()
+        val internalPath = Environment.getExternalStorageDirectory().absolutePath
         
-        // Internal storage
-        paths.add(Environment.getExternalStorageDirectory().absolutePath)
+        // Always add Internal Storage
+        volumes.add(StorageVolume("Internal Storage", internalPath, false))
         
-        // External SD cards
-         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-             val sm = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
-             sm.storageVolumes.forEach { volume ->
-                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                     volume.directory?.absolutePath?.let { paths.add(it) }
-                 } else {
-                     // Older versions (N, O, P, Q)
-                     try {
-                         val getPath = volume.javaClass.getMethod("getPath")
-                         val path = getPath.invoke(volume) as String
-                         if (path.isNotBlank()) paths.add(path)
-                     } catch (e: Exception) {
-                         // Fallback to simpler method if reflection fails
-                         if (!volume.isPrimary) {
-                             Log.d("FtpServerManager", "Detected non-primary volume: ${volume.uuid}")
-                         }
-                     }
-                 }
-             }
-         }
+        // Detect External SD cards
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val sm = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
+            sm.storageVolumes.forEach { volume ->
+                val path = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    volume.directory?.absolutePath
+                } else {
+                    try {
+                        val getPath = volume.javaClass.getMethod("getPath")
+                        getPath.invoke(volume) as String
+                    } catch (_: Exception) { null }
+                }
+                
+                if (path != null && path != internalPath && !path.contains("emulated")) {
+                    val name = volume.getDescription(context) ?: "SD Card"
+                    volumes.add(StorageVolume(name, path, true))
+                }
+            }
+        }
         
-        // Fallback for older versions or if directory is null
-        val externalFilesDirs = context.getExternalFilesDirs(null)
-        externalFilesDirs.forEach { file ->
-            if (file != null) {
-                val path = file.absolutePath
-                if (path.contains("/Android/data/")) {
-                    val root = path.split("/Android/data/")[0]
-                    if (!paths.contains(root)) {
-                        paths.add(root)
+        // Fallback for older versions
+        if (volumes.size == 1) {
+            context.getExternalFilesDirs(null).forEach { file ->
+                if (file != null) {
+                    val path = file.absolutePath
+                    if (path.contains("/Android/data/")) {
+                        val root = path.split("/Android/data/")[0]
+                        if (root != internalPath && !volumes.any { it.path == root }) {
+                            volumes.add(StorageVolume("SD Card", root, true))
+                        }
                     }
                 }
             }
         }
         
-        return paths.distinct()
+        return volumes.distinctBy { it.path }
     }
 
     fun stop() {
         try {
             server?.stop()
             server = null
+            activePath = null
             Log.i("FtpServerManager", "FTP Server stopped")
         } catch (e: Exception) {
             Log.e("FtpServerManager", "Failed to stop FTP server", e)

@@ -236,8 +236,8 @@ class MainActivity : ComponentActivity() {
                             onShowNotes = viewModel::showNotes,
                             onSelectBridge = viewModel::selectBridge,
                             onSearchQueryChange = viewModel::updateSearchQuery,
-                            onToggleFtp = viewModel::toggleFtp,
-                            onOpenFtpOnPc = viewModel::openFtpOnPc,
+                            onToggleFtp = { viewModel.toggleFtp(it) },
+                            onOpenFtpOnPc = { viewModel.openFtpOnPc(it) },
                         )
                     }
                 }
@@ -352,8 +352,8 @@ private fun RemoteScreen(
     onShowNotes: () -> Unit,
     onSelectBridge: (BridgeInfo) -> Unit,
     onSearchQueryChange: (String) -> Unit,
-    onToggleFtp: () -> Unit,
-    onOpenFtpOnPc: () -> Unit,
+    onToggleFtp: (String?) -> Unit,
+    onOpenFtpOnPc: (String?) -> Unit,
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -626,7 +626,7 @@ private fun RemoteScreen(
                                         }
                                         Switch(
                                             checked = ftpActive,
-                                            onCheckedChange = { onToggleFtp() },
+                                            onCheckedChange = { onToggleFtp(null) },
                                             modifier = Modifier.scale(0.8f),
                                             colors = SwitchDefaults.colors(
                                                 checkedThumbColor = Color.White,
@@ -638,22 +638,38 @@ private fun RemoteScreen(
                                     }
                                     
                                     if (ftpActive) {
-                                        Button(
-                                            onClick = onOpenFtpOnPc,
-                                            enabled = connected,
-                                            modifier = Modifier.fillMaxWidth().height(42.dp),
-                                            shape = iOSSquircleSmall,
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = iOSAccent,
-                                                contentColor = Color.White,
-                                                disabledContainerColor = iOSAccent.copy(alpha = 0.3f)
-                                            ),
-                                            contentPadding = PaddingValues(0.dp),
-                                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
-                                        ) {
-                                            Icon(Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(14.dp))
-                                            Spacer(Modifier.width(8.dp))
-                                            Text("Open on PC", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            state.availableStorages.forEach { storage ->
+                                                val isActive = state.activeFtpPath == storage.path
+                                                Button(
+                                                    onClick = { onOpenFtpOnPc(storage.path) },
+                                                    enabled = connected,
+                                                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                                                    shape = iOSSquircleSmall,
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = if (isActive) iOSGreen else iOSAccent,
+                                                        contentColor = Color.White,
+                                                        disabledContainerColor = (if (isActive) iOSGreen else iOSAccent).copy(alpha = 0.3f)
+                                                    ),
+                                                    contentPadding = PaddingValues(horizontal = 16.dp)
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Icon(
+                                                            if (storage.isSdCard) Icons.Default.SdCard else Icons.Default.Smartphone,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Text(
+                                                            "Open ${storage.name}",
+                                                            style = MaterialTheme.typography.labelLarge,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }

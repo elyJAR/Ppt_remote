@@ -43,16 +43,21 @@ class RemoteControlService : Service() {
         const val ACTION_START         = "com.antigravity.pptremote.action.START"
         const val ACTION_STOP_SHOW     = "com.antigravity.pptremote.action.STOP_SHOW"
         const val ACTION_STOP_SERVICE  = "com.antigravity.pptremote.action.STOP_SERVICE"
+        const val ACTION_STOP_FTP      = "com.antigravity.pptremote.action.STOP_FTP"
         const val ACTION_TOGGLE_FTP    = "com.antigravity.pptremote.action.TOGGLE_FTP"
+        const val EXTRA_FTP_HOME_DIR   = "com.antigravity.pptremote.action.FTP_HOME_DIR"
 
         private val ftpManager = FtpServerManager()
 
-        fun toggleFtp(context: Context) {
+        fun toggleFtp(context: Context, homeDir: String? = null) {
             val intent = Intent(context, RemoteControlService::class.java).apply {
                 action = ACTION_TOGGLE_FTP
+                putExtra(EXTRA_FTP_HOME_DIR, homeDir)
             }
             context.startService(intent)
         }
+
+        fun getActiveFtpPath(): String? = ftpManager.activePath
 
         fun isFtpRunning(): Boolean = ftpManager.isRunning()
 
@@ -133,11 +138,12 @@ class RemoteControlService : Service() {
             ACTION_START         -> executeBridgeAction("start")
             ACTION_STOP_SHOW     -> executeBridgeAction("stop")
             ACTION_TOGGLE_FTP    -> {
-                if (ftpManager.isRunning()) {
+                val homeDir = intent.getStringExtra(EXTRA_FTP_HOME_DIR)
+                if (ftpManager.isRunning() && homeDir == ftpManager.activePath) {
                     ftpManager.stop()
                     RemotePrefs.setFtpEnabled(this, false)
                 } else {
-                    ftpManager.start(this)
+                    ftpManager.start(this, homeDir = homeDir)
                     RemotePrefs.setFtpEnabled(this, true)
                 }
             }

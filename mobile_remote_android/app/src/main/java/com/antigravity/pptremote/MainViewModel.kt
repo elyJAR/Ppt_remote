@@ -21,6 +21,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val client = BridgeClient()
     private val appContext = getApplication<Application>()
+    private val ftpManager = FtpServerManager()
     private val thumbnailCache = ConcurrentHashMap<String, ConcurrentHashMap<Int, ByteArray>>()
     private val thumbnailWarmupComplete = ConcurrentHashMap.newKeySet<String>()
     private val thumbnailWarmupInFlight = ConcurrentHashMap.newKeySet<String>()
@@ -49,6 +50,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         updateNetworkType()
         updateServiceStatus()
+        refreshStorageVolumes()
         registerNetworkChangeListener()
         // Sync API key into client on startup
         client.apiKey = RemotePrefs.getApiKey(appContext)
@@ -243,9 +245,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateServiceStatus()
     }
 
+    fun refreshStorageVolumes() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val volumes = ftpManager.getStorageVolumes(appContext)
+            _state.value = _state.value.copy(
+                availableStorages = volumes,
+                activeFtpPath = RemoteControlService.getActiveFtpPath()
+            )
+        }
+    }
+
+    fun toggleFtp(homeDir: String? = null) {
+        RemoteControlService.toggleFtp(appContext, homeDir)
+        // Give it a moment to update then refresh state
+        viewModelScope.launch {
+            delay(500)
+            updateServiceStatus()
+        }
+    }
+
+    fun openFtpOnPc(homeDir: String? = null) {
+        // If not running, start it first on requested path
+        if (!state.value.isFtpEnabled || state.value.activeFtpPath != homeDir) {
+            RemoteControlService.toggleFtp(appContext, homeDir)
+            // Wait for it to start
+            viewModelScope.launch {
+                delay(1000)
+                updateServiceStatus()
+                if (state.value.isFtpEnabled) {
+                    runBridgeAction("Opened files on PC") { url -> client.openFtpOnPc(url) }
+                }
+            }
+        } else {
+            runBridgeAction("Opened files on PC") { url -> client.openFtpOnPc(url) }
+        }
+    }
+
     private fun updateServiceStatus() {
         val isRunning = RemoteControlService.isRunning(appContext)
-        _state.value = _state.value.copy(isServiceRunning = isRunning)
+        val isFtpRunning = RemoteControlService.isFtpRunning()
+        val activePath = RemoteControlService.getActiveFtpPath()
+        
+        _state.value = _state.value.copy(
+            isServiceRunning = isRunning,
+            isFtpEnabled = isFtpRunning,
+            activeFtpPath = activePath
+        )
     }
 
     fun completeOnboarding() {
@@ -291,18 +336,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(apiKey = key)
     }
 
-    fun toggleFtp() {
-        RemoteControlService.toggleFtp(appContext)
-        // Briefly delay to let the service update the state
-        viewModelScope.launch {
-            delay(200)
-            _state.value = _state.value.copy(isFtpEnabled = RemotePrefs.isFtpEnabled(appContext))
-        }
-    }
 
-    fun openFtpOnPc() {
-        runBridgeAction("Opened files on PC") { url -> client.openFtpOnPc(url) }
-    }
 
     fun updateFtpAutoStart(enabled: Boolean) {
         RemotePrefs.setFtpAutoStart(appContext, enabled)
