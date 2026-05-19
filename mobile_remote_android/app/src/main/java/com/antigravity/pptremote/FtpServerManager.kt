@@ -48,7 +48,7 @@ class FtpServerManager {
             // 2. Otherwise, use the best-guess automatic logic
             else {
                 val volumes = getStorageVolumes(context)
-                val externalVolumes = volumes.filter { it != internalStorage && !it.contains("emulated") }
+                val externalVolumes = volumes.filter { it.path != internalStorage && !it.path.contains("emulated") }
                 
                 if (externalVolumes.isNotEmpty()) {
                     val storageRoot = File("/storage")
