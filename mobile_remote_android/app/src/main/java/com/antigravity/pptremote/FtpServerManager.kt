@@ -45,24 +45,22 @@ class FtpServerManager {
             
             if (externalVolumes.isNotEmpty()) {
                 // We found an SD card!
-                // Instead of /storage (which can be restricted), we serve the parent of internal storage
-                // which usually contains all mount points like /storage/emulated/0 and /storage/SD_CARD_ID
-                val internalFile = File(internalStorage)
-                val storageParent = internalFile.parentFile?.parentFile // e.g. /storage from /storage/emulated/0
+                // Instead of /storage (which can be restricted), we serve the root of all storage
+                // On most Android devices, this is "/storage"
+                val storageRoot = File("/storage")
                 
-                if (storageParent != null && storageParent.exists() && storageParent.canRead()) {
-                    user.homeDirectory = storageParent.absolutePath
-                    Log.i("FtpServerManager", "Serving storage root: ${storageParent.absolutePath}")
+                // Detailed debug info for logcat
+                Log.i("FtpServerManager", "External volumes found: $externalVolumes")
+                
+                if (storageRoot.exists()) {
+                    // Force using /storage if it exists, even if canRead() returns false initially
+                    // (The FTP user will have permissions once the server starts)
+                    user.homeDirectory = "/storage"
+                    Log.i("FtpServerManager", "Multiple volumes detected, serving /storage as root")
                 } else {
-                    // Fallback: Use /storage directly if parent traversal failed
-                    val storageRoot = File("/storage")
-                    if (storageRoot.exists() && storageRoot.canRead()) {
-                        user.homeDirectory = "/storage"
-                        Log.i("FtpServerManager", "Multiple volumes detected, using /storage as root")
-                    } else {
-                        user.homeDirectory = internalStorage
-                        Log.i("FtpServerManager", "/storage not accessible, falling back to internal storage")
-                    }
+                    // Fallback to internal storage if /storage doesn't exist
+                    user.homeDirectory = internalStorage
+                    Log.e("FtpServerManager", "/storage root NOT found, falling back to internal storage")
                 }
             } else {
                 user.homeDirectory = internalStorage

@@ -1,0 +1,49 @@
+2026-04-26 10:21:27  INFO      bridge_service: ============================================================
+2026-04-26 10:21:27  INFO      bridge_service: PPT Remote Bridge starting up
+2026-04-26 10:21:34  INFO      bridge_service: HTTP server thread started — http://localhost:8787
+2026-04-26 10:21:35  INFO      bridge_service: Starting uvicorn on 0.0.0.0:8787
+2026-04-26 10:21:36  INFO      bridge_service: Tray icon starting (blocks main thread until Quit)
+2026-04-26 10:21:36  INFO      tray_icon: Starting tray icon event loop
+2026-04-26 10:30:40  INFO      bridge_service: ============================================================
+2026-04-26 10:30:40  INFO      bridge_service: PPT Remote Bridge starting up
+2026-04-26 10:30:42  INFO      bridge_service: HTTP server thread started — http://localhost:8787
+2026-04-26 10:30:42  INFO      bridge_service: Starting uvicorn on 0.0.0.0:8787
+2026-04-26 10:30:43  INFO      bridge_service: Tray icon starting (blocks main thread until Quit)
+2026-04-26 10:30:43  INFO      tray_icon: Starting tray icon event loop
+2026-04-26 10:33:21  INFO      bridge_service: ============================================================
+2026-04-26 10:33:21  INFO      bridge_service: PPT Remote Bridge starting up
+2026-04-26 10:33:22  INFO      bridge_service: HTTP server thread started — http://localhost:8787
+2026-04-26 10:33:23  INFO      bridge_service: Starting uvicorn on 0.0.0.0:8787
+2026-04-26 10:33:24  INFO      bridge_service: Tray icon starting (blocks main thread until Quit)
+2026-04-26 10:33:24  INFO      tray_icon: Starting tray icon event loop
+2026-04-26 11:00:23  INFO      bridge_service: ============================================================
+2026-04-26 11:00:23  INFO      bridge_service: PPT Remote Bridge starting up
+2026-04-26 11:00:25  INFO      bridge_service: HTTP server thread started — http://localhost:8787
+2026-04-26 11:00:25  INFO      bridge_service: Starting uvicorn on 0.0.0.0:8787
+2026-04-26 11:00:26  INFO      bridge_service: Tray icon starting (blocks main thread until Quit)
+2026-04-26 11:00:26  INFO      tray_icon: Starting tray icon event loop
+2026-04-26 11:01:03  INFO      tray_icon: Quit selected from tray menu
+2026-04-26 11:01:03  INFO      bridge_service: Quit requested via tray — shutting down
+2026-04-26 11:01:03  ERROR     pystray._base: An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\ElyJah\AppData\Roaming\Python\Python314\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        uMsg, lambda w, l: 0)(wParam, lParam) or 0)
+        ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "C:\Users\ElyJah\AppData\Roaming\Python\Python314\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\ElyJah\AppData\Roaming\Python\Python314\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+    ~~~~~~~~^^^^^^
+  File "C:\Users\ElyJah\AppData\Roaming\Python\Python314\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\Users\ElyJah\Documents\AntiGravity_Projects\Ppt_remote\desktop_bridge\tray_icon.py", line 146, in _handle_quit
+    self._on_quit()
+    ~~~~~~~~~~~~~^^
+  File "C:\Users\ElyJah\Documents\AntiGravity_Projects\Ppt_remote\desktop_bridge\bridge_service.py", line 155, in _on_quit
+    sys.exit(0)
+    ~~~~~~~~^^^
+SystemExit: 0
