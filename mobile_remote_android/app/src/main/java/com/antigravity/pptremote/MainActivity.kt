@@ -638,34 +638,41 @@ private fun RemoteScreen(
                                     }
                                     
                                     if (ftpActive) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
                                             state.availableStorages.forEach { storage ->
                                                 val isActive = state.activeFtpPath == storage.path
                                                 Button(
                                                     onClick = { onOpenFtpOnPc(storage.path) },
                                                     enabled = connected,
-                                                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .height(42.dp),
                                                     shape = iOSSquircleSmall,
                                                     colors = ButtonDefaults.buttonColors(
                                                         containerColor = if (isActive) iOSGreen else iOSAccent,
                                                         contentColor = Color.White,
                                                         disabledContainerColor = (if (isActive) iOSGreen else iOSAccent).copy(alpha = 0.3f)
                                                     ),
-                                                    contentPadding = PaddingValues(horizontal = 16.dp)
+                                                    contentPadding = PaddingValues(horizontal = 8.dp)
                                                 ) {
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                                     ) {
                                                         Icon(
                                                             if (storage.isSdCard) Icons.Default.SdCard else Icons.Default.Smartphone,
                                                             contentDescription = null,
-                                                            modifier = Modifier.size(16.dp)
+                                                            modifier = Modifier.size(14.dp)
                                                         )
                                                         Text(
-                                                            "Open ${storage.name}",
-                                                            style = MaterialTheme.typography.labelLarge,
-                                                            fontWeight = FontWeight.Bold
+                                                            if (storage.isSdCard) "SD Card" else "Internal",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.Bold,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
                                                         )
                                                     }
                                                 }
