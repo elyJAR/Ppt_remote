@@ -1487,7 +1487,7 @@ private fun SettingsScreen(
                 )
                 SettingsSwitchRow(
                     title = "Auto-start FTP",
-                    subtitle = "Start FTP server when app opens",
+                    subtitle = "Automatically turn on Mobile Files when app starts",
                     checked = state.isFtpAutoStart,
                     onCheckedChange = onUpdateFtpAutoStart
                 )
