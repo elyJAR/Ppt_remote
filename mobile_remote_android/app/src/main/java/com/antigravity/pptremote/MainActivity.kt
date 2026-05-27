@@ -1072,7 +1072,7 @@ private fun FilesScreen(
                                 }
 
                                 state.fileEntries.forEach { entry ->
-                                    val dateStr = formatter.format(java.util.Date(entry.lastModifiedMillis))
+                                    val dateStr = entry.lastModifiedMillis?.let { formatter.format(java.util.Date(it)) } ?: ""
                                     Surface(
                                         onClick = { 
                                             if (entry.isDirectory) onNavigateFilesTo(entry.path)
