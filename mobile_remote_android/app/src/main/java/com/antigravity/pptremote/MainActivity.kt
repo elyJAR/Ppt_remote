@@ -676,9 +676,10 @@ private fun RemoteScreen(
                                         )
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                "Mobile Files", 
-                                                fontWeight = FontWeight.Bold, 
-                                                fontSize = 14.sp,
+                                                "Mobile Files",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
                                             if (state.filesLoading) {
                                                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                                             }
