@@ -58,6 +58,14 @@ data class FileEntry(
     val lastModifiedMillis: Long? = null,
 )
 
+enum class SortCategory {
+    NAME, SIZE, DATE
+}
+
+enum class SortOrder {
+    ASCENDING, DESCENDING
+}
+
 /**
  * Immutable UI state for the entire app, held in [MainViewModel] as a [kotlinx.coroutines.flow.StateFlow].
  *
@@ -108,8 +116,13 @@ data class RemoteState(
     val currentFilesPath: String? = null,
     val fileEntries: List<FileEntry> = emptyList(),
     val filesLoading: Boolean = false,
-    val filesError: String? = null
-    ,
+    val filesError: String? = null,
+    val filesSearchQuery: String = "",
+    val filesSearchResults: List<FileEntry> = emptyList(),
+    val isSearchingFiles: Boolean = false,
+    val filesSortCategory: SortCategory = SortCategory.NAME,
+    val filesSortOrder: SortOrder = SortOrder.ASCENDING,
+    val highlightFilePath: String? = null,
     // Show dedicated Files screen
     val showFiles: Boolean = false,
     // Whether the app currently has storage access required to browse files

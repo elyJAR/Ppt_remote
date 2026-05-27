@@ -48,7 +48,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             discoveredBridges = RemotePrefs.getSavedBridges(appContext),
             selectedBridgeId = RemotePrefs.getSelectedBridgeId(appContext),
             isFtpEnabled = RemotePrefs.isFtpEnabled(appContext),
-            isFtpAutoStart = RemotePrefs.isFtpAutoStart(appContext)
+            isFtpAutoStart = RemotePrefs.isFtpAutoStart(appContext),
+            filesSortCategory = try { SortCategory.valueOf(RemotePrefs.getFilesSortCategory(appContext)) } catch (_: Exception) { SortCategory.NAME },
+            filesSortOrder = try { SortOrder.valueOf(RemotePrefs.getFilesSortOrder(appContext)) } catch (_: Exception) { SortOrder.ASCENDING }
         )
     )
     val state: StateFlow<RemoteState> = _state.asStateFlow()
@@ -359,6 +361,115 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadFilesForPath(currentPath)
     }
 
+    fun setFilesSort(category: SortCategory, order: SortOrder) {
+        RemotePrefs.setFilesSortCategory(appContext, category.name)
+        RemotePrefs.setFilesSortOrder(appContext, order.name)
+        _state.value = _state.value.copy(
+            filesSortCategory = category,
+            filesSortOrder = order
+        )
+        val currentEntries = _state.value.fileEntries
+        if (currentEntries.isNotEmpty()) {
+            _state.value = _state.value.copy(
+                fileEntries = sortFileEntries(currentEntries, category, order)
+            )
+        }
+    }
+
+    private var filesSearchJob: kotlinx.coroutines.Job? = null
+
+    fun updateFilesSearchQuery(query: String) {
+        filesSearchJob?.cancel()
+        _state.value = _state.value.copy(filesSearchQuery = query)
+        if (query.isBlank()) {
+            _state.value = _state.value.copy(
+                filesSearchResults = emptyList(),
+                isSearchingFiles = false
+            )
+            return
+        }
+
+        val currentPath = _state.value.currentFilesPath ?: _state.value.filesRootPath ?: return
+        _state.value = _state.value.copy(isSearchingFiles = true)
+
+        filesSearchJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val results = mutableListOf<FileEntry>()
+                val rootDir = File(currentPath)
+                if (rootDir.exists() && rootDir.isDirectory) {
+                    traverseAndSearch(rootDir, query, results)
+                }
+                val sortedResults = sortFileEntries(
+                    results,
+                    _state.value.filesSortCategory,
+                    _state.value.filesSortOrder
+                )
+                _state.value = _state.value.copy(
+                    filesSearchResults = sortedResults,
+                    isSearchingFiles = false
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(isSearchingFiles = false)
+            }
+        }
+    }
+
+    private suspend fun traverseAndSearch(dir: File, query: String, results: MutableList<FileEntry>) {
+        if (results.size >= 200) return
+        val files = dir.listFiles() ?: return
+        for (file in files) {
+            if (results.size >= 200) return
+            if (!kotlinx.coroutines.currentCoroutineContext().isActive) return
+
+            if (file.name.contains(query, ignoreCase = true)) {
+                results.add(
+                    FileEntry(
+                        name = file.name,
+                        path = file.absolutePath,
+                        isDirectory = file.isDirectory,
+                        sizeBytes = if (file.isFile) file.length() else null,
+                        lastModifiedMillis = file.lastModified()
+                    )
+                )
+            }
+            if (file.isDirectory) {
+                traverseAndSearch(file, query, results)
+            }
+        }
+    }
+
+    fun jumpToFileLocation(entry: FileEntry) {
+        val file = File(entry.path)
+        if (entry.isDirectory) {
+            navigateToFilesFolder(entry.path)
+            _state.value = _state.value.copy(
+                filesSearchQuery = "",
+                filesSearchResults = emptyList()
+            )
+        } else {
+            val parent = file.parentFile?.absolutePath
+            if (parent != null) {
+                _state.value = _state.value.copy(
+                    highlightFilePath = entry.path,
+                    filesSearchQuery = "",
+                    filesSearchResults = emptyList()
+                )
+                navigateToFilesFolder(parent)
+
+                viewModelScope.launch {
+                    delay(3000)
+                    if (_state.value.highlightFilePath == entry.path) {
+                        _state.value = _state.value.copy(highlightFilePath = null)
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearHighlight() {
+        _state.value = _state.value.copy(highlightFilePath = null)
+    }
+
     fun openCurrentFilesFolderOnPc() {
         val current = _state.value
         val rootPath = current.filesRootPath ?: current.activeFtpPath ?: current.availableStorages.firstOrNull()?.path
@@ -530,6 +641,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return "http://$cleanUrl:$port"
     }
 
+    private fun sortFileEntries(entries: List<FileEntry>, category: SortCategory, order: SortOrder): List<FileEntry> {
+        val comparator = when (category) {
+            SortCategory.NAME -> {
+                if (order == SortOrder.ASCENDING) {
+                    compareByDescending<FileEntry> { it.isDirectory }
+                        .thenBy { it.name.lowercase() }
+                } else {
+                    compareByDescending<FileEntry> { it.isDirectory }
+                        .thenByDescending { it.name.lowercase() }
+                }
+            }
+            SortCategory.SIZE -> {
+                if (order == SortOrder.ASCENDING) {
+                    compareByDescending<FileEntry> { it.isDirectory }
+                        .thenBy { it.sizeBytes ?: 0L }
+                        .thenBy { it.name.lowercase() }
+                } else {
+                    compareByDescending<FileEntry> { it.isDirectory }
+                        .thenByDescending { it.sizeBytes ?: 0L }
+                        .thenBy { it.name.lowercase() }
+                }
+            }
+            SortCategory.DATE -> {
+                if (order == SortOrder.ASCENDING) {
+                    compareByDescending<FileEntry> { it.isDirectory }
+                        .thenBy { it.lastModifiedMillis ?: 0L }
+                        .thenBy { it.name.lowercase() }
+                } else {
+                    compareByDescending<FileEntry> { it.isDirectory }
+                        .thenByDescending { it.lastModifiedMillis ?: 0L }
+                        .thenBy { it.name.lowercase() }
+                }
+            }
+        }
+        return entries.sortedWith(comparator)
+    }
+
     private fun loadFilesForPath(path: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -543,7 +691,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                val entries = folder.listFiles()
+                val rawEntries = folder.listFiles()
                     ?.map {
                         FileEntry(
                             name = it.name.ifBlank { it.absolutePath },
@@ -553,15 +701,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             lastModifiedMillis = it.lastModified()
                         )
                     }
-                    ?.sortedWith(
-                        compareByDescending<FileEntry> { it.isDirectory }
-                            .thenBy { it.name.lowercase() }
-                    )
                     ?: emptyList()
+
+                val sorted = sortFileEntries(
+                    rawEntries,
+                    _state.value.filesSortCategory,
+                    _state.value.filesSortOrder
+                )
 
                 _state.value = _state.value.copy(
                     currentFilesPath = folder.absolutePath,
-                    fileEntries = entries,
+                    fileEntries = sorted,
                     filesLoading = false,
                     filesError = null
                 )

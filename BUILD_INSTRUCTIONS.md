@@ -3,6 +3,7 @@
 This document outlines the standardized build process for the PPT Remote project.
 
 ## 📱 Android App (APK)
+
 The Android app is built automatically using GitHub Actions.
 
 - **Process**: Triggered on every tag push matching `pre-v*` or manually via the "Actions" tab.
@@ -14,17 +15,19 @@ The Android app is built automatically using GitHub Actions.
 
 There are two versions of the Windows executable: the **Installer** and the **Portable EXE**.
 
-### 1. Windows Installer (NSIS)
+### 1. Windows Installer (Inno Setup)
+
 The installer version is built **locally** and then manually uploaded to GitHub.
 
-- **Requirement**: [NSIS (Nullsoft Scriptable Install System)](https://nsis.sourceforge.io/Download) must be installed.
-- **Build Script**: `desktop_bridge/build_nsis.ps1`
+- **Requirement**: [Inno Setup 6](https://jrsoftware.org/isinfo.php) must be installed.
+- **Build Script**: `desktop_bridge/build_installer.ps1`
 - **Process**:
-    1. Ensure the bridge is built (using `build_portable.ps1` or similar to populate `dist/`).
-    2. Run `powershell -File build_nsis.ps1`.
-    3. The output `dist\PptRemoteBridgeSetup_NSIS.exe` should be uploaded to the corresponding GitHub Release.
+  1. Ensure the bridge is built (using `build_portable.ps1` or similar to populate `dist/`).
+  2. Run `powershell -File build_installer.ps1`.
+  3. The output `dist\PptRemoteBridgeSetup.exe` should be uploaded to the corresponding GitHub Release.
 
 ### 2. Portable EXE (Standalone)
+
 The portable version is built automatically on GitHub.
 
 - **Process**: Triggered on every tag push matching `pre-v*` or manually via the "Actions" tab.
@@ -35,8 +38,8 @@ The portable version is built automatically on GitHub.
 
 ## 🛠️ Summary Table
 
-| Artifact | Build Environment | Tooling | Release Method |
-| :--- | :--- | :--- | :--- |
-| **Android APK** | GitHub Actions | Gradle / JDK 21 | Auto-attached to Pre-release |
-| **Portable EXE** | GitHub Actions | PyInstaller | Auto-attached to Pre-release |
-| **Installer EXE** | Local Machine | NSIS (makensis) | Manual Upload to Release |
+| Artifact          | Build Environment | Tooling           | Release Method               |
+| :---------------- | :---------------- | :---------------- | :--------------------------- |
+| **Android APK**   | GitHub Actions    | Gradle / JDK 21   | Auto-attached to Pre-release |
+| **Portable EXE**  | GitHub Actions    | PyInstaller       | Auto-attached to Pre-release |
+| **Installer EXE** | Local Machine     | Inno Setup (ISCC) | Manual Upload to Release     |

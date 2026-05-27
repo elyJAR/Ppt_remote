@@ -241,4 +241,25 @@ object RemotePrefs {
         }
         return getBridgeUrl(context)
     }
+
+    private const val KEY_FILES_SORT_CATEGORY = "files_sort_category"
+    private const val KEY_FILES_SORT_ORDER = "files_sort_order"
+
+    fun getFilesSortCategory(context: Context): String =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_FILES_SORT_CATEGORY, "NAME") ?: "NAME"
+
+    fun setFilesSortCategory(context: Context, category: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_FILES_SORT_CATEGORY, category).apply()
+    }
+
+    fun getFilesSortOrder(context: Context): String =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_FILES_SORT_ORDER, "ASCENDING") ?: "ASCENDING"
+
+    fun setFilesSortOrder(context: Context, order: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_FILES_SORT_ORDER, order).apply()
+    }
 }
