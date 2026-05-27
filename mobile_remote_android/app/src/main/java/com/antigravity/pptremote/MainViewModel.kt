@@ -57,6 +57,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<RemoteState> = _state.asStateFlow()
 
     init {
+        SafStorageHelper.appPackageName = appContext.packageName
         updateNetworkType()
         updateServiceStatus()
         refreshStorageVolumes()

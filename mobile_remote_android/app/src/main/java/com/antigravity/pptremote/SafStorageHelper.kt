@@ -8,8 +8,14 @@ import java.io.File
 
 object SafStorageHelper {
     
+    var appPackageName: String = "com.antigravity.pptremote"
+
     fun isPathRestricted(path: String): Boolean {
         val normalized = path.replace('\\', '/')
+        if (normalized.contains("/Android/data/$appPackageName", ignoreCase = true) || 
+            normalized.contains("/Android/obb/$appPackageName", ignoreCase = true)) {
+            return false
+        }
         return normalized.contains("/Android/data", ignoreCase = true) || 
                normalized.contains("/Android/obb", ignoreCase = true)
     }

@@ -217,6 +217,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SafStorageHelper.appPackageName = packageName
         // Install splash screen before calling super.onCreate()
         installSplashScreen()
         
