@@ -379,14 +379,26 @@ class MainActivity : ComponentActivity() {
         } catch (_: Exception) {}
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        try {
-            if (requestCode == 1001) {
-                viewModel.checkStorageAccess()
-                viewModel.refreshStorageVolumes()
+
+    private fun requestStorageAccess() {
+        // Prefer the MANAGE_EXTERNAL_STORAGE settings flow on Android 11+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                intent.data = Uri.parse("package:$packageName")
+                startActivity(intent)
+                return
+            } catch (_: Exception) {
+                // Fall through to SAF picker
             }
-        } catch (_: Exception) {}
+        }
+
+        // Launch SAF folder picker as a fallback for scoped storage
+        try {
+            openDocumentTreeLauncher.launch(null)
+        } catch (_: Exception) {
+            // ignore
+        }
     }
 }
 
@@ -868,26 +880,6 @@ private fun RemoteScreen(
                                                     }
                                                 }
                                             }
-                                                ) {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                    ) {
-                                                        Icon(
-                                                            if (storage.isSdCard) Icons.Default.SdCard else Icons.Default.Smartphone,
-                                                            contentDescription = null,
-                                                            modifier = Modifier.size(14.dp)
-                                                        )
-                                                        Text(
-                                                            if (storage.isSdCard) "SD Card" else "Internal",
-                                                            style = MaterialTheme.typography.labelMedium,
-                                                            fontWeight = FontWeight.Bold,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
-                                                    }
-                                                }
-                                            }
                                         }
                                     }
                                 }
@@ -1098,28 +1090,6 @@ private fun RemoteScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-    private fun requestStorageAccess() {
-        // Prefer the MANAGE_EXTERNAL_STORAGE settings flow on Android 11+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                intent.data = Uri.parse("package:$packageName")
-                startActivity(intent)
-                return
-            } catch (_: Exception) {
-                // Fall through to SAF picker
-            }
-        }
-
-        // Launch SAF folder picker as a fallback for scoped storage
-        try {
-            openDocumentTreeLauncher.launch(null)
-        } catch (_: Exception) {
-            // ignore
         }
     }
 
