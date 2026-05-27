@@ -304,6 +304,35 @@ RemoteControlService keeps running as foreground service
   └─▶ MediaSession stays active → system routes volume key events here
   └─▶ VolumeProvider.onAdjustVolume() fires → same HTTP POST path as Phase 3
   └─▶ Notification text refreshed on next poll from service's own coroutine
+
+---
+
+## Files Feature (FTP) — Architecture Notes
+
+This project includes a lightweight FTP-based file-browsing flow that lets the Android
+app expose phone storage to Windows Explorer via the Desktop Bridge. Key points:
+
+- The Android app runs an embedded FTP server on port `2121` (configurable) when the
+  user enables the FTP feature. The server serves a user-selected root path (internal
+  storage or SD card).
+- When the phone connects to the bridge (discovery / polling), the bridge stores the
+  client's IP address (`last_client_ip`) in memory. This IP is used to construct FTP URLs.
+- The Files UI sends `POST /api/ftp/open?ftp_path=<relative-path>` to the bridge to ask
+  the bridge to open a network folder in Windows Explorer. The bridge will:
+  1. Validate `ftp_path` (reject path traversal such as `..`).
+  2. Normalize slashes and percent-encode special characters (spaces, unicode, `%`).
+  3. Build a URL like `ftp://<client_ip>:2121/<encoded-path>` and run `explorer.exe "<url>"`.
+- The bridge returns `400` if no client IP is known or if launching Explorer fails.
+- Tests: encoding and failure cases are covered by `desktop_bridge/tests/test_api.py`.
+
+Security & UX notes
+
+- The FTP server is intended for trusted local LAN use only; do not expose the phone's
+  FTP server to the public internet. The bridge intentionally binds Explorer to the FTP URL
+  using the last-known client IP rather than accepting arbitrary hostnames from external callers.
+- The Android app requests storage access using the `MANAGE_EXTERNAL_STORAGE` settings flow on
+  Android 11+ and falls back to the SAF `OpenDocumentTree` picker for scoped storage. The UI
+  explains this and re-checks permissions on resume so users understand the required steps.
 ```
 
 ---
