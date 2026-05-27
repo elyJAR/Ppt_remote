@@ -145,6 +145,10 @@ class AndroidFtpFile(
         return getDoc()?.lastModified() ?: 0L
     }
 
+    override fun setLastModified(lastModified: Long): Boolean {
+        return false
+    }
+
     override fun isReadable(): Boolean {
         return SafStorageHelper.getTreeUriForPath(context, physicalPath) != null
     }
