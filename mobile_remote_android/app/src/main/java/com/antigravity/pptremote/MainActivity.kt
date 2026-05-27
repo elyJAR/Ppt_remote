@@ -58,6 +58,9 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.launch
+import java.io.File
+import android.webkit.MimeTypeMap
+import androidx.core.content.FileProvider
 
 // ---  Colour palette — iOS Dark Inspired ───────────────────────────────────────
 private val iOSBlack     = Color(0xFF000000)
@@ -247,8 +250,9 @@ class MainActivity : ComponentActivity() {
                                 onNavigateFilesTo = viewModel::navigateToFilesFolder,
                                 onNavigateFilesUp = viewModel::navigateUpFilesFolder,
                                 onRefreshFiles = viewModel::refreshFiles,
-                                onOpenCurrentFilesFolderOnPc = viewModel::openCurrentFilesFolderOnPc
-                                , onRequestStorageAccess = { requestStorageAccess() }
+                                onOpenCurrentFilesFolderOnPc = viewModel::openCurrentFilesFolderOnPc,
+                                onRequestStorageAccess = { requestStorageAccess() },
+                                onOpenFile = { path -> openFile(File(path)) }
                             )
                         } else {
                             RemoteScreen(
@@ -398,6 +402,22 @@ class MainActivity : ComponentActivity() {
             openDocumentTreeLauncher.launch(null)
         } catch (_: Exception) {
             // ignore
+        }
+    }
+
+    private fun openFile(file: File) {
+        try {
+            val authority = "${packageName}.provider"
+            val uri = FileProvider.getUriForFile(this, authority, file)
+            val extension = file.extension.lowercase()
+            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "*/*"
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, "Open file with"))
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(this, "Failed to open file: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
         }
     }
 }
@@ -868,6 +888,10 @@ private fun RemoteScreen(
     }
 }
 
+private enum class FileViewMode {
+    LIST, DETAILED, GRID
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilesScreen(
@@ -878,10 +902,13 @@ private fun FilesScreen(
     onNavigateFilesUp: () -> Unit,
     onRefreshFiles: () -> Unit,
     onOpenCurrentFilesFolderOnPc: () -> Unit,
-    onRequestStorageAccess: () -> Unit
+    onRequestStorageAccess: () -> Unit,
+    onOpenFile: (String) -> Unit
 ) {
     val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
     var showHelp by remember { mutableStateOf(false) }
+    var viewMode by remember { mutableStateOf(FileViewMode.LIST) }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -892,6 +919,24 @@ private fun FilesScreen(
                 actions = {
                     IconButton(onClick = onRefreshFiles) { Icon(Icons.Default.Refresh, contentDescription = "Refresh") }
                     IconButton(onClick = onOpenCurrentFilesFolderOnPc) { Icon(Icons.Default.OpenInBrowser, contentDescription = "Open on PC") }
+                    IconButton(
+                        onClick = {
+                            viewMode = when (viewMode) {
+                                FileViewMode.LIST -> FileViewMode.DETAILED
+                                FileViewMode.DETAILED -> FileViewMode.GRID
+                                FileViewMode.GRID -> FileViewMode.LIST
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = when (viewMode) {
+                                FileViewMode.LIST -> Icons.Default.List
+                                FileViewMode.DETAILED -> Icons.Default.ViewHeadline
+                                FileViewMode.GRID -> Icons.Default.GridView
+                            },
+                            contentDescription = "Change view mode"
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = colorScheme.screenBg,
@@ -949,34 +994,168 @@ private fun FilesScreen(
                 }
 
                 if (currentFilesPath != null) {
-                    // Breadcrumbs
+                    // Breadcrumbs + Up navigation button
                     val root = filesRootPath ?: currentFilesPath
                     val relative = if (currentFilesPath.startsWith(root)) currentFilesPath.removePrefix(root).trimStart('/') else currentFilesPath
                     val segments = relative.split('/').filter { it.isNotBlank() }
 
-                    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Root button
-                        AssistChip(onClick = { onSelectFilesRoot(root) }, label = { Text("Root") })
-                        var accum = root
-                        segments.forEachIndexed { idx, seg ->
-                            accum = if (accum.endsWith('/')) "$accum$seg" else "$accum/$seg"
-                            AssistChip(onClick = { onNavigateFilesTo(accum) }, label = { Text(seg) })
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        IconButton(
+                            onClick = onNavigateFilesUp,
+                            enabled = currentFilesPath != root,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowUpward,
+                                contentDescription = "Up",
+                                tint = if (currentFilesPath != root) colorScheme.primary else colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Root button
+                            AssistChip(onClick = { onSelectFilesRoot(root) }, label = { Text("Root") })
+                            var accum = root
+                            segments.forEachIndexed { idx, seg ->
+                                accum = if (accum.endsWith('/')) "$accum$seg" else "$accum/$seg"
+                                AssistChip(onClick = { onNavigateFilesTo(accum) }, label = { Text(seg) })
+                            }
                         }
                     }
+
                     Spacer(Modifier.height(8.dp))
                     Text(currentFilesPath, style = MaterialTheme.typography.labelSmall)
 
                     Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
-                        state.fileEntries.forEach { entry ->
-                            Surface(onClick = { if (entry.isDirectory) onNavigateFilesTo(entry.path) }, modifier = Modifier.fillMaxWidth()) {
-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(if (entry.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(entry.name, fontWeight = FontWeight.SemiBold)
-                                        Text(entry.path, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        when (viewMode) {
+                            FileViewMode.LIST -> {
+                                state.fileEntries.forEach { entry ->
+                                    Surface(
+                                        onClick = { 
+                                            if (entry.isDirectory) onNavigateFilesTo(entry.path)
+                                            else onOpenFile(entry.path)
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = if (entry.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
+                                                contentDescription = null,
+                                                tint = if (entry.isDirectory) iOSGreen else colorScheme.textSecondary
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(entry.name, fontWeight = FontWeight.SemiBold, color = colorScheme.textPrimary)
+                                                Text(entry.path, style = MaterialTheme.typography.labelSmall, color = colorScheme.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                            if (entry.isDirectory) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = colorScheme.textSecondary)
+                                        }
                                     }
-                                    if (entry.isDirectory) Icon(Icons.Default.ChevronRight, contentDescription = null)
+                                }
+                            }
+                            FileViewMode.DETAILED -> {
+                                val formatter = remember { java.text.SimpleDateFormat("dd MMM yyyy HH:mm", java.util.Locale.getDefault()) }
+                                
+                                fun formatSize(bytes: Long?): String {
+                                    if (bytes == null) return ""
+                                    if (bytes < 1024) return "$bytes B"
+                                    val exp = (Math.log(bytes.toDouble()) / Math.log(1024.0)).toInt()
+                                    val pre = "KMGTPE"[exp - 1]
+                                    return String.format(java.util.Locale.US, "%.1f %cB", bytes / Math.pow(1024.0, exp.toDouble()), pre)
+                                }
+
+                                state.fileEntries.forEach { entry ->
+                                    val dateStr = formatter.format(java.util.Date(entry.lastModifiedMillis))
+                                    Surface(
+                                        onClick = { 
+                                            if (entry.isDirectory) onNavigateFilesTo(entry.path)
+                                            else onOpenFile(entry.path)
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = if (entry.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
+                                                contentDescription = null,
+                                                tint = if (entry.isDirectory) iOSGreen else colorScheme.textSecondary
+                                            )
+                                            Spacer(Modifier.width(12.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(entry.name, fontWeight = FontWeight.Bold, color = colorScheme.textPrimary)
+                                                Text(entry.path, style = MaterialTheme.typography.bodySmall, color = colorScheme.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Spacer(Modifier.height(4.dp))
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    val sizeText = formatSize(entry.sizeBytes)
+                                                    if (sizeText.isNotEmpty()) {
+                                                        Text(sizeText, style = MaterialTheme.typography.labelSmall, color = colorScheme.textSecondary.copy(alpha = 0.7f))
+                                                    }
+                                                    Text(dateStr, style = MaterialTheme.typography.labelSmall, color = colorScheme.textSecondary.copy(alpha = 0.7f))
+                                                }
+                                            }
+                                            if (entry.isDirectory) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = colorScheme.textSecondary)
+                                        }
+                                    }
+                                }
+                            }
+                            FileViewMode.GRID -> {
+                                val columns = 3
+                                val chunks = state.fileEntries.chunked(columns)
+                                chunks.forEach { rowEntries ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        for (i in 0 until columns) {
+                                            val entry = rowEntries.getOrNull(i)
+                                            if (entry != null) {
+                                                Surface(
+                                                    onClick = { 
+                                                        if (entry.isDirectory) onNavigateFilesTo(entry.path)
+                                                        else onOpenFile(entry.path)
+                                                    },
+                                                    modifier = Modifier.weight(1f),
+                                                    shape = iOSSquircleSmall,
+                                                    color = colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                                    border = BorderStroke(0.5.dp, colorScheme.outline.copy(alpha = 0.1f))
+                                                ) {
+                                                    Column(
+                                                        modifier = Modifier.padding(12.dp),
+                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = if (entry.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
+                                                            contentDescription = null,
+                                                            tint = if (entry.isDirectory) iOSGreen else colorScheme.textSecondary,
+                                                            modifier = Modifier.size(36.dp)
+                                                        )
+                                                        Text(
+                                                            entry.name,
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = colorScheme.textPrimary,
+                                                            textAlign = TextAlign.Center,
+                                                            maxLines = 2,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            modifier = Modifier.heightIn(min = 36.dp)
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                Spacer(Modifier.weight(1f))
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
