@@ -149,6 +149,10 @@ class AndroidFtpFile(
         return false
     }
 
+    override fun getPhysicalFile(): Any? {
+        return File(physicalPath)
+    }
+
     override fun isReadable(): Boolean {
         return SafStorageHelper.getTreeUriForPath(context, physicalPath) != null
     }
