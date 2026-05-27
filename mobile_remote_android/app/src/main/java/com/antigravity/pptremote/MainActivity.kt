@@ -1092,6 +1092,7 @@ private fun RemoteScreen(
             }
         }
     }
+}
 
 @Composable
 private fun FilesScreen(
