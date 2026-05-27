@@ -31,19 +31,56 @@ object SafStorageHelper {
         return null
     }
 
-    fun getTreeUriForPath(context: Context, path: String): Uri? {
-        val normalized = path.replace('\\', '/')
-        val volumeRoot = getVolumeRoot(path) ?: return null
-        val rootId = if (volumeRoot == Environment.getExternalStorageDirectory().absolutePath) "primary" else File(volumeRoot).name
-        val isObb = normalized.contains("/Android/obb", ignoreCase = true)
-        val folderName = if (isObb) "Android/obb" else "Android/data"
+    data class MatchingTree(val treeUri: Uri, val relativePath: String)
+
+    fun findMatchingTree(context: Context, path: String): MatchingTree? {
+        val normalizedPath = path.replace('\\', '/').trimEnd('/')
+        val persisted = context.contentResolver.persistedUriPermissions
         
-        val persistedPermissions = context.contentResolver.persistedUriPermissions
-        return persistedPermissions.find { perm ->
-            val permStr = perm.uri.toString()
-            permStr.contains(rootId, ignoreCase = true) && 
-            permStr.contains(folderName.replace("/", "%2F"), ignoreCase = true)
-        }?.uri
+        var bestMatch: MatchingTree? = null
+        var longestMatchLen = -1
+
+        for (perm in persisted) {
+            val uriStr = perm.uri.toString()
+            val treePart = uriStr.substringAfter("/tree/", "")
+            if (treePart.isEmpty()) continue
+            
+            val decodedPart = Uri.decode(treePart)
+            val colonIdx = decodedPart.indexOf(':')
+            if (colonIdx == -1) continue
+            
+            val rootId = decodedPart.substring(0, colonIdx)
+            val relPath = decodedPart.substring(colonIdx + 1)
+            
+            val volumeRoot = if (rootId.equals("primary", ignoreCase = true)) {
+                Environment.getExternalStorageDirectory().absolutePath
+            } else {
+                "/storage/$rootId"
+            }
+            
+            val cleanRelPath = relPath.trim('/')
+            val treePhysicalPath = if (cleanRelPath.isEmpty()) {
+                File(volumeRoot).absolutePath
+            } else {
+                File(volumeRoot, cleanRelPath).absolutePath
+            }.replace('\\', '/').trimEnd('/')
+            
+            if (normalizedPath.equals(treePhysicalPath, ignoreCase = true)) {
+                return MatchingTree(perm.uri, "")
+            } else if (normalizedPath.startsWith("$treePhysicalPath/", ignoreCase = true)) {
+                val matchLen = treePhysicalPath.length
+                if (matchLen > longestMatchLen) {
+                    longestMatchLen = matchLen
+                    val subPath = normalizedPath.substring(matchLen + 1).trimStart('/')
+                    bestMatch = MatchingTree(perm.uri, subPath)
+                }
+            }
+        }
+        return bestMatch
+    }
+
+    fun getTreeUriForPath(context: Context, path: String): Uri? {
+        return findMatchingTree(context, path)?.treeUri
     }
 
     fun getRelativePathUnderRestricted(path: String): String {
@@ -60,14 +97,13 @@ object SafStorageHelper {
     }
 
     fun getDocumentFileForPath(context: Context, path: String): DocumentFile? {
-        val treeUri = getTreeUriForPath(context, path) ?: return null
-        val rootDoc = DocumentFile.fromTreeUri(context, treeUri) ?: return null
-        val relativePath = getRelativePathUnderRestricted(path)
-        if (relativePath.isEmpty()) {
+        val match = findMatchingTree(context, path) ?: return null
+        val rootDoc = DocumentFile.fromTreeUri(context, match.treeUri) ?: return null
+        if (match.relativePath.isEmpty()) {
             return rootDoc
         }
         var currentDoc = rootDoc
-        for (segment in relativePath.split('/')) {
+        for (segment in match.relativePath.split('/')) {
             if (segment.isEmpty()) continue
             currentDoc = currentDoc.findFile(segment) ?: return null
         }

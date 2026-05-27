@@ -201,8 +201,15 @@ class MainActivity : ComponentActivity() {
                 File(volumeRoot).name
             }
             val isObb = path.replace('\\', '/').contains("/Android/obb", ignoreCase = true)
-            val folder = if (isObb) "Android%2Fobb" else "Android%2Fdata"
-            val documentUri = Uri.parse("content://com.android.externalstorage.documents/document/$rootId%3A$folder")
+            val volRootNormalized = volumeRoot.replace('\\', '/').trimEnd('/')
+            val pathNormalized = path.replace('\\', '/').trimEnd('/')
+            val relPathFromRoot = if (pathNormalized.startsWith(volRootNormalized)) {
+                pathNormalized.substring(volRootNormalized.length).trimStart('/')
+            } else {
+                if (isObb) "Android/obb" else "Android/data"
+            }
+            val escapedRelPath = relPathFromRoot.replace("/", "%2F")
+            val documentUri = Uri.parse("content://com.android.externalstorage.documents/tree/$rootId%3A$escapedRelPath")
             openDocumentTreeLauncher.launch(documentUri)
         } catch (_: Exception) {
             openDocumentTreeLauncher.launch(null)
