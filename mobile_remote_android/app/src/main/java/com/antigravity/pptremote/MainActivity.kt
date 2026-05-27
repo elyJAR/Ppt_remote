@@ -188,7 +188,25 @@ class MainActivity : ComponentActivity() {
             val vm = viewModel
             vm.refreshStorageVolumes()
             vm.checkStorageAccess()
+            vm.refreshFiles()
         } catch (_: Exception) {}
+    }
+
+    private fun requestRestrictedFolderAccess(path: String) {
+        try {
+            val volumeRoot = SafStorageHelper.getVolumeRoot(path) ?: Environment.getExternalStorageDirectory().absolutePath
+            val rootId = if (volumeRoot == Environment.getExternalStorageDirectory().absolutePath) {
+                "primary"
+            } else {
+                File(volumeRoot).name
+            }
+            val isObb = path.replace('\\', '/').contains("/Android/obb", ignoreCase = true)
+            val folder = if (isObb) "Android%2Fobb" else "Android%2Fdata"
+            val documentUri = Uri.parse("content://com.android.externalstorage.documents/document/$rootId%3A$folder")
+            openDocumentTreeLauncher.launch(documentUri)
+        } catch (_: Exception) {
+            openDocumentTreeLauncher.launch(null)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -252,7 +270,8 @@ class MainActivity : ComponentActivity() {
                                 onRefreshFiles = viewModel::refreshFiles,
                                 onOpenCurrentFilesFolderOnPc = viewModel::openCurrentFilesFolderOnPc,
                                 onRequestStorageAccess = { requestStorageAccess() },
-                                onOpenFile = { path -> openFile(File(path)) },
+                                onRequestRestrictedFolderAccess = { requestRestrictedFolderAccess(it) },
+                                onOpenFile = { path -> openFile(path) },
                                 onFilesSearchQueryChange = viewModel::updateFilesSearchQuery,
                                 onJumpToFileLocation = viewModel::jumpToFileLocation,
                                 onFilesSortChange = viewModel::setFilesSort
@@ -408,11 +427,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun openFile(file: File) {
+    private fun openFile(path: String) {
         try {
-            val authority = "${packageName}.provider"
-            val uri = FileProvider.getUriForFile(this, authority, file)
-            val extension = file.extension.lowercase()
+            val isRestricted = SafStorageHelper.isPathRestricted(path)
+            val uri = if (isRestricted) {
+                val doc = SafStorageHelper.getDocumentFileForPath(this, path) ?: throw Exception("File not found under restricted path")
+                doc.uri
+            } else {
+                val file = File(path)
+                val authority = "${packageName}.provider"
+                FileProvider.getUriForFile(this, authority, file)
+            }
+            val extension = path.substringAfterLast('.', "").lowercase()
             val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: "*/*"
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, mimeType)
@@ -906,6 +932,7 @@ private fun FilesScreen(
     onRefreshFiles: () -> Unit,
     onOpenCurrentFilesFolderOnPc: () -> Unit,
     onRequestStorageAccess: () -> Unit,
+    onRequestRestrictedFolderAccess: (String) -> Unit,
     onOpenFile: (String) -> Unit,
     onFilesSearchQueryChange: (String) -> Unit,
     onJumpToFileLocation: (FileEntry) -> Unit,
@@ -1193,6 +1220,39 @@ private fun FilesScreen(
                         Spacer(Modifier.height(8.dp))
                         Text(currentFilesPath, style = MaterialTheme.typography.labelSmall)
 
+                        val isCurrentRestricted = SafStorageHelper.isPathRestricted(currentFilesPath)
+                        val hasRestrictedPermission = SafStorageHelper.getTreeUriForPath(LocalContext.current, currentFilesPath) != null
+
+                        if (isCurrentRestricted && !hasRestrictedPermission) {
+                            Spacer(Modifier.height(8.dp))
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = iOSRed.copy(alpha = 0.1f)),
+                                border = BorderStroke(1.dp, iOSRed.copy(alpha = 0.3f))
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text(
+                                        "Restricted Folder Access Required",
+                                        fontWeight = FontWeight.Bold,
+                                        color = iOSRed
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "To browse and manage files in Android/data or Android/obb, Android requires you to grant explicit folder permission. Tap below and choose 'Use this folder'.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = colorScheme.textPrimary
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    Button(
+                                        onClick = { onRequestRestrictedFolderAccess(currentFilesPath) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = iOSRed, contentColor = Color.White)
+                                    ) {
+                                        Text("Grant Folder Access")
+                                    }
+                                }
+                            }
+                        }
+
                         Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
                             when (viewMode) {
                                 FileViewMode.LIST -> {
@@ -1349,71 +1409,155 @@ private fun FileIconOrThumbnail(
     }
 
     if (isThumbnailCandidate && bitmap == null) {
+        val context = LocalContext.current
         LaunchedEffect(entry.path) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 try {
-                    val file = File(entry.path)
-                    if (file.exists() && file.isFile) {
-                        val ext = file.extension.lowercase()
-                        val generatedBitmap = when {
-                            ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp") -> {
-                                val options = android.graphics.BitmapFactory.Options().apply {
-                                    inJustDecodeBounds = true
-                                }
-                                android.graphics.BitmapFactory.decodeFile(file.absolutePath, options)
-                                val reqSize = 128
-                                var inSampleSize = 1
-                                if (options.outHeight > reqSize || options.outWidth > reqSize) {
-                                    val halfHeight = options.outHeight / 2
-                                    val halfWidth = options.outWidth / 2
-                                    while (halfHeight / inSampleSize >= reqSize && halfWidth / inSampleSize >= reqSize) {
-                                        inSampleSize *= 2
+                    val isRestricted = SafStorageHelper.isPathRestricted(entry.path)
+                    val ext = entry.path.substringAfterLast('.', "").lowercase()
+                    if (isRestricted) {
+                        val doc = SafStorageHelper.getDocumentFileForPath(context, entry.path)
+                        if (doc != null && doc.isFile) {
+                            val generatedBitmap = when {
+                                ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp") -> {
+                                    val options = android.graphics.BitmapFactory.Options().apply {
+                                        inJustDecodeBounds = true
+                                    }
+                                    context.contentResolver.openInputStream(doc.uri)?.use { stream ->
+                                        android.graphics.BitmapFactory.decodeStream(stream, null, options)
+                                    }
+                                    val reqSize = 128
+                                    var inSampleSize = 1
+                                    if (options.outHeight > reqSize || options.outWidth > reqSize) {
+                                        val halfHeight = options.outHeight / 2
+                                        val halfWidth = options.outWidth / 2
+                                        while (halfHeight / inSampleSize >= reqSize && halfWidth / inSampleSize >= reqSize) {
+                                            inSampleSize *= 2
+                                        }
+                                    }
+                                    options.inSampleSize = inSampleSize
+                                    options.inJustDecodeBounds = false
+                                    context.contentResolver.openInputStream(doc.uri)?.use { stream ->
+                                        android.graphics.BitmapFactory.decodeStream(stream, null, options)
                                     }
                                 }
-                                options.inSampleSize = inSampleSize
-                                options.inJustDecodeBounds = false
-                                android.graphics.BitmapFactory.decodeFile(file.absolutePath, options)
-                            }
-                            ext in setOf("mp4", "mkv", "avi", "3gp", "webm") -> {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                ext in setOf("mp4", "mkv", "avi", "3gp", "webm") -> {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                        try {
+                                            context.contentResolver.loadThumbnail(doc.uri, android.util.Size(128, 128), null)
+                                        } catch (e: Exception) {
+                                            val retriever = android.media.MediaMetadataRetriever()
+                                            try {
+                                                retriever.setDataSource(context, doc.uri)
+                                                retriever.getFrameAtTime(1000000)
+                                            } finally {
+                                                retriever.release()
+                                            }
+                                        }
+                                    } else {
+                                        val retriever = android.media.MediaMetadataRetriever()
+                                        try {
+                                            retriever.setDataSource(context, doc.uri)
+                                            retriever.getFrameAtTime(1000000)
+                                        } finally {
+                                            retriever.release()
+                                        }
+                                    }
+                                }
+                                ext == "pdf" -> {
+                                    var pdfRenderer: android.graphics.pdf.PdfRenderer? = null
+                                    var fileDescriptor: android.os.ParcelFileDescriptor? = null
                                     try {
-                                        android.media.ThumbnailUtils.createVideoThumbnail(file, android.util.Size(128, 128), null)
+                                        fileDescriptor = context.contentResolver.openFileDescriptor(doc.uri, "r")
+                                        if (fileDescriptor != null) {
+                                            pdfRenderer = android.graphics.pdf.PdfRenderer(fileDescriptor)
+                                            if (pdfRenderer.pageCount > 0) {
+                                                val page = pdfRenderer.openPage(0)
+                                                val destBitmap = android.graphics.Bitmap.createBitmap(128, 128, android.graphics.Bitmap.Config.ARGB_8888)
+                                                val canvas = android.graphics.Canvas(destBitmap)
+                                                canvas.drawColor(android.graphics.Color.WHITE)
+                                                page.render(destBitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                                page.close()
+                                                destBitmap
+                                            } else null
+                                        } else null
                                     } catch (e: Exception) {
+                                        null
+                                    } finally {
+                                        pdfRenderer?.close()
+                                        fileDescriptor?.close()
+                                    }
+                                }
+                                else -> null
+                            }
+                            if (generatedBitmap != null) {
+                                ThumbnailCache.put(entry.path, generatedBitmap)
+                                bitmap = generatedBitmap
+                            }
+                        }
+                    } else {
+                        val file = File(entry.path)
+                        if (file.exists() && file.isFile) {
+                            val generatedBitmap = when {
+                                ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp") -> {
+                                    val options = android.graphics.BitmapFactory.Options().apply {
+                                        inJustDecodeBounds = true
+                                    }
+                                    android.graphics.BitmapFactory.decodeFile(file.absolutePath, options)
+                                    val reqSize = 128
+                                    var inSampleSize = 1
+                                    if (options.outHeight > reqSize || options.outWidth > reqSize) {
+                                        val halfHeight = options.outHeight / 2
+                                        val halfWidth = options.outWidth / 2
+                                        while (halfHeight / inSampleSize >= reqSize && halfWidth / inSampleSize >= reqSize) {
+                                            inSampleSize *= 2
+                                        }
+                                    }
+                                    options.inSampleSize = inSampleSize
+                                    options.inJustDecodeBounds = false
+                                    android.graphics.BitmapFactory.decodeFile(file.absolutePath, options)
+                                }
+                                ext in setOf("mp4", "mkv", "avi", "3gp", "webm") -> {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                        try {
+                                            android.media.ThumbnailUtils.createVideoThumbnail(file, android.util.Size(128, 128), null)
+                                        } catch (e: Exception) {
+                                            @Suppress("DEPRECATION")
+                                            android.media.ThumbnailUtils.createVideoThumbnail(file.absolutePath, android.provider.MediaStore.Video.Thumbnails.MINI_KIND)
+                                        }
+                                    } else {
                                         @Suppress("DEPRECATION")
                                         android.media.ThumbnailUtils.createVideoThumbnail(file.absolutePath, android.provider.MediaStore.Video.Thumbnails.MINI_KIND)
                                     }
-                                } else {
-                                    @Suppress("DEPRECATION")
-                                    android.media.ThumbnailUtils.createVideoThumbnail(file.absolutePath, android.provider.MediaStore.Video.Thumbnails.MINI_KIND)
                                 }
-                            }
-                            ext == "pdf" -> {
-                                var pdfRenderer: android.graphics.pdf.PdfRenderer? = null
-                                var fileDescriptor: android.os.ParcelFileDescriptor? = null
-                                try {
-                                    fileDescriptor = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
-                                    pdfRenderer = android.graphics.pdf.PdfRenderer(fileDescriptor)
-                                    if (pdfRenderer.pageCount > 0) {
-                                        val page = pdfRenderer.openPage(0)
-                                        val destBitmap = android.graphics.Bitmap.createBitmap(128, 128, android.graphics.Bitmap.Config.ARGB_8888)
-                                        val canvas = android.graphics.Canvas(destBitmap)
-                                        canvas.drawColor(android.graphics.Color.WHITE)
-                                        page.render(destBitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                                        page.close()
-                                        destBitmap
-                                    } else null
-                                } catch (e: Exception) {
-                                    null
-                                } finally {
-                                    pdfRenderer?.close()
-                                    fileDescriptor?.close()
+                                ext == "pdf" -> {
+                                    var pdfRenderer: android.graphics.pdf.PdfRenderer? = null
+                                    var fileDescriptor: android.os.ParcelFileDescriptor? = null
+                                    try {
+                                        fileDescriptor = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
+                                        pdfRenderer = android.graphics.pdf.PdfRenderer(fileDescriptor)
+                                        if (pdfRenderer.pageCount > 0) {
+                                            val page = pdfRenderer.openPage(0)
+                                            val destBitmap = android.graphics.Bitmap.createBitmap(128, 128, android.graphics.Bitmap.Config.ARGB_8888)
+                                            val canvas = android.graphics.Canvas(destBitmap)
+                                            canvas.drawColor(android.graphics.Color.WHITE)
+                                            page.render(destBitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                            page.close()
+                                            destBitmap
+                                        } else null
+                                    } catch (e: Exception) {
+                                        null
+                                    } finally {
+                                        pdfRenderer?.close()
+                                        fileDescriptor?.close()
+                                    }
                                 }
+                                else -> null
                             }
-                            else -> null
-                        }
-                        if (generatedBitmap != null) {
-                            ThumbnailCache.put(entry.path, generatedBitmap)
-                            bitmap = generatedBitmap
+                            if (generatedBitmap != null) {
+                                ThumbnailCache.put(entry.path, generatedBitmap)
+                                bitmap = generatedBitmap
+                            }
                         }
                     }
                 } catch (e: Exception) {

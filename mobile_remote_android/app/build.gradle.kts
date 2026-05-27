@@ -113,6 +113,7 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.media:media:1.7.0")
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
     // FTP Server for file transfer
     implementation("org.apache.ftpserver:ftpserver-core:1.2.0")

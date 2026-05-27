@@ -8,6 +8,7 @@ import android.util.Log
 import org.apache.ftpserver.FtpServer
 import org.apache.ftpserver.FtpServerFactory
 import org.apache.ftpserver.ftplet.Authority
+import org.apache.ftpserver.ftplet.FileSystemFactory
 import org.apache.ftpserver.ftplet.UserManager
 import org.apache.ftpserver.listener.ListenerFactory
 import org.apache.ftpserver.usermanager.impl.BaseUser
@@ -75,6 +76,10 @@ class FtpServerManager {
             user.authorities = authorities
 
             serverFactory.userManager.save(user)
+
+            serverFactory.fileSystem = FileSystemFactory { u ->
+                AndroidFileSystemView(context, u.homeDirectory ?: "", u)
+            }
 
             server = serverFactory.createServer()
             server?.start()

@@ -19,6 +19,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import androidx.documentfile.provider.DocumentFile
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private companion object {
@@ -395,9 +396,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         filesSearchJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val results = mutableListOf<FileEntry>()
-                val rootDir = File(currentPath)
-                if (rootDir.exists() && rootDir.isDirectory) {
-                    traverseAndSearch(rootDir, query, results)
+                val isRestricted = SafStorageHelper.isPathRestricted(currentPath)
+                if (isRestricted) {
+                    traverseAndSearch(currentPath, query, results)
+                } else {
+                    val rootDir = File(currentPath)
+                    if (rootDir.exists() && rootDir.isDirectory) {
+                        traverseAndSearch(currentPath, query, results)
+                    }
                 }
                 val sortedResults = sortFileEntries(
                     results,
@@ -414,26 +420,58 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun traverseAndSearch(dir: File, query: String, results: MutableList<FileEntry>) {
+    private suspend fun traverseAndSearch(path: String, query: String, results: MutableList<FileEntry>) {
         if (results.size >= 200) return
-        val files = dir.listFiles() ?: return
-        for (file in files) {
-            if (results.size >= 200) return
-            if (!kotlinx.coroutines.currentCoroutineContext().isActive) return
+        if (!kotlinx.coroutines.currentCoroutineContext().isActive) return
 
-            if (file.name.contains(query, ignoreCase = true)) {
-                results.add(
-                    FileEntry(
-                        name = file.name,
-                        path = file.absolutePath,
-                        isDirectory = file.isDirectory,
-                        sizeBytes = if (file.isFile) file.length() else null,
-                        lastModifiedMillis = file.lastModified()
+        val normalized = path.replace('\\', '/')
+        if (SafStorageHelper.isPathRestricted(normalized)) {
+            val hasPermission = SafStorageHelper.getTreeUriForPath(appContext, normalized) != null
+            if (!hasPermission) return
+            val docDir = SafStorageHelper.getDocumentFileForPath(appContext, normalized) ?: return
+            val files = docDir.listFiles()
+            for (file in files) {
+                if (results.size >= 200) return
+                if (!kotlinx.coroutines.currentCoroutineContext().isActive) return
+
+                val name = file.name ?: ""
+                val childPath = File(path, name).absolutePath
+                if (name.contains(query, ignoreCase = true)) {
+                    results.add(
+                        FileEntry(
+                            name = name,
+                            path = childPath,
+                            isDirectory = file.isDirectory,
+                            sizeBytes = if (file.isFile) file.length() else null,
+                            lastModifiedMillis = file.lastModified()
+                        )
                     )
-                )
+                }
+                if (file.isDirectory) {
+                    traverseAndSearch(childPath, query, results)
+                }
             }
-            if (file.isDirectory) {
-                traverseAndSearch(file, query, results)
+        } else {
+            val dir = File(path)
+            val files = dir.listFiles() ?: return
+            for (file in files) {
+                if (results.size >= 200) return
+                if (!kotlinx.coroutines.currentCoroutineContext().isActive) return
+
+                if (file.name.contains(query, ignoreCase = true)) {
+                    results.add(
+                        FileEntry(
+                            name = file.name,
+                            path = file.absolutePath,
+                            isDirectory = file.isDirectory,
+                            sizeBytes = if (file.isFile) file.length() else null,
+                            lastModifiedMillis = file.lastModified()
+                        )
+                    )
+                }
+                if (file.isDirectory) {
+                    traverseAndSearch(file.absolutePath, query, results)
+                }
             }
         }
     }
@@ -681,6 +719,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadFilesForPath(path: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val normalizedPath = path.replace('\\', '/')
+                val isRestricted = SafStorageHelper.isPathRestricted(normalizedPath)
+                val hasPermission = SafStorageHelper.getTreeUriForPath(appContext, normalizedPath) != null
+
+                if (isRestricted) {
+                    if (hasPermission) {
+                        val doc = SafStorageHelper.getDocumentFileForPath(appContext, normalizedPath)
+                        val rawEntries = doc?.listFiles()?.map {
+                            FileEntry(
+                                name = it.name ?: "",
+                                path = File(path, it.name ?: "").absolutePath,
+                                isDirectory = it.isDirectory,
+                                sizeBytes = if (it.isFile) it.length() else null,
+                                lastModifiedMillis = it.lastModified()
+                            )
+                        } ?: emptyList()
+
+                        val sorted = sortFileEntries(
+                            rawEntries,
+                            _state.value.filesSortCategory,
+                            _state.value.filesSortOrder
+                        )
+
+                        _state.value = _state.value.copy(
+                            currentFilesPath = normalizedPath,
+                            fileEntries = sorted,
+                            filesLoading = false,
+                            filesError = null
+                        )
+                    } else {
+                        // Restricted but no permission yet: let UI handle the permission card
+                        _state.value = _state.value.copy(
+                            currentFilesPath = normalizedPath,
+                            fileEntries = emptyList(),
+                            filesLoading = false,
+                            filesError = null
+                        )
+                    }
+                    return@launch
+                }
+
                 val folder = File(path)
                 if (!folder.exists() || !folder.isDirectory) {
                     _state.value = _state.value.copy(
@@ -709,23 +788,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _state.value.filesSortOrder
                 )
 
-                val normalizedPath = folder.absolutePath.replace('\\', '/')
-                val isRestricted = normalizedPath.endsWith("/Android/data") || 
-                                   normalizedPath.contains("/Android/data/") ||
-                                   normalizedPath.endsWith("/Android/obb") || 
-                                   normalizedPath.contains("/Android/obb/")
-
-                val errorMsg = if (rawEntries.isEmpty() && isRestricted) {
-                    "Android system restricts access to Android/data and Android/obb folders."
-                } else {
-                    null
-                }
-
                 _state.value = _state.value.copy(
                     currentFilesPath = folder.absolutePath,
                     fileEntries = sorted,
                     filesLoading = false,
-                    filesError = errorMsg
+                    filesError = null
                 )
             } catch (ex: Exception) {
                 _state.value = _state.value.copy(
