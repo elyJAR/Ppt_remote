@@ -40,6 +40,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   all API routes, rate-limit behaviour, authentication, and `network_detector` logic
   (`desktop_bridge/tests/`).
 
+#### Files / FTP
+- **Files browsing UI (Android)** — a dedicated `Files` section allowing users to browse
+  phone storage, drill into folders, and persist the last-browsed folder across app restarts.
+- **Open-on-PC action** — the Files UI exposes an `Open on PC` action that asks the Desktop Bridge
+  to launch Windows Explorer at the matching FTP URL (`ftp://<phone_ip>:2121/<path>`).
+- **Storage permission flows** — implemented MANAGE_EXTERNAL_STORAGE settings flow for Android 11+,
+  with a SAF `OpenDocumentTree` fallback for scoped-storage devices. The app re-checks permissions on
+  resume and updates the UI accordingly.
+- **Bridge FTP open endpoint** — `POST /api/ftp/open?ftp_path=<path>` accepts a relative FTP path,
+  normalizes and percent-encodes special characters, and launches Explorer; rejects path traversal.
+- **Tests for encoding and failure cases** — added desktop bridge tests covering spaces, unicode,
+  percent encoding, and offline/explorer-failure cases (`desktop_bridge/tests/test_api.py`).
+
 #### Android App
 - **Network warning banners** — an amber `WarningBanner` composable is shown when
   `networkWarning` (phone-side) or `bridgeNetworkWarning` (desktop-side) is non-null,
