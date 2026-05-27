@@ -724,6 +724,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val hasPermission = SafStorageHelper.getTreeUriForPath(appContext, normalizedPath) != null
 
                 if (isRestricted) {
+                    val isRootFolder = normalizedPath.endsWith("/Android/data", ignoreCase = true) || 
+                                       normalizedPath.endsWith("/Android/obb", ignoreCase = true)
                     if (hasPermission) {
                         val doc = SafStorageHelper.getDocumentFileForPath(appContext, normalizedPath)
                         val rawEntries = doc?.listFiles()?.map {
@@ -748,8 +750,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             filesLoading = false,
                             filesError = null
                         )
+                    } else if (isRootFolder) {
+                        val rawEntries = try {
+                            val pm = appContext.packageManager
+                            pm.getInstalledPackages(0).map { pkg ->
+                                FileEntry(
+                                    name = pkg.packageName,
+                                    path = File(path, pkg.packageName).absolutePath,
+                                    isDirectory = true,
+                                    sizeBytes = null,
+                                    lastModifiedMillis = null
+                                )
+                            }
+                        } catch (e: Exception) {
+                            emptyList()
+                        }.toMutableList()
+
+                        val ownPkg = appContext.packageName
+                        if (rawEntries.none { it.name == ownPkg }) {
+                            rawEntries.add(
+                                FileEntry(
+                                    name = ownPkg,
+                                    path = File(path, ownPkg).absolutePath,
+                                    isDirectory = true,
+                                    sizeBytes = null,
+                                    lastModifiedMillis = null
+                                )
+                            )
+                        }
+
+                        val sorted = sortFileEntries(
+                            rawEntries.distinctBy { it.name },
+                            _state.value.filesSortCategory,
+                            _state.value.filesSortOrder
+                        )
+
+                        _state.value = _state.value.copy(
+                            currentFilesPath = normalizedPath,
+                            fileEntries = sorted,
+                            filesLoading = false,
+                            filesError = null
+                        )
                     } else {
-                        // Restricted but no permission yet: let UI handle the permission card
                         _state.value = _state.value.copy(
                             currentFilesPath = normalizedPath,
                             fileEntries = emptyList(),
