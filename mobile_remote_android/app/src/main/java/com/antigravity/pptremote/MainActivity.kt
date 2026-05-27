@@ -170,6 +170,23 @@ class MainActivity : ComponentActivity() {
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> if (granted) RemoteControlService.start(this) }
+    private val openDocumentTreeLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        try {
+            if (uri != null) {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+        } catch (_: Exception) {}
+        try { // Ask ViewModel to refresh volumes and re-check access
+            val vm = viewModel
+            vm.refreshStorageVolumes()
+            vm.checkStorageAccess()
+        } catch (_: Exception) {}
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Install splash screen before calling super.onCreate()
@@ -222,23 +239,42 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     else -> {
-                        RemoteScreen(
-                            state = state,
-                            onBridgeUrlChange = viewModel::setBridgeUrl,
-                            onPresentationSelect = viewModel::selectPresentation,
-                            onStartSlideshow = viewModel::startSelectedSlideshow,
-                            onStopSlideshow = viewModel::stopSelectedSlideshow,
-                            onNext = viewModel::nextSlide,
-                            onPrevious = viewModel::previousSlide,
-                            onRefresh = viewModel::refreshPresentations,
-                            onToggleService = viewModel::toggleService,
-                            onShowSettings = viewModel::showSettings,
-                            onShowNotes = viewModel::showNotes,
-                            onSelectBridge = viewModel::selectBridge,
-                            onSearchQueryChange = viewModel::updateSearchQuery,
-                            onToggleFtp = { viewModel.toggleFtp(it) },
-                            onOpenFtpOnPc = { viewModel.openFtpOnPc(it) },
-                        )
+                        if (state.showFiles) {
+                            FilesScreen(
+                                state = state,
+                                onClose = viewModel::hideFiles,
+                                onSelectFilesRoot = viewModel::selectFilesRoot,
+                                onNavigateFilesTo = viewModel::navigateToFilesFolder,
+                                onNavigateFilesUp = viewModel::navigateUpFilesFolder,
+                                onRefreshFiles = viewModel::refreshFiles,
+                                onOpenCurrentFilesFolderOnPc = viewModel::openCurrentFilesFolderOnPc
+                                , onRequestStorageAccess = { requestStorageAccess() }
+                            )
+                        } else {
+                            RemoteScreen(
+                                state = state,
+                                onBridgeUrlChange = viewModel::setBridgeUrl,
+                                onPresentationSelect = viewModel::selectPresentation,
+                                onStartSlideshow = viewModel::startSelectedSlideshow,
+                                onStopSlideshow = viewModel::stopSelectedSlideshow,
+                                onNext = viewModel::nextSlide,
+                                onPrevious = viewModel::previousSlide,
+                                onRefresh = viewModel::refreshPresentations,
+                                onToggleService = viewModel::toggleService,
+                                onShowSettings = viewModel::showSettings,
+                                onShowNotes = viewModel::showNotes,
+                                onSelectBridge = viewModel::selectBridge,
+                                onSearchQueryChange = viewModel::updateSearchQuery,
+                                onToggleFtp = { viewModel.toggleFtp(it) },
+                                onSelectFilesRoot = viewModel::selectFilesRoot,
+                                onNavigateFilesTo = viewModel::navigateToFilesFolder,
+                                onNavigateFilesUp = viewModel::navigateUpFilesFolder,
+                                onRefreshFiles = viewModel::refreshFiles,
+                                onOpenCurrentFilesFolderOnPc = viewModel::openCurrentFilesFolderOnPc,
+                                onShowFiles = viewModel::showFiles
+                                , onRequestStorageAccess = { requestStorageAccess() }
+                            )
+                        }
                     }
                 }
             }
@@ -332,6 +368,26 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() { super.onDestroy() }
+
+    override fun onResume() {
+        super.onResume()
+        try {
+            // Re-check storage access in case user granted via Settings flow
+            val vm = viewModel
+            vm.checkStorageAccess()
+            vm.refreshStorageVolumes()
+        } catch (_: Exception) {}
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        try {
+            if (requestCode == 1001) {
+                viewModel.checkStorageAccess()
+                viewModel.refreshStorageVolumes()
+            }
+        } catch (_: Exception) {}
+    }
 }
 
 // ---  Root screen ─────────────────────────────────────────────────────────────
@@ -353,7 +409,13 @@ private fun RemoteScreen(
     onSelectBridge: (BridgeInfo) -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onToggleFtp: (String?) -> Unit,
-    onOpenFtpOnPc: (String?) -> Unit,
+    onSelectFilesRoot: (String) -> Unit,
+    onNavigateFilesTo: (String) -> Unit,
+    onNavigateFilesUp: () -> Unit,
+    onRefreshFiles: () -> Unit,
+    onOpenCurrentFilesFolderOnPc: () -> Unit,
+    onShowFiles: () -> Unit,
+    onRequestStorageAccess: () -> Unit,
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -587,6 +649,8 @@ private fun RemoteScreen(
                             
                             val ftpActive = state.isFtpEnabled
                             val autoStartEnabled = state.isFtpAutoStart
+                            val filesRootPath = state.filesRootPath ?: state.activeFtpPath
+                            val currentFilesPath = state.currentFilesPath ?: filesRootPath
                             
                             AppCard(
                                 backgroundColor = MaterialTheme.colorScheme.surface,
@@ -615,48 +679,194 @@ private fun RemoteScreen(
                                                 "Mobile Files", 
                                                 fontWeight = FontWeight.Bold, 
                                                 fontSize = 14.sp,
-                                                color = MaterialTheme.colorScheme.textPrimary
-                                            )
-                                            Text(
-                                                (if (ftpActive) "Active" else "FTP Server") + (if (autoStartEnabled) " (Auto)" else ""), 
-                                                fontSize = 11.sp, 
-                                                color = if (ftpActive) iOSGreen else MaterialTheme.colorScheme.textSecondary,
-                                                fontWeight = if (ftpActive) FontWeight.Medium else FontWeight.Normal
-                                            )
-                                        }
-                                        Switch(
-                                            checked = ftpActive,
-                                            onCheckedChange = { onToggleFtp(null) },
-                                            modifier = Modifier.scale(0.8f),
-                                            colors = SwitchDefaults.colors(
-                                                checkedThumbColor = Color.White,
-                                                checkedTrackColor = iOSGreen,
-                                                uncheckedThumbColor = Color.White,
-                                                uncheckedTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                                            )
-                                        )
-                                    }
-                                    
-                                    if (ftpActive) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            state.availableStorages.forEach { storage ->
-                                                val isActive = state.activeFtpPath == storage.path
-                                                Button(
-                                                    onClick = { onOpenFtpOnPc(storage.path) },
-                                                    enabled = connected,
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .height(42.dp),
-                                                    shape = iOSSquircleSmall,
-                                                    colors = ButtonDefaults.buttonColors(
-                                                        containerColor = if (isActive) iOSGreen else iOSAccent,
-                                                        contentColor = Color.White,
-                                                        disabledContainerColor = (if (isActive) iOSGreen else iOSAccent).copy(alpha = 0.3f)
-                                                    ),
-                                                    contentPadding = PaddingValues(horizontal = 8.dp)
+                                            if (state.filesLoading) {
+                                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                            }
+
+                                            if (ftpActive) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        "Files on Phone",
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.textPrimary
+                                                    )
+                                                    TextButton(onClick = onOpenCurrentFilesFolderOnPc, enabled = connected) {
+                                                        Text("Open current folder on PC")
+                                                    }
+                                                }
+
+                                                Text(
+                                                    currentFilesPath ?: "Select a folder to browse",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.textSecondary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+
+                                                if (state.availableStorages.isNotEmpty()) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        state.availableStorages.forEach { storage ->
+                                                            val isActive = filesRootPath == storage.path
+                                                            Button(
+                                                                onClick = { onSelectFilesRoot(storage.path) },
+                                                                modifier = Modifier
+                                                                    .weight(1f)
+                                                                    .height(42.dp),
+                                                                shape = iOSSquircleSmall,
+                                                                colors = ButtonDefaults.buttonColors(
+                                                                    containerColor = if (isActive) iOSGreen else iOSAccent,
+                                                                    contentColor = Color.White
+                                                                ),
+                                                                contentPadding = PaddingValues(horizontal = 8.dp)
+                                                            ) {
+                                                                Row(
+                                                                    verticalAlignment = Alignment.CenterVertically,
+                                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                                ) {
+                                                                    Icon(
+                                                                        if (storage.isSdCard) Icons.Default.SdCard else Icons.Default.Smartphone,
+                                                                        contentDescription = null,
+                                                                        modifier = Modifier.size(14.dp)
+                                                                    )
+                                                                    Text(
+                                                                        if (storage.isSdCard) "SD Card" else "Internal",
+                                                                        style = MaterialTheme.typography.labelMedium,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        maxLines = 1,
+                                                                        overflow = TextOverflow.Ellipsis
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                if (currentFilesPath != null) {
+                                                    val rootPath = filesRootPath
+                                                    val breadcrumbSegments = if (rootPath != null && currentFilesPath.startsWith(rootPath)) {
+                                                        currentFilesPath.removePrefix(rootPath).trim('/').split('/').filter { it.isNotBlank() }
+                                                    } else {
+                                                        currentFilesPath.trim('/').split('/').filter { it.isNotBlank() }
+                                                    }
+
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        TextButton(onClick = onNavigateFilesUp, enabled = currentFilesPath != rootPath) {
+                                                            Text("Up")
+                                                        }
+
+                                                        // Make breadcrumb segments clickable: build path targets and navigate
+                                                        val basePrefix = if (!rootPath.isNullOrBlank() && currentFilesPath.startsWith(rootPath)) rootPath.trimEnd('/') else ""
+                                                        breadcrumbSegments.take(4).forEachIndexed { idx, segment ->
+                                                            val targetSegments = breadcrumbSegments.take(idx + 1)
+                                                            val targetPath = if (basePrefix.isBlank()) "/" + targetSegments.joinToString("/") else basePrefix + "/" + targetSegments.joinToString("/")
+                                                            val isLast = idx == breadcrumbSegments.lastIndex
+
+                                                            AssistChip(
+                                                                onClick = { if (!isLast) onNavigateFilesTo(targetPath) },
+                                                                label = { Text(segment, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                                                enabled = !isLast
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            "Folders and files",
+                                                            style = MaterialTheme.typography.labelMedium,
+                                                            color = MaterialTheme.colorScheme.textSecondary
+                                                        )
+                                                        IconButton(onClick = onRefreshFiles) {
+                                                            Icon(Icons.Default.Refresh, contentDescription = "Refresh files")
+                                                        }
+                                                    }
+
+                                                    if (state.filesError != null) {
+                                                        Text(
+                                                            state.filesError,
+                                                            color = iOSRed,
+                                                            style = MaterialTheme.typography.labelSmall
+                                                        )
+                                                    }
+
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .heightIn(max = 260.dp)
+                                                            .verticalScroll(rememberScrollState()),
+                                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                                    ) {
+                                                        state.fileEntries.forEach { entry ->
+                                                            Surface(
+                                                                onClick = { if (entry.isDirectory) onNavigateFilesTo(entry.path) },
+                                                                color = MaterialTheme.colorScheme.cardBgSelected.copy(alpha = if (entry.isDirectory) 0.8f else 0.45f),
+                                                                shape = iOSSquircleSmall,
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            ) {
+                                                                Row(
+                                                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                                                    verticalAlignment = Alignment.CenterVertically,
+                                                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                                                ) {
+                                                                    Icon(
+                                                                        if (entry.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
+                                                                        contentDescription = null,
+                                                                        tint = if (entry.isDirectory) iOSGreen else MaterialTheme.colorScheme.textSecondary,
+                                                                        modifier = Modifier.size(18.dp)
+                                                                    )
+                                                                    Column(modifier = Modifier.weight(1f)) {
+                                                                        Text(
+                                                                            entry.name,
+                                                                            fontWeight = FontWeight.SemiBold,
+                                                                            color = MaterialTheme.colorScheme.textPrimary,
+                                                                            maxLines = 1,
+                                                                            overflow = TextOverflow.Ellipsis
+                                                                        )
+                                                                        Text(
+                                                                            entry.path,
+                                                                            style = MaterialTheme.typography.labelSmall,
+                                                                            color = MaterialTheme.colorScheme.textMuted,
+                                                                            maxLines = 1,
+                                                                            overflow = TextOverflow.Ellipsis
+                                                                        )
+                                                                    }
+                                                                    if (entry.isDirectory) {
+                                                                        Icon(
+                                                                            Icons.Default.ChevronRight,
+                                                                            contentDescription = null,
+                                                                            tint = MaterialTheme.colorScheme.textSecondary,
+                                                                            modifier = Modifier.size(18.dp)
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        if (state.fileEntries.isEmpty() && !state.filesLoading) {
+                                                            Text(
+                                                                "No files found in this folder.",
+                                                                color = MaterialTheme.colorScheme.textSecondary,
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                modifier = Modifier.padding(vertical = 8.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
                                                 ) {
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
@@ -727,6 +937,9 @@ private fun RemoteScreen(
                     actions = {
                         IconButton(onClick = onRefresh) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
+                        IconButton(onClick = onShowFiles) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = "Files")
                         }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -881,6 +1094,113 @@ private fun RemoteScreen(
                             color = iOSAccent,
                             trackColor = MaterialTheme.colorScheme.screenBg,
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+    private fun requestStorageAccess() {
+        // Prefer the MANAGE_EXTERNAL_STORAGE settings flow on Android 11+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                intent.data = Uri.parse("package:$packageName")
+                startActivity(intent)
+                return
+            } catch (_: Exception) {
+                // Fall through to SAF picker
+            }
+        }
+
+        // Launch SAF folder picker as a fallback for scoped storage
+        try {
+            openDocumentTreeLauncher.launch(null)
+        } catch (_: Exception) {
+            // ignore
+        }
+    }
+
+@Composable
+private fun FilesScreen(
+    state: RemoteState,
+    onClose: () -> Unit,
+    onSelectFilesRoot: (String) -> Unit,
+    onNavigateFilesTo: (String) -> Unit,
+    onNavigateFilesUp: () -> Unit,
+    onRefreshFiles: () -> Unit,
+    onOpenCurrentFilesFolderOnPc: () -> Unit,
+) {
+    val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("Files", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onClose) { Icon(Icons.Default.ArrowBack, contentDescription = "Close") }
+                },
+                actions = {
+                    IconButton(onClick = onRefreshFiles) { Icon(Icons.Default.Refresh, contentDescription = "Refresh") }
+                    IconButton(onClick = onOpenCurrentFilesFolderOnPc) { Icon(Icons.Default.OpenInBrowser, contentDescription = "Open on PC") }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = colorScheme.screenBg,
+                    titleContentColor = colorScheme.textPrimary
+                )
+            )
+        },
+        containerColor = colorScheme.screenBg
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Mobile Files", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                val filesRootPath = state.filesRootPath ?: state.activeFtpPath
+                val currentFilesPath = state.currentFilesPath ?: filesRootPath
+
+                if (!state.hasStorageAccess) {
+                    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Storage access required to browse files.")
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = { onRequestStorageAccess() }) { Text("Grant access") }
+                                TextButton(onClick = { /* show help or docs later */ }) { Text("How it works") }
+                            }
+                        }
+                    }
+                }
+
+                if (state.availableStorages.isNotEmpty()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        state.availableStorages.forEach { storage ->
+                            val isActive = filesRootPath == storage.path
+                            Button(onClick = { onSelectFilesRoot(storage.path) }, modifier = Modifier.weight(1f)) {
+                                Icon(if (storage.isSdCard) Icons.Default.SdCard else Icons.Default.Smartphone, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (storage.isSdCard) "SD Card" else "Internal")
+                            }
+                        }
+                    }
+                }
+
+                if (currentFilesPath != null) {
+                    Text(currentFilesPath, style = MaterialTheme.typography.labelSmall)
+
+                    Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
+                        state.fileEntries.forEach { entry ->
+                            Surface(onClick = { if (entry.isDirectory) onNavigateFilesTo(entry.path) }, modifier = Modifier.fillMaxWidth()) {
+                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(if (entry.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(entry.name, fontWeight = FontWeight.SemiBold)
+                                        Text(entry.path, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    if (entry.isDirectory) Icon(Icons.Default.ChevronRight, contentDescription = null)
+                                }
+                            }
+                        }
                     }
                 }
             }

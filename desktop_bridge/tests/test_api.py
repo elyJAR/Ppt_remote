@@ -218,10 +218,90 @@ class TestListPresentations:
         assert r.status_code == 400
         assert "PowerPoint is not running." in r.json()["detail"]
 
+
+# ===========================================================================
+# POST /api/ftp/open
+# ===========================================================================
+
+
+class TestOpenFtpOnPc:
+    """FTP open endpoint should accept nested folder paths and reject traversal."""
+
+    def test_opens_root_folder(self, client):
+        with patch("main.open_ftp_explorer", return_value=True) as mock_open:
+            r = client.post("/api/ftp/open")
+
+        assert r.status_code == 200
+        assert r.json() == {"ok": True}
+        mock_open.assert_called_once()
+        assert mock_open.call_args.args[1] is None
+
+    def test_opens_nested_folder(self, client):
+        with patch("main.open_ftp_explorer", return_value=True) as mock_open:
+            r = client.post(
+                "/api/ftp/open",
+                params={"ftp_path": "Downloads/Project A"},
+            )
+
+        assert r.status_code == 200
+        assert r.json() == {"ok": True}
+        mock_open.assert_called_once()
+        assert mock_open.call_args.args[1] == "Downloads/Project A"
+
+    def test_rejects_path_traversal(self, client):
+        r = client.post("/api/ftp/open", params={"ftp_path": "../Windows"})
+        assert r.status_code == 400
+        assert "Invalid ftp_path" in r.json()["detail"]
+
+    def test_handles_spaces_and_special_chars(self, client):
+        ftp_path = "My Folder/Project & Stuff"
+        import urllib.parse
+
+        expected = urllib.parse.quote("My Folder/Project & Stuff", safe="/")
+        with patch("subprocess.Popen") as mock_popen:
+            r = client.post("/api/ftp/open", params={"ftp_path": ftp_path})
+
+        assert r.status_code == 200
+        mock_popen.assert_called_once()
+        called_cmd = mock_popen.call_args[0][0]
+        assert f"/{expected}" in called_cmd
+
+    def test_encodes_unicode_and_percent(self, client):
+        ftp_path = "Photos/éå/100% Complete/测试"
+        import urllib.parse
+
+        expected = urllib.parse.quote(ftp_path, safe="/")
+        with patch("subprocess.Popen") as mock_popen:
+            r = client.post("/api/ftp/open", params={"ftp_path": ftp_path})
+
+        assert r.status_code == 200
+        mock_popen.assert_called_once()
+        called_cmd = mock_popen.call_args[0][0]
+        assert f"/{expected}" in called_cmd
+
     def test_controller_called_once(self, client, mock_controller):
         mock_controller.list_presentations.return_value = []
         client.get("/api/presentations")
         mock_controller.list_presentations.assert_called_once()
+
+    def test_open_ftp_explorer_returns_false_when_no_client(self):
+        import main
+        # Ensure no client IP is known
+        main.STATE["last_client_ip"] = None
+        # Calling the helper directly should return False when no client present
+        assert main.open_ftp_explorer(None, None) is False
+
+    def test_endpoint_returns_400_when_explorer_launch_fails(self, client):
+        import main
+        # Ensure a client IP exists so the function attempts to launch
+        main.STATE["last_client_ip"] = "192.0.2.5"
+        from unittest.mock import patch
+
+        with patch("subprocess.Popen", side_effect=Exception("boom")):
+            r = client.post("/api/ftp/open")
+
+        assert r.status_code == 400
+        assert "failed to launch" in r.json()["detail"] or "Client not detected" in r.json()["detail"]
 
 
 # ===========================================================================

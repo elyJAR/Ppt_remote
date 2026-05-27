@@ -1,3 +1,29 @@
+# FTP / Files Feature
+
+This document describes the new Files browsing feature and how the Desktop Bridge opens a phone folder in Windows Explorer.
+
+Overview
+- The Android app exposes a `Files` section allowing browsing phone storage (uses SAF or MANAGE_EXTERNAL_STORAGE when available).
+- Each folder view includes an `Open on PC` action which requests the Desktop Bridge to open Windows Explorer at the matching `ftp://` URL.
+
+Desktop Bridge endpoint
+- Endpoint: `POST /api/ftp/open`
+- Query parameter: `ftp_path` — a path relative to the FTP root (e.g. `DCIM/Camera/2026-05`).
+- Behavior: the bridge will resolve the last-seen client IP and attempt to launch Explorer with a URL like `ftp://<client_ip>:2121/<encoded-path>`.
+- Security: the bridge normalizes and validates `ftp_path` (rejects `..` traversal) and percent-encodes special characters before launching Explorer.
+- Failure cases: if no client IP is known the endpoint returns 400; if Explorer launch fails the endpoint returns 400 with an error detail.
+
+Examples
+- Curl (from bridge host):
+
+```bash
+curl -X POST "http://localhost:8000/api/ftp/open?ftp_path=My%20Folder/Project%20%26%20Stuff"
+```
+
+Notes for developers
+- The Android code calls `BridgeClient.openFtpOnPc(baseUrl, ftpPath=...)` which POSTs to the bridge. The path is sent unencoded; the bridge will encode it safely.
+- Tests for encoding, unicode, and offline/failure cases are in `desktop_bridge/tests/test_api.py`.
+
 # Feature Proposal: Android FTP Server & Desktop Explorer Integration
 
 ## Overview

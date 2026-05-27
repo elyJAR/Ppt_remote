@@ -95,6 +95,19 @@ You can access your phone's files directly from Windows Explorer:
    - OR Right-click the **Bridge Icon** in your PC tray and select **📁 Open Android Files**.
 3. Windows Explorer will open the phone's storage (port 2121) as a network folder.
 
+### Developer / advanced notes
+
+- The app exposes an FTP server on port `2121` when enabled. The Desktop Bridge records the mobile client's IP when it connects.
+- The Android UI sends a request to the bridge to open a specific folder on the PC using the bridge endpoint:
+
+```
+POST /api/ftp/open?ftp_path=<path>
+```
+
+- The bridge will normalize and percent-encode the `ftp_path` to safely include spaces, unicode, and percent signs. Path traversal (`..`) is rejected.
+- If no client is known the endpoint returns `400` with a helpful message. If launching Explorer fails the endpoint returns `400` with an error detail.
+- Tests and examples are in `desktop_bridge/tests/test_api.py` and `FTP_FEATURE.md`.
+
 ## Build On GitHub (APK)
 
 This repository automatically builds the Android APK in the cloud.
