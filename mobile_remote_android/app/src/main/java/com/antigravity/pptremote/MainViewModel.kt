@@ -709,11 +709,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _state.value.filesSortOrder
                 )
 
+                val normalizedPath = folder.absolutePath.replace('\\', '/')
+                val isRestricted = normalizedPath.endsWith("/Android/data") || 
+                                   normalizedPath.contains("/Android/data/") ||
+                                   normalizedPath.endsWith("/Android/obb") || 
+                                   normalizedPath.contains("/Android/obb/")
+
+                val errorMsg = if (rawEntries.isEmpty() && isRestricted) {
+                    "Android system restricts access to Android/data and Android/obb folders."
+                } else {
+                    null
+                }
+
                 _state.value = _state.value.copy(
                     currentFilesPath = folder.absolutePath,
                     fileEntries = sorted,
                     filesLoading = false,
-                    filesError = null
+                    filesError = errorMsg
                 )
             } catch (ex: Exception) {
                 _state.value = _state.value.copy(
