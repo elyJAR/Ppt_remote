@@ -1094,6 +1094,7 @@ private fun RemoteScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FilesScreen(
     state: RemoteState,
