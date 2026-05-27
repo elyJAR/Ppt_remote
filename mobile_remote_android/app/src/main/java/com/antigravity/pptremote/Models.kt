@@ -49,6 +49,15 @@ data class Presentation(
     }
 }
 
+/** Represents a browsable phone file or folder inside the Files section. */
+data class FileEntry(
+    val name: String,
+    val path: String,
+    val isDirectory: Boolean,
+    val sizeBytes: Long? = null,
+    val lastModifiedMillis: Long? = null,
+)
+
 /**
  * Immutable UI state for the entire app, held in [MainViewModel] as a [kotlinx.coroutines.flow.StateFlow].
  *
@@ -93,7 +102,18 @@ data class RemoteState(
     val isFtpEnabled: Boolean = false,
     val isFtpAutoStart: Boolean = false,
     val availableStorages: List<StorageVolume> = emptyList(),
-    val activeFtpPath: String? = null
+    val activeFtpPath: String? = null,
+    // Files browser state
+    val filesRootPath: String? = null,
+    val currentFilesPath: String? = null,
+    val fileEntries: List<FileEntry> = emptyList(),
+    val filesLoading: Boolean = false,
+    val filesError: String? = null
+    ,
+    // Show dedicated Files screen
+    val showFiles: Boolean = false,
+    // Whether the app currently has storage access required to browse files
+    val hasStorageAccess: Boolean = true
 )
 
 /** Represents a detected storage volume (Internal or SD Card). */

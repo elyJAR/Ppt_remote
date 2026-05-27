@@ -37,6 +37,7 @@ Ensure the bridge is running. You should see the PowerPoint icon in your system 
 
 ### 4. Firewall Note
 If the phone cannot connect, you may need to allow the bridge through Windows Firewall:
+
 1. Go to **Windows Security** > **Firewall & network protection**.
 2. Click **Allow an app through firewall**.
 3. Ensure `PptRemoteBridge` has both **Private** and **Public** checked.

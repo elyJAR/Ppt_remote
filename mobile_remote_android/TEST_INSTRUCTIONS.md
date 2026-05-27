@@ -28,12 +28,14 @@ adb logcat > crash_log.txt
 
 ### Wake Lock
 The app now uses a PARTIAL_WAKE_LOCK to keep running even when the screen is off:
+
 - Volume buttons work with screen off
 - Network polling continues
 - Minimal battery impact (only CPU stays awake, screen stays off)
 
 ### Battery Optimization Exemption
 On first launch, the app will request to be exempted from battery optimization:
+
 - Prevents Android from killing the app in the background
 - Ensures the app stays responsive even after hours
 - User can grant or deny this permission
@@ -152,6 +154,7 @@ The APK will be at: `app/build/outputs/apk/debug/app-debug.apk`
    ```bash
    adb shell dumpsys activity services | grep RemoteControlService
    ```
+
 3. Some manufacturers (Samsung, Xiaomi, Huawei) have aggressive battery management:
    - Samsung: Settings → Apps → PowerPoint Remote → Battery → Allow background activity
    - Xiaomi: Settings → Apps → Manage apps → PowerPoint Remote → Autostart → Enable
@@ -160,6 +163,7 @@ The APK will be at: `app/build/outputs/apk/debug/app-debug.apk`
 ## Report Crash Information
 
 Please provide:
+
 1. Android version (e.g., Android 13, Android 14)
 2. Phone manufacturer and model
 3. Exact error message from logcat

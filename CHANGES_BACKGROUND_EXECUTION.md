@@ -119,11 +119,13 @@ Both the Android app and desktop bridge now support running in the background, a
 ### For Existing Users
 
 **Android App:**
+
 - Simply update the app
 - Service starts automatically on first launch
 - No configuration needed
 
 **Desktop Bridge:**
+
 - Old scripts (`start_bridge.ps1`) still work for visible console mode
 - New scripts (`start_background.ps1`) for background mode
 - Choose your preferred mode
@@ -149,6 +151,7 @@ Both the Android app and desktop bridge now support running in the background, a
 ## Support
 
 For issues or questions:
+
 1. Check [BACKGROUND_EXECUTION.md](BACKGROUND_EXECUTION.md) for detailed setup
 2. Review troubleshooting section
 3. Check Task Manager (desktop) or notification (Android) to verify service is running

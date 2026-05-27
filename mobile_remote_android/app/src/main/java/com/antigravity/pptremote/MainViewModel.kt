@@ -6,12 +6,18 @@ import android.net.ConnectivityManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Environment
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -57,6 +63,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         startPolling()
         startDiscovery()
         startRegistrationLoop()
+        // Restore last browsed folder if available
+        try {
+            val last = RemotePrefs.getLastBrowsedFolder(appContext)
+            if (!last.isNullOrBlank()) {
+                selectFilesRoot(last)
+            }
+        } catch (_: Exception) {}
+        // Check storage access state
+        checkStorageAccess()
     }
 
     fun updateSearchQuery(query: String) {
@@ -252,6 +267,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 availableStorages = volumes,
                 activeFtpPath = RemoteControlService.getActiveFtpPath()
             )
+
+            val current = _state.value
+            val initialFilesRoot = current.filesRootPath
+                ?: current.activeFtpPath
+                ?: volumes.firstOrNull()?.path
+            if (current.filesRootPath == null && initialFilesRoot != null) {
+                selectFilesRoot(initialFilesRoot)
+            }
+            // Re-check storage permission after discovering volumes
+            checkStorageAccess()
+        }
+    }
+
+    fun checkStorageAccess() {
+        try {
+            val has = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Environment.isExternalStorageManager()
+            } else {
+                ContextCompat.checkSelfPermission(appContext, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+            }
+            _state.value = _state.value.copy(
+                hasStorageAccess = has,
+                filesError = if (!has) "Storage access required. Tap Files to grant access." else _state.value.filesError
+            )
+        } catch (e: Exception) {
+            // Fail safe: assume access granted
+            _state.value = _state.value.copy(hasStorageAccess = true)
         }
     }
 
@@ -281,6 +323,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun selectFilesRoot(path: String) {
+        val normalized = File(path).absolutePath
+        if (normalized.isBlank()) return
+        _state.value = _state.value.copy(
+            filesRootPath = normalized,
+            currentFilesPath = normalized,
+            filesLoading = true,
+            filesError = null,
+            fileEntries = emptyList()
+        )
+        try { RemotePrefs.setLastBrowsedFolder(appContext, normalized) } catch (_: Exception) {}
+        loadFilesForPath(normalized)
+    }
+
+    fun navigateToFilesFolder(path: String) {
+        val normalized = File(path).absolutePath
+        if (normalized.isBlank()) return
+        _state.value = _state.value.copy(currentFilesPath = normalized, filesLoading = true, filesError = null)
+        try { RemotePrefs.setLastBrowsedFolder(appContext, normalized) } catch (_: Exception) {}
+        loadFilesForPath(normalized)
+    }
+
+    fun navigateUpFilesFolder() {
+        val currentPath = _state.value.currentFilesPath ?: return
+        val rootPath = _state.value.filesRootPath ?: return
+        val parent = File(currentPath).parentFile?.absolutePath ?: return
+        if (parent == currentPath) return
+        if (!isPathWithinRoot(parent, rootPath)) return
+        navigateToFilesFolder(parent)
+    }
+
+    fun refreshFiles() {
+        val currentPath = _state.value.currentFilesPath ?: _state.value.filesRootPath ?: return
+        loadFilesForPath(currentPath)
+    }
+
+    fun openCurrentFilesFolderOnPc() {
+        val current = _state.value
+        val rootPath = current.filesRootPath ?: current.activeFtpPath ?: current.availableStorages.firstOrNull()?.path
+        val currentPath = current.currentFilesPath ?: rootPath ?: return
+        val ftpRelativePath = relativeFtpPath(rootPath ?: currentPath, currentPath)
+
+        if (rootPath != null && (!current.isFtpEnabled || current.activeFtpPath != rootPath)) {
+            RemoteControlService.toggleFtp(appContext, rootPath)
+            viewModelScope.launch {
+                delay(1000)
+                updateServiceStatus()
+                if (state.value.isFtpEnabled) {
+                    runBridgeAction("Opened current folder on PC") { url -> client.openFtpOnPc(url, ftpPath = ftpRelativePath) }
+                }
+            }
+        } else {
+            runBridgeAction("Opened current folder on PC") { url -> client.openFtpOnPc(url, ftpPath = ftpRelativePath) }
+        }
+    }
+
     private fun updateServiceStatus() {
         val isRunning = RemoteControlService.isRunning(appContext)
         val isFtpRunning = RemoteControlService.isFtpRunning()
@@ -304,6 +402,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun hideSettings() {
         _state.value = _state.value.copy(showSettings = false)
+    }
+
+    fun showFiles() {
+        _state.value = _state.value.copy(showFiles = true)
+    }
+
+    fun hideFiles() {
+        _state.value = _state.value.copy(showFiles = false)
     }
 
     fun updateBridgePort(port: Int) {
@@ -423,6 +529,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val cleanUrl = baseUrl.removePrefix("http://").removePrefix("https://")
         return "http://$cleanUrl:$port"
     }
+
+    private fun loadFilesForPath(path: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val folder = File(path)
+                if (!folder.exists() || !folder.isDirectory) {
+                    _state.value = _state.value.copy(
+                        filesLoading = false,
+                        filesError = "Folder does not exist.",
+                        fileEntries = emptyList()
+                    )
+                    return@launch
+                }
+
+                val entries = folder.listFiles()
+                    ?.map {
+                        FileEntry(
+                            name = it.name.ifBlank { it.absolutePath },
+                            path = it.absolutePath,
+                            isDirectory = it.isDirectory,
+                            sizeBytes = if (it.isFile) it.length() else null,
+                            lastModifiedMillis = it.lastModified()
+                        )
+                    }
+                    ?.sortedWith(
+                        compareByDescending<FileEntry> { it.isDirectory }
+                            .thenBy { it.name.lowercase() }
+                    )
+                    ?: emptyList()
+
+                _state.value = _state.value.copy(
+                    currentFilesPath = folder.absolutePath,
+                    fileEntries = entries,
+                    filesLoading = false,
+                    filesError = null
+                )
+            } catch (ex: Exception) {
+                _state.value = _state.value.copy(
+                    filesLoading = false,
+                    filesError = ex.message ?: "Failed to load folder.",
+                    fileEntries = emptyList()
+                )
+            }
+        }
+    }
+
+    private fun relativeFtpPath(rootPath: String, currentPath: String): String = FilePathUtils.relativeFtpPath(rootPath, currentPath)
+
+    private fun isPathWithinRoot(candidatePath: String, rootPath: String): Boolean = FilePathUtils.isPathWithinRoot(candidatePath, rootPath)
 
     private fun ensureSelectedPresentation(): String? {
         val current = _state.value

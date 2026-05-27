@@ -1,0 +1,1316 @@
+{
+  "modified_files": [
+    "CONTRIBUTING.md",
+    "desktop_bridge\\START_HIDDEN_README.md",
+    "Screen_mirror_feature\\docs\\lan-mirror\\design.md",
+    "Screen_mirror_feature\\docs\\lan-mirror\\tasks.md"
+  ],
+  "remaining_count": 247,
+  "remaining": {
+    "ANDROID_10_SUPPORT.md": {
+      "count": 11,
+      "issues": [
+        {
+          "line": 81,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 59,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 59,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 81,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 9,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 14,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 28,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 32,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 41,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 45,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 52,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "ARCHITECTURE.md": {
+      "count": 18,
+      "issues": [
+        {
+          "line": 75,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 112,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 156,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 185,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 322,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 417,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 30,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 75,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 100,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 112,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 154,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 156,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 172,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 185,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 248,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 322,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 371,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 417,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "BACKGROUND_EXECUTION.md": {
+      "count": 24,
+      "issues": [
+        {
+          "line": 54,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 64,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 109,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 132,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 138,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 146,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 157,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 267,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 48,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 54,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 58,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 64,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 107,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 109,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 130,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 132,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 136,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 138,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 144,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 146,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 155,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 157,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 258,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 267,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "CHANGELOG.md": {
+      "count": 2,
+      "issues": [
+        {
+          "line": 167,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 209,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "CHANGES_BACKGROUND_EXECUTION.md": {
+      "count": 16,
+      "issues": [
+        {
+          "line": 9,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 15,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 25,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 35,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 42,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 47,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 57,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 68,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 73,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 79,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 87,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 93,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 101,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 109,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 135,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 143,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "CONTRIBUTING.md": {
+      "count": 57,
+      "issues": [
+        {
+          "line": 80,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 104,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 111,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 122,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 141,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 198,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 204,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 211,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 220,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 230,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 288,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 310,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 317,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 346,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 429,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 452,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 458,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 494,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 508,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 26,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 80,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 101,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 104,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 108,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 111,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 120,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 122,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 139,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 141,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 190,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 198,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 202,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 204,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 208,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 211,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 215,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 220,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 227,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 230,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 272,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 288,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 295,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 310,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 314,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 317,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 341,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 346,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 425,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 429,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 448,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 452,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 456,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 458,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 487,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 494,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 506,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 508,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "FTP_FEATURE.md": {
+      "count": 9,
+      "issues": [
+        {
+          "line": 24,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 22,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 24,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 39,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 45,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 49,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 56,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 64,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 69,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "MULTI_DEVICE_PLAN.md": {
+      "count": 8,
+      "issues": [
+        {
+          "line": 6,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 31,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 54,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 60,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 69,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 75,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 80,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 86,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "README.md": {
+      "count": 8,
+      "issues": [
+        {
+          "line": 40,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 105,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 34,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 40,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 103,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 105,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 79,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 84,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "UI_UX_Best_Practices.md": {
+      "count": 14,
+      "issues": [
+        {
+          "line": 9,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 14,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 19,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 24,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 29,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 36,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 43,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 49,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 55,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 61,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 66,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 71,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 77,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 84,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "desktop_bridge\\README_INSTALL.md": {
+      "count": 5,
+      "issues": [
+        {
+          "line": 30,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 34,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 50,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 54,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 58,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "desktop_bridge\\START_HIDDEN_README.md": {
+      "count": 3,
+      "issues": [
+        {
+          "line": 16,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 14,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 16,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "mobile_remote_android\\TEST_INSTRUCTIONS.md": {
+      "count": 15,
+      "issues": [
+        {
+          "line": 13,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 88,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 6,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 6,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 13,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 85,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 88,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 16,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 23,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 44,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 121,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 128,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 136,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 143,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 152,
+          "code": "MD032",
+          "msg": "List should be surrounded by blank lines (previous)"
+        }
+      ]
+    },
+    "Screen_mirror_feature\\docs\\lan-mirror\\design.md": {
+      "count": 57,
+      "issues": [
+        {
+          "line": 31,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 64,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 85,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 109,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 136,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 153,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 161,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 169,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 178,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 186,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 192,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 205,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 235,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 286,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 305,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 337,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 392,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 408,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 519,
+          "code": "MD040",
+          "msg": "Fenced code block missing language"
+        },
+        {
+          "line": 13,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 31,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 47,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 64,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 77,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 85,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 101,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 109,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 121,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 136,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 140,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 153,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 159,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 161,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 167,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 169,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 175,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 178,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 184,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 186,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 190,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 192,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 200,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 205,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 216,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 235,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 261,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 286,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 288,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 305,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 315,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 337,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 345,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 392,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 396,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 408,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        },
+        {
+          "line": 508,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (next)"
+        },
+        {
+          "line": 519,
+          "code": "MD031",
+          "msg": "Fenced code block should be surrounded by blank lines (previous)"
+        }
+      ]
+    }
+  }
+}

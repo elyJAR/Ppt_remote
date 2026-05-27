@@ -134,26 +134,6 @@ class ClientRegistry:
 
 client_registry = ClientRegistry()
 
-def open_ftp_explorer(client_ip: str | None = None) -> bool:
-    """Launch Windows Explorer pointed at a specific mobile device's FTP server."""
-    target_ip = client_ip or STATE.get("last_client_ip")
-    if not target_ip:
-        _logger.warning("open_ftp_explorer: No mobile client IP specified or known.")
-        return False
-
-    import subprocess
-    # Force the trailing slash and ensure port 2121
-    ftp_url = f"ftp://{target_ip}:2121/"
-    _logger.info("Opening Android files in Explorer: %s", ftp_url)
-    try:
-        # Use shell=True and quotes for maximum compatibility with protocol handlers
-        # This helps in cases where explorer.exe needs to be invoked via shell to handle the ftp: scheme
-        subprocess.Popen(f'explorer.exe "{ftp_url}"', shell=True)
-        return True
-    except Exception as exc:
-        _logger.error("Failed to open FTP explorer: %s", exc)
-        return False
-
 # ---------------------------------------------------------------------------
 # Configuration (overridable via environment variables)
 # ---------------------------------------------------------------------------
@@ -456,9 +436,8 @@ def list_presentations() -> list[PresentationDto]:
         items = controller.list_presentations()
         return [PresentationDto(**item.__dict__) for item in items]
     except PowerPointControllerError as exc:
-        message = str(exc)
-        if "PowerPoint is not running" in message or "Open at least one presentation first" in message:
-            return []
+        # Surface controller errors to the client as HTTP 400 so callers
+        # can distinguish COM/controller failures from empty result sets.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -600,15 +579,49 @@ def get_current_slide_thumbnail(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+def _normalize_ftp_path(ftp_path: str | None) -> str:
+    if not ftp_path:
+        return ""
+
+    cleaned = ftp_path.strip().replace("\\", "/")
+    cleaned = cleaned.lstrip("/")
+    segments = [segment for segment in cleaned.split("/") if segment and segment != "."]
+    if any(segment == ".." for segment in segments):
+        raise HTTPException(status_code=400, detail="Invalid ftp_path.")
+    return urllib.parse.quote("/".join(segments), safe="/")
+
+
+def open_ftp_explorer(client_ip: str | None = None, ftp_path: str | None = None) -> bool:
+    """Launch Windows Explorer pointed at a specific mobile device's FTP server."""
+    target_ip = client_ip or STATE.get("last_client_ip")
+    if not target_ip:
+        _logger.warning("open_ftp_explorer: No mobile client IP specified or known.")
+        return False
+
+    import subprocess
+
+    normalized_path = _normalize_ftp_path(ftp_path)
+    ftp_url = f"ftp://{target_ip}:2121/"
+    if normalized_path:
+        ftp_url = f"{ftp_url}{normalized_path}"
+    _logger.info("Opening Android files in Explorer: %s", ftp_url)
+    try:
+        subprocess.Popen(f'explorer.exe "{ftp_url}"', shell=True)
+        return True
+    except Exception as exc:
+        _logger.error("Failed to open FTP explorer: %s", exc)
+        return False
+
+
 @app.post(
     "/api/ftp/open",
     summary="Open Android FTP server in Windows File Explorer",
     dependencies=[Depends(verify_api_key)],
 )
-def open_ftp_on_pc(request: Request, client_ip: str | None = None):
+def open_ftp_on_pc(request: Request, client_ip: str | None = None, ftp_path: str | None = None):
     # Prefer provided IP, then the IP of the device making the request
     target = client_ip or (request.client.host if request.client else None)
-    if not open_ftp_explorer(target):
+    if not open_ftp_explorer(target, ftp_path):
         raise HTTPException(
             status_code=400,
             detail="Client not detected or failed to launch Explorer.",

@@ -23,7 +23,7 @@ submit your changes.
 
 ## 1. Project Structure Overview
 
-```
+```text
 Ppt_remote/
 ├── desktop_bridge/                  # Windows Python service (FastAPI + COM automation)
 │   ├── main.py                      # FastAPI app, all HTTP routes, DiscoveryResponder
@@ -90,7 +90,7 @@ and UDP. Changes to the API contract affect **both sides** — see
 ### Prerequisites
 
 | Requirement | Version | Notes |
-|---|---|---|
+| --- | --- | --- |
 | Windows | 10 / 11 | COM automation requires Windows |
 | Microsoft PowerPoint | Any recent version | Must be installed, not just Office Online |
 | Python | 3.10 or newer | `python --version` to check |
@@ -124,7 +124,7 @@ pip install -r requirements.txt
 Key packages installed:
 
 | Package | Purpose |
-|---|---|
+| --- | --- |
 | `fastapi` | HTTP API framework |
 | `uvicorn[standard]` | ASGI server |
 | `pywin32` | PowerPoint COM automation |
@@ -147,7 +147,7 @@ python -c "import fastapi, uvicorn, win32com.client; print('OK')"
 ### Prerequisites
 
 | Requirement | Version | Notes |
-|---|---|---|
+| --- | --- | --- |
 | Android Studio | Giraffe (2022.3.1) or newer | Hedgehog / Iguana also work |
 | Android SDK | API 26 (Android 8.0) minimum, API 34 target | Install via SDK Manager |
 | JDK | 17 | Bundled with recent Android Studio |
@@ -199,7 +199,7 @@ uvicorn main:app --host 0.0.0.0 --port 8787 --reload
 
 The bridge will print its startup URL:
 
-```
+```bash
 INFO:     Uvicorn running on http://0.0.0.0:8787 (Press CTRL+C to quit)
 ```
 
@@ -255,6 +255,7 @@ See [`BACKGROUND_EXECUTION.md`](BACKGROUND_EXECUTION.md) for full details.
 
 - **Auto-discovery**: The app broadcasts a UDP probe on port `8788`. If the desktop bridge
   is running on the same LAN, it responds with its URL automatically.
+
 - **Manual**: Tap the **Desktop Bridge URL** field and enter `http://<PC-IP>:8787`.
   Find your PC IP with `ipconfig` → look for the IPv4 address on your Wi-Fi adapter.
 
@@ -310,7 +311,7 @@ cd ..\mobile_remote_android
 
 Test reports are written to:
 
-```
+```text
 app/build/reports/tests/testDebugUnitTest/index.html
 app/build/reports/lint-results-debug.html
 ```
@@ -330,6 +331,7 @@ tests automatically on every push. A PR will not be merged if CI is red.
 - Maximum line length: **88 characters** (compatible with `black`).
 - Use **type annotations** on all function signatures (`from __future__ import annotations`
   is already at the top of `main.py` — keep it there).
+
 - Use `f-strings` for string formatting; avoid `%`-style or `.format()`.
 - All public functions must have a **docstring**.
 - Sort imports with `isort` (stdlib → third-party → local), separated by blank lines.
@@ -348,11 +350,13 @@ flake8 . --max-line-length 88
 - Follow the official **[Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html)**.
 - Use **Jetpack Compose** idioms: stateless composables, state hoisting, `remember` /
   `collectAsState`.
+
 - Prefer `val` over `var`; keep mutation inside the `ViewModel`.
 - Use `StateFlow` / `MutableStateFlow` for UI state; avoid `LiveData` for new code.
 - Write **KDoc** comments on all public classes and functions.
 - Keep composable functions small and focused; extract sub-composables when a function
   exceeds ~40 lines.
+
 - Use `Result` / sealed classes for error handling — do not swallow exceptions silently.
 
 Android Studio's built-in formatter (Ctrl+Alt+L) applies most of these automatically.
@@ -407,7 +411,7 @@ Android Studio's built-in formatter (Ctrl+Alt+L) applies most of these automatic
 ### Branch naming conventions
 
 | Prefix | Use for |
-|---|---|
+| --- | --- |
 | `feature/` | New functionality |
 | `fix/` | Bug fixes |
 | `docs/` | Documentation-only changes |
@@ -418,7 +422,7 @@ Android Studio's built-in formatter (Ctrl+Alt+L) applies most of these automatic
 
 Use the **imperative mood** in the subject line (50 chars or fewer):
 
-```
+```text
 Add rate limiting to action endpoints
 Fix isBusy not reset after successful command
 Update CONTRIBUTING with Android setup steps
@@ -434,7 +438,7 @@ These variables are read at **startup** by the desktop bridge (`main.py`). Set t
 shell or in the process environment before launching the bridge.
 
 | Variable | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `PPT_BRIDGE_PORT` | `8787` | TCP port the FastAPI HTTP server listens on. Change this if `8787` is already in use on your machine. The Android app must be pointed at the same port. |
 | `PPT_DISCOVERY_PORT` | `8788` | UDP port the `DiscoveryResponder` listens on. The Android app broadcasts to this port to auto-detect the bridge. Both sides must agree on this value. |
 | `PPT_API_KEY` | *(unset)* | When set, all API endpoints (except `GET /api/health`) require the caller to send an `X-Api-Key: <value>` HTTP header. Leave unset for open/local-only mode. |
@@ -467,7 +471,7 @@ PPT Remote is a **two-part system**: the desktop bridge (Python/Windows) and the
 ### Specific rules
 
 | Change | Desktop file(s) to update | Android file(s) to update |
-|---|---|---|
+| --- | --- | --- |
 | Add a new endpoint | `main.py` (route + DTO) | `BridgeClient.kt` (new call) + `MainViewModel.kt` (trigger logic) |
 | Rename or re-path an endpoint | `main.py` | `BridgeClient.kt` |
 | Change a request or response body | `main.py` (Pydantic model) | `Models.kt` (data class) + `BridgeClient.kt` |

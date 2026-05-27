@@ -5,25 +5,12 @@ PPT Remote project: the **Desktop Bridge** (Windows) and the **Android App**.
 
 ---
 
-## Table of Contents
-
-1. [Component Overview](#1-component-overview)
-2. [Communication Flow Diagram](#2-communication-flow-diagram)
-3. [Port Reference](#3-port-reference)
-4. [Desktop Bridge Internals](#4-desktop-bridge-internals)
-5. [Android App Internals](#5-android-app-internals)
-6. [Data Flow: End-to-End Walkthrough](#6-data-flow-end-to-end-walkthrough)
-7. [Background Execution](#7-background-execution)
-8. [Environment Variables](#8-environment-variables)
-
----
-
 ## 1. Component Overview
 
 PPT Remote is split into two independent but tightly coupled subsystems:
 
 | Subsystem | Language / Stack | Runs On |
-|---|---|---|
+| --- | --- | --- |
 | `desktop_bridge/` | Python 3.10+, FastAPI, uvicorn, pywin32, pystray | Windows PC with PowerPoint |
 | `mobile_remote_android/` | Kotlin, Jetpack Compose, OkHttp3 | Android phone (API 26+) |
 
@@ -42,49 +29,49 @@ phone screen is off or the app is not in the foreground.
 
 ```mermaid
 flowchart TD
-    subgraph Phone["Android Phone"]
-        direction TB
-        MA["MainActivity\n(Jetpack Compose UI)"]
-        VM["MainViewModel\n(state + coroutines)"]
-        BC["BridgeClient\n(OkHttp3 HTTP + UDP)"]
-        RCS["RemoteControlService\n(Foreground Service)"]
-        BR["BootReceiver\n(BroadcastReceiver)"]
-        ND_A["NetworkDetector\n(WiFi / hotspot / cellular)"]
-        RP["RemotePrefs\n(SharedPreferences)"]
+  subgraph Phone["Android Phone"]
+    direction TB
+    MA["MainActivity\n(Jetpack Compose UI)"]
+    VM["MainViewModel\n(state + coroutines)"]
+    BC["BridgeClient\n(OkHttp3 HTTP + UDP)"]
+    RCS["RemoteControlService\n(Foreground Service)"]
+    BR["BootReceiver\n(BroadcastReceiver)"]
+    ND_A["NetworkDetector\n(WiFi / hotspot / cellular)"]
+    RP["RemotePrefs\n(SharedPreferences)"]
 
-        MA <-->|"observe UiState"| VM
-        VM --> BC
-        VM --> ND_A
-        MA --> RCS
-        BR -->|"auto-start on reboot"| RCS
-        RCS --> BC
-        BC --> RP
-    end
+    MA <-->| "observe UiState" | VM
+    VM --> BC
+    VM --> ND_A
+    MA --> RCS
+    BR -->| "auto-start on reboot" | RCS
+    RCS --> BC
+    BC --> RP
+  end
 
-    subgraph PC["Windows PC"]
-        direction TB
-        TI["Tray Icon\n(pystray — main thread)"]
-        UV["uvicorn\n(HTTP server thread)"]
-        API["FastAPI App\n(routes, auth, rate limit)"]
-        DR["DiscoveryResponder\n(UDP thread)"]
-        PC_C["PowerPointController\n(pywin32 COM)"]
-        ND_D["network_detector.py\n(Windows NIC inspection)"]
-        PPT["PowerPoint.exe\n(COM object)"]
+  subgraph PC["Windows PC"]
+    direction TB
+    TI["Tray Icon\n(pystray — main thread)"]
+    UV["uvicorn\n(HTTP server thread)"]
+    API["FastAPI App\n(routes, auth, rate limit)"]
+    DR["DiscoveryResponder\n(UDP thread)"]
+    PC_C["PowerPointController\n(pywin32 COM)"]
+    ND_D["network_detector.py\n(Windows NIC inspection)"]
+    PPT["PowerPoint.exe\n(COM object)"]
 
-        TI --- UV
-        UV --> API
-        API --> PC_C
-        API --> ND_D
-        PC_C <-->|"COM automation"| PPT
-        DR -.- UV
-    end
+    TI --- UV
+    UV --> API
+    API --> PC_C
+    API --> ND_D
+    PC_C <-->| "COM automation" | PPT
+    DR -.- UV
+  end
 
-    BC -->|"UDP broadcast\nPPT_REMOTE_DISCOVER\nport 8788"| DR
-    DR -->|"UDP unicast reply\n{bridge_url}"| BC
+  BC -->| "UDP broadcast\nPPT_REMOTE_DISCOVER\nport 8788" | DR
+  DR -->| "UDP unicast reply\n{bridge_url}" | BC
 
-    BC -->|"HTTP GET /api/presentations\nHTTP GET /api/health\nport 8787"| API
-    BC -->|"HTTP POST /api/presentations/{id}/next\n/previous · /start · /stop\nport 8787"| API
-    API -->|"JSON response\n{ok: true} or PresentationDto[]"| BC
+  BC -->| "HTTP GET /api/presentations\nHTTP GET /api/health\nport 8787" | API
+  BC -->| "HTTP POST /api/presentations/{id}/next\n/previous · /start · /stop\nport 8787" | API
+  API -->| "JSON response\n{ok: true} or PresentationDto[]" | BC
 ```
 
 > **Note:** The tray icon owns the Python main thread. `uvicorn` and `DiscoveryResponder` each run
@@ -95,7 +82,7 @@ flowchart TD
 ## 3. Port Reference
 
 | Port | Protocol | Direction | Purpose |
-|------|----------|-----------|---------|
+| ------ | ---------- | ----------- | --------- |
 | **8787** | TCP (HTTP) | Android → Desktop | REST API for all control commands and status polling |
 | **8788** | UDP | Android → Desktop (broadcast), Desktop → Android (unicast) | Auto-discovery: phone broadcasts a token; desktop replies with its HTTP URL |
 
@@ -110,7 +97,7 @@ auto-discovery fails, only port 8787 needs to be reachable (the user can enter t
 
 ### 4.1 Process Model
 
-```
+```text
 PptRemoteBridge.exe  (or  pythonw.exe run_background.py)
 │
 ├── [Main Thread]       pystray tray icon — event loop, right-click menu
@@ -124,21 +111,10 @@ PptRemoteBridge.exe  (or  pythonw.exe run_background.py)
 └── [Thread: Discovery] DiscoveryResponder UDP socket on 0.0.0.0:8788
 ```
 
-### 4.2 Key Modules
-
-| File | Responsibility |
-|------|---------------|
-| `main.py` | FastAPI application, all HTTP routes, CORS, auth, rate limiting, lifespan |
-| `bridge_service.py` | Entry point: starts uvicorn thread, DiscoveryResponder thread, and tray icon |
-| `powerpoint_controller.py` | All COM automation — list presentations, start/stop slideshow, next/previous, speaker notes |
-| `network_detector.py` | Inspects Windows NIC configuration to classify the connection (WiFi / hotspot / cellular / ethernet) |
-| `tray_icon.py` | `pystray` tray icon setup, menu actions, icon image generation |
-| `run_background.py` | Headless entry point for `pythonw.exe` background mode (no tray icon) |
-
 ### 4.3 REST API Endpoints
 
 | Method | Path | Rate Limited | Auth Required* | Description |
-|--------|------|:---:|:---:|-------------|
+| -------- | ------ | :---: | :---: | ------------- |
 | `GET` | `/api/health` | — | — | Bridge liveness + network type |
 | `GET` | `/api/network/status` | — | ✓ | Detailed network classification + warning text |
 | `GET` | `/api/presentations` | — | ✓ | List all open `.pptx` files with slide state |
@@ -163,6 +139,7 @@ Key behaviours:
 
 - **Auto-start slideshow**: If `next` or `previous` is called on a presentation that is not yet in
   slideshow mode, the controller starts the slideshow first and then advances the slide.
+
 - **Error surface**: All COM errors are caught and re-raised as `PowerPointControllerError`, which
   the route handlers map to HTTP 400 responses.
 
@@ -170,12 +147,15 @@ Key behaviours:
 
 1. Android sends a UDP broadcast to `255.255.255.255:8788` containing the ASCII token
    `PPT_REMOTE_DISCOVER`.
-2. `DiscoveryResponder` receives the packet, determines the correct local interface IP that routes
-   back to the phone (using a temporary UDP `connect()` trick), and replies with:
-   ```json
-   {"bridge_url": "http://192.168.1.x:8787"}
-   ```
-3. The Android app stores the URL in `RemotePrefs` and begins polling.
+
+1. `DiscoveryResponder` receives the packet, determines the correct local interface IP that routes
+  back to the phone (using a temporary UDP `connect()` trick), and replies with:
+
+```json
+{"bridge_url": "http://192.168.1.x:8787"}
+```
+
+1. The Android app stores the URL in `RemotePrefs` and begins polling.
 
 ### 4.6 Logging
 
@@ -189,7 +169,7 @@ the Python `logging` module. Background mode (`run_background.py`) sets the root
 
 ### 5.1 Class Map
 
-```
+```text
 com.antigravity.pptremote
 │
 ├── MainActivity.kt          — Single-activity host; Compose UI; volume key capture (foreground)
@@ -210,7 +190,7 @@ com.antigravity.pptremote
 data class holds:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | `bridgeUrl` | `String` | Currently configured bridge URL |
 | `presentations` | `List<PresentationInfo>` | Latest poll result |
 | `selectedId` | `String?` | Presentation currently selected by the user |
@@ -225,7 +205,7 @@ data class holds:
 **2 seconds**. The polling interval is adaptive:
 
 | Network type | Poll interval |
-|---|---|
+| --- | --- |
 | WiFi (standard) | 2 s |
 | Hotspot (phone as AP) | 3 s |
 | Cellular | 5 s |
@@ -235,7 +215,7 @@ If the bridge is unreachable the client applies **exponential backoff** before r
 ### 5.4 Background Volume Button Capture
 
 | Scenario | Mechanism |
-|----------|-----------|
+| ---------- | ----------- |
 | App in foreground | `onKeyDown()` in `MainActivity` intercepts `KEYCODE_VOLUME_UP/DOWN` |
 | App in background / screen locked | `RemoteControlService` registers a `MediaSession` with a custom `VolumeProvider`; Android routes volume key events to the active `MediaSession` |
 
@@ -248,11 +228,13 @@ command is being dispatched.
 - **Persistent notification actions**: Previous, Next, Start, Stop.
 - **Dynamic text**: notification body updates to show the currently selected presentation name and
   the current slide number / total slides whenever the poll result changes.
+
 - **Tap target**: tapping the notification opens `MainActivity`.
 
 ### 5.6 BootReceiver
 
 Declared in `AndroidManifest.xml` with intent filters for:
+
 - `android.intent.action.BOOT_COMPLETED`
 - `android.intent.action.QUICKBOOT_POWERON` (HTC / OnePlus devices)
 
@@ -263,7 +245,7 @@ has been previously saved, avoiding a spurious service start on a fresh install.
 
 ## 6. Data Flow: End-to-End Walkthrough
 
-```
+```text
 Phase 1 — Discovery
 ───────────────────
 Android App boots / user opens app
@@ -315,10 +297,13 @@ app expose phone storage to Windows Explorer via the Desktop Bridge. Key points:
 - The Android app runs an embedded FTP server on port `2121` (configurable) when the
   user enables the FTP feature. The server serves a user-selected root path (internal
   storage or SD card).
+
 - When the phone connects to the bridge (discovery / polling), the bridge stores the
   client's IP address (`last_client_ip`) in memory. This IP is used to construct FTP URLs.
+
 - The Files UI sends `POST /api/ftp/open?ftp_path=<relative-path>` to the bridge to ask
   the bridge to open a network folder in Windows Explorer. The bridge will:
+
   1. Validate `ftp_path` (reject path traversal such as `..`).
   2. Normalize slashes and percent-encode special characters (spaces, unicode, `%`).
   3. Build a URL like `ftp://<client_ip>:2121/<encoded-path>` and run `explorer.exe "<url>"`.
@@ -330,6 +315,7 @@ Security & UX notes
 - The FTP server is intended for trusted local LAN use only; do not expose the phone's
   FTP server to the public internet. The bridge intentionally binds Explorer to the FTP URL
   using the last-known client IP rather than accepting arbitrary hostnames from external callers.
+
 - The Android app requests storage access using the `MANAGE_EXTERNAL_STORAGE` settings flow on
   Android 11+ and falls back to the SAF `OpenDocumentTree` picker for scoped storage. The UI
   explains this and re-checks permissions on resume so users understand the required steps.
@@ -342,7 +328,7 @@ Security & UX notes
 ### Desktop Side
 
 | Mode | Entry point | Console? | How to launch |
-|------|-------------|----------|---------------|
+| ------ | ------------- | ---------- | --------------- |
 | Dev / debug | `start_bridge.ps1` → `python main.py` | Visible | `.\start_bridge.ps1` |
 | Background (manual) | `start_background.ps1` → `pythonw.exe run_background.py` | Hidden | `.\start_background.ps1` |
 | Background (auto-login) | Windows Task Scheduler task `PptRemoteBridge` | Hidden | `.\install_startup_task.ps1` |
@@ -369,7 +355,7 @@ These variables are read by the desktop bridge at startup. They do not require a
 them in your shell, in the Task Scheduler action, or in a `.env` file sourced by the launch script.
 
 | Variable | Default | Required | Description |
-|---|---|:---:|---|
+| --- | --- | :---: | --- |
 | `PPT_BRIDGE_PORT` | `8787` | No | TCP port the FastAPI HTTP server listens on |
 | `PPT_DISCOVERY_PORT` | `8788` | No | UDP port the DiscoveryResponder listens on |
 | `PPT_API_KEY` | *(unset)* | No | When set, all API endpoints (except `/api/health`) require an `X-Api-Key: <value>` request header. When unset the bridge operates in open/unauthenticated mode. |
@@ -382,7 +368,7 @@ auto-discovery and manual URL entry will disagree.
 
 ## 9. Repository Layout (Quick Reference)
 
-```
+```text
 Ppt_remote/
 ├── desktop_bridge/
 │   ├── main.py                     # FastAPI app + all HTTP routes

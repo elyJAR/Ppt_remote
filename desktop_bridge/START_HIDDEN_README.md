@@ -10,6 +10,7 @@ Double-click `start_hidden.bat` - this will start the bridge with no visible win
 
 ### Option 2: Use PowerShell with Hidden Window Style
 Open Command Prompt (not PowerShell) and run:
+
 ```cmd
 powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "desktop_bridge\start_background.ps1"
 ```

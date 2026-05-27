@@ -117,8 +117,15 @@ class BridgeClient {
     fun next(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/next")
     fun previous(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/previous")
     fun gotoSlide(url: String, presentationId: String, slideIndex: Int) = post(url, "/api/presentations/${encodedId(presentationId)}/goto/$slideIndex")
-    fun openFtpOnPc(url: String, clientIp: String? = null) {
-        val path = if (clientIp != null) "/api/ftp/open?client_ip=$clientIp" else "/api/ftp/open"
+    private fun encodeQueryParam(value: String): String =
+        URLEncoder.encode(value, StandardCharsets.UTF_8.toString()).replace("+", "%20")
+
+    fun openFtpOnPc(url: String, clientIp: String? = null, ftpPath: String? = null) {
+        val query = buildList {
+            if (clientIp != null) add("client_ip=${encodeQueryParam(clientIp)}")
+            if (ftpPath != null) add("ftp_path=${encodeQueryParam(ftpPath)}")
+        }
+        val path = if (query.isEmpty()) "/api/ftp/open" else "/api/ftp/open?${query.joinToString("&")}" 
         post(url, path)
     }
 

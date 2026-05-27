@@ -190,8 +190,16 @@ def _is_using_hotspot_connection(interface_name: str) -> bool:
 
             if result.returncode == 0:
                 output_norm = _norm(result.stdout)
+                # If the interface name appears anywhere in the output AND any
+                # hotspot indicator appears anywhere in the output, treat it as
+                # a hotspot connection. This handles cases where netsh emits the
+                # interface header on one line and the hotspot hint on another
+                # (common on some Windows builds / drivers).
                 if interface_norm in output_norm:
-                    # Find the line(s) that mention this interface and check for hotspot keywords
+                    for indicator in hotspot_indicators:
+                        if _norm(indicator) in output_norm:
+                            return True
+                    # Fallback: also check per-line when indicators are present
                     for line in result.stdout.splitlines():
                         if interface_name.lower() in line.lower():
                             line_norm = _norm(line)

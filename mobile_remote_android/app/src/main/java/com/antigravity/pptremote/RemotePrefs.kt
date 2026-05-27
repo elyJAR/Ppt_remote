@@ -21,6 +21,7 @@ object RemotePrefs {
     private const val KEY_API_KEY = "api_key"
     private const val KEY_FTP_ENABLED = "ftp_enabled"
     private const val KEY_FTP_AUTO_START = "ftp_auto_start"
+    private const val KEY_LAST_BROWSED_FOLDER = "last_browsed_folder"
     private const val KEY_DEVICE_ID = "device_id"
     private const val KEY_SELECTED_BRIDGE_ID = "selected_bridge_id"
     private const val KEY_SAVED_BRIDGES = "saved_bridges"
@@ -42,6 +43,15 @@ object RemotePrefs {
     fun isFtpAutoStart(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getBoolean(KEY_FTP_AUTO_START, false)
+
+    fun setLastBrowsedFolder(context: Context, path: String?) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_LAST_BROWSED_FOLDER, path).apply()
+    }
+
+    fun getLastBrowsedFolder(context: Context): String? =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_LAST_BROWSED_FOLDER, null)
 
     fun setBridgeUrl(context: Context, url: String) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

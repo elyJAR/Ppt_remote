@@ -249,7 +249,7 @@ Tracked here so they don't get lost; do not start until Phase 8 ships.
 ## Risk register
 
 | Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | WebCodecs HW decode missing on some Windows GPUs | Medium | Stutter, high CPU | Fall back to ffmpeg.wasm software decode; expose codec choice in receiver settings. |
 | mDNS blocked on corporate / hotspot networks | High | Discovery silently fails | Manual IP entry is mandatory v1 (F1.4). UI surfaces "no devices found — try manual" within 8 s. |
 | Phone OEMs throttle background CPU mid-session | Medium | Frame drops | Acquire `WAKE_LOCK`; show user a one-time tip about disabling battery optimisation for the app. |

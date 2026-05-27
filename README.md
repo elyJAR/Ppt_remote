@@ -100,7 +100,7 @@ You can access your phone's files directly from Windows Explorer:
 - The app exposes an FTP server on port `2121` when enabled. The Desktop Bridge records the mobile client's IP when it connects.
 - The Android UI sends a request to the bridge to open a specific folder on the PC using the bridge endpoint:
 
-```
+```http
 POST /api/ftp/open?ftp_path=<path>
 ```
 
@@ -113,6 +113,7 @@ POST /api/ftp/open?ftp_path=<path>
 This repository automatically builds the Android APK in the cloud.
 
 How to trigger a build:
+
 - Push a tag starting with `pre-v` (e.g., `pre-v2.0.2`).
 - The GitHub Action will compile the project and publish the APK as a pre-release.
 

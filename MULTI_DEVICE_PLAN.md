@@ -14,6 +14,7 @@ This document outlines the strategy for supporting multiple PCs (Bridges) and mu
 
 ### A. Enhanced Discovery (UDP)
 Currently, the discovery response is a simple JSON with a URL. We will expand this:
+
 - **New Response Schema**:
   ```json
   {
@@ -23,6 +24,7 @@ Currently, the discovery response is a simple JSON with a URL. We will expand th
     "version": "1.9.6"
   }
   ```
+
 - **Bridge Name**: Defaults to the Windows Hostname, but overridable in Bridge settings (via a new `.bridge_name` config file or environment variable).
 
 ### B. Android Bridge Management
@@ -31,6 +33,7 @@ Currently, the discovery response is a simple JSON with a URL. We will expand th
 
 ### C. Client Registration (Heartbeat)
 To allow the PC to "see" multiple phones:
+
 - **Registration API**: New endpoint `POST /api/clients/register`.
 - **Payload**:
   ```json
@@ -40,6 +43,7 @@ To allow the PC to "see" multiple phones:
     "ftp_port": 2121
   }
   ```
+
 - **Tracking**: The Bridge will maintain an in-memory registry of active clients with TTL (Time-To-Live) logic.
 
 ---

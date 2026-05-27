@@ -243,7 +243,7 @@ PC side has no `AWAITING_PROJECTION`; everything else mirrors.
 Three viable stacks. Pick one for v1; the protocol is identical so any can be swapped later.
 
 | Stack | Pros | Cons |
-|---|---|---|
+| --- | --- | --- |
 | **Electron + WebCodecs** | Cross-platform free; modern HW-accelerated H.264 decode via WebCodecs API; familiar JS/TS; easy UI; small enough installer | ~80 MB install; needs Chromium WebCodecs (Electron 20+) |
 | **.NET 8 WPF + LibVLCSharp** | Native Windows feel; mature ffmpeg-based decode; single .exe via self-contained publish | Windows-first; larger app footprint with bundled libvlc; .NET runtime ergonomics |
 | **Rust + ffmpeg + winit/SDL2** | Smallest binary; fastest startup; cross-platform | Most code to write; no UI framework included; trickier for non-Rust contributors |
@@ -351,6 +351,7 @@ data class MirrorConfig(
     val bitrateBps: Int = 4_000_000,
     val codec: Codec = Codec.H264_BASELINE,
     /**
+
      * Which transport to use.
      *  - AUTO    : try Miracast if device is allow-listed (§6), otherwise LAN.
      *  - LAN     : force LAN; never attempt Miracast.
@@ -424,7 +425,7 @@ The standalone `app/` module is itself a consumer of this API — it doesn't hav
 ### 6.1 Decision table (when `MirrorConfig.transport = AUTO`)
 
 | Device fingerprint state | Action |
-|---|---|
+| --- | --- |
 | `ALLOWED` | Try Miracast. On any failure within 5 s, demote to `DENIED` and fall back to LAN. |
 | `DENIED` | Skip Miracast entirely. Use LAN. |
 | `UNKNOWN` | Use built-in heuristic: if `manufacturer == "google"` AND `sdkInt <= 33` → try Miracast, else `DENIED`. Update state based on outcome. |
@@ -493,6 +494,7 @@ The encoder → network bridge is a **bounded** `Channel<NalUnit>(capacity = 30)
 The standalone `app/` module registers the bundled service.
 
 Notification:
+
 - Title: *"Mirror — connected to {receiverName}"*
 - Stop action that calls `MirrorClient.disconnect()`
 - Tap → opens the standalone activity (or a no-op when embedded headless)
@@ -540,6 +542,7 @@ Explicit non-goals for v1, called out so reviewers don't assume otherwise:
 This is acceptable for a v1 LAN-only tool with the default port and zero exposure to the internet, but **must** be highlighted in the README and in the receiver's UI ("connected without encryption").
 
 v2 plan (separate spec):
+
 - Out-of-band PIN displayed on PC, typed on phone, mixes into a Noise-XX or TLS-PSK key.
 - AEAD-encrypted frames over the same TCP socket.
 - Receiver remembers paired phones by their public key.
@@ -549,7 +552,7 @@ v2 plan (separate spec):
 ## 13. Out-of-scope items deferred to later versions
 
 | Feature | Why deferred |
-|---|---|
+| --- | --- |
 | Audio mirroring | Needs `AudioPlaybackCapture` (API 29+) and a separate AAC encoder; doubles the protocol surface area. |
 | Touch-back | Needs uinput on PC (admin) or a custom kernel driver; major scope. |
 | H.265 / AV1 | Decoder support not universal in WebCodecs as of 2026; revisit when stable. |

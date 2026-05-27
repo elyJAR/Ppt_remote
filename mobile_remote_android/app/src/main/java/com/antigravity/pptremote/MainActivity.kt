@@ -1131,8 +1131,10 @@ private fun FilesScreen(
     onNavigateFilesUp: () -> Unit,
     onRefreshFiles: () -> Unit,
     onOpenCurrentFilesFolderOnPc: () -> Unit,
+    onRequestStorageAccess: () -> Unit
 ) {
     val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
+    var showHelp by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -1163,12 +1165,27 @@ private fun FilesScreen(
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text("Storage access required to browse files.")
                             Spacer(Modifier.height(8.dp))
+                            Text("This app needs access to your phone storage to list and open folders. On Android 11+ we prefer the 'All files access' settings screen; otherwise we use the SAF folder picker.")
+                            Spacer(Modifier.height(8.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(onClick = { onRequestStorageAccess() }) { Text("Grant access") }
-                                TextButton(onClick = { /* show help or docs later */ }) { Text("How it works") }
+                                TextButton(onClick = { showHelp = true }) { Text("How it works") }
                             }
                         }
                     }
+                }
+
+                if (showHelp) {
+                    AlertDialog(
+                        onDismissRequest = { showHelp = false },
+                        confirmButton = {
+                            TextButton(onClick = { showHelp = false }) { Text("OK") }
+                        },
+                        title = { Text("How storage access works") },
+                        text = {
+                            Text("If you're on Android 11 or newer, tapping Grant access will open the system Settings page where you can allow 'All files access'. On older Android versions we'll open the SAF folder picker. If you choose Settings, return to the app after granting access.")
+                        }
+                    )
                 }
 
                 if (state.availableStorages.isNotEmpty()) {
@@ -1185,6 +1202,21 @@ private fun FilesScreen(
                 }
 
                 if (currentFilesPath != null) {
+                    // Breadcrumbs
+                    val root = filesRootPath ?: currentFilesPath
+                    val relative = if (currentFilesPath.startsWith(root)) currentFilesPath.removePrefix(root).trimStart('/') else currentFilesPath
+                    val segments = relative.split('/').filter { it.isNotBlank() }
+
+                    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Root button
+                        AssistChip(onClick = { onSelectFilesRoot(root) }, label = { Text("Root") })
+                        var accum = root
+                        segments.forEachIndexed { idx, seg ->
+                            accum = if (accum.endsWith('/')) "$accum$seg" else "$accum/$seg"
+                            AssistChip(onClick = { onNavigateFilesTo(accum) }, label = { Text(seg) })
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
                     Text(currentFilesPath, style = MaterialTheme.typography.labelSmall)
 
                     Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
