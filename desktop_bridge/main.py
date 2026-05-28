@@ -9,6 +9,7 @@ import socket
 import threading
 import time
 import urllib.parse
+import anyio
 from contextlib import asynccontextmanager
 from typing import Annotated
 
