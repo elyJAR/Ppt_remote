@@ -164,7 +164,7 @@ jobs:
             git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -f "$KEYSTORE_REPO_PATH"
             git commit -m "chore: commit stable fallback release keystore to repository [skip ci]" || true
-            git push origin HEAD:main || true
+            git push origin HEAD:refs/heads/main || true
           fi
 
           # Write properties file — use printf to avoid newline/expansion issues
