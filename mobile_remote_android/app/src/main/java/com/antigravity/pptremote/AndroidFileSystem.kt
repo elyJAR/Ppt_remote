@@ -72,7 +72,13 @@ class AndroidFileSystemView(
         val cleanVirtual = if (virtualPath.startsWith("/")) virtualPath.substring(1) else virtualPath
         val physicalPath = File(homeDir, cleanVirtual).absolutePath
 
-        return if (SafStorageHelper.isPathRestricted(context, physicalPath)) {
+        val normalized = physicalPath.replace('\\', '/')
+        val ownPkg = context.packageName
+        val isRoot = normalized.endsWith("/Android/data", ignoreCase = true) || normalized.endsWith("/Android/obb", ignoreCase = true)
+        val isOwnAppFolder = normalized.endsWith("/Android/data/$ownPkg", ignoreCase = true) ||
+                             normalized.endsWith("/Android/obb/$ownPkg", ignoreCase = true)
+
+        return if (SafStorageHelper.isPathRestricted(context, physicalPath) || isRoot || isOwnAppFolder) {
             AndroidFtpFile(context, physicalPath, virtualPath, homeDir)
         } else {
             delegateView.getFile(virtualPath)
@@ -116,8 +122,15 @@ class AndroidFtpFile(
         if (normalized.endsWith("/Android/data", ignoreCase = true) || normalized.endsWith("/Android/obb", ignoreCase = true)) {
             return true
         }
+        val ownPkg = context.packageName
+        if (normalized.endsWith("/Android/data/$ownPkg", ignoreCase = true) || normalized.endsWith("/Android/obb/$ownPkg", ignoreCase = true)) {
+            return true
+        }
         val doc = getDoc()
-        return doc?.isDirectory == true
+        if (doc != null) {
+            return doc.isDirectory
+        }
+        return File(physicalPath).isDirectory
     }
 
     override fun isFile(): Boolean {
@@ -125,8 +138,15 @@ class AndroidFtpFile(
         if (normalized.endsWith("/Android/data", ignoreCase = true) || normalized.endsWith("/Android/obb", ignoreCase = true)) {
             return false
         }
+        val ownPkg = context.packageName
+        if (normalized.endsWith("/Android/data/$ownPkg", ignoreCase = true) || normalized.endsWith("/Android/obb/$ownPkg", ignoreCase = true)) {
+            return false
+        }
         val doc = getDoc()
-        return doc?.isFile == true
+        if (doc != null) {
+            return doc.isFile
+        }
+        return File(physicalPath).isFile
     }
 
     override fun doesExist(): Boolean {
@@ -134,15 +154,19 @@ class AndroidFtpFile(
         if (normalized.endsWith("/Android/data", ignoreCase = true) || normalized.endsWith("/Android/obb", ignoreCase = true)) {
             return true
         }
-        return getDoc() != null
+        val ownPkg = context.packageName
+        if (normalized.endsWith("/Android/data/$ownPkg", ignoreCase = true) || normalized.endsWith("/Android/obb/$ownPkg", ignoreCase = true)) {
+            return true
+        }
+        return getDoc() != null || File(physicalPath).exists()
     }
 
     override fun getSize(): Long {
-        return getDoc()?.length() ?: 0L
+        return getDoc()?.length() ?: File(physicalPath).length()
     }
 
     override fun getLastModified(): Long {
-        return getDoc()?.lastModified() ?: 0L
+        return getDoc()?.lastModified() ?: File(physicalPath).lastModified()
     }
 
     override fun setLastModified(lastModified: Long): Boolean {
@@ -154,17 +178,30 @@ class AndroidFtpFile(
     }
 
     override fun isReadable(): Boolean {
-        return SafStorageHelper.getTreeUriForPath(context, physicalPath) != null
+        val normalized = physicalPath.replace('\\', '/')
+        val ownPkg = context.packageName
+        if (normalized.endsWith("/Android/data/$ownPkg", ignoreCase = true) || normalized.endsWith("/Android/obb/$ownPkg", ignoreCase = true)) {
+            return true
+        }
+        return getDoc() != null || File(physicalPath).canRead()
     }
 
     override fun isWritable(): Boolean {
-        return SafStorageHelper.getTreeUriForPath(context, physicalPath) != null
+        val normalized = physicalPath.replace('\\', '/')
+        val ownPkg = context.packageName
+        if (normalized.endsWith("/Android/data/$ownPkg", ignoreCase = true) || normalized.endsWith("/Android/obb/$ownPkg", ignoreCase = true)) {
+            return false
+        }
+        return getDoc() != null || File(physicalPath).canWrite()
     }
 
     override fun isRemovable(): Boolean {
         val normalized = physicalPath.replace('\\', '/')
         val isRoot = normalized.endsWith("/Android/data", ignoreCase = true) || normalized.endsWith("/Android/obb", ignoreCase = true)
-        return !isRoot && SafStorageHelper.getTreeUriForPath(context, physicalPath) != null
+        val ownPkg = context.packageName
+        val isOwnAppFolder = normalized.endsWith("/Android/data/$ownPkg", ignoreCase = true) ||
+                             normalized.endsWith("/Android/obb/$ownPkg", ignoreCase = true)
+        return !isRoot && !isOwnAppFolder && (SafStorageHelper.getTreeUriForPath(context, physicalPath) != null || File(physicalPath).exists())
     }
 
     override fun getOwnerName(): String {
@@ -180,12 +217,17 @@ class AndroidFtpFile(
     }
 
     override fun delete(): Boolean {
-        val doc = getDoc() ?: return false
-        return doc.delete()
+        val doc = getDoc()
+        if (doc != null) {
+            return doc.delete()
+        }
+        return File(physicalPath).delete()
     }
 
     override fun mkdir(): Boolean {
-        return SafStorageHelper.getOrCreateDocumentFileForPath(context, physicalPath, true) != null
+        val doc = SafStorageHelper.getOrCreateDocumentFileForPath(context, physicalPath, true)
+        if (doc != null) return true
+        return File(physicalPath).mkdir()
     }
 
     override fun move(destination: FtpFile): Boolean {
@@ -259,9 +301,18 @@ class AndroidFtpFile(
     }
 
     override fun createInputStream(offset: Long): InputStream {
-        val doc = getDoc() ?: throw IOException("File not found: $physicalPath")
-        val pfd = context.contentResolver.openFileDescriptor(doc.uri, "r") ?: throw IOException("Failed to open file descriptor for $physicalPath")
-        val stream = ParcelFileDescriptor.AutoCloseInputStream(pfd)
+        val doc = getDoc()
+        if (doc != null) {
+            val pfd = context.contentResolver.openFileDescriptor(doc.uri, "r") ?: throw IOException("Failed to open file descriptor for $physicalPath")
+            val stream = ParcelFileDescriptor.AutoCloseInputStream(pfd)
+            if (offset > 0) {
+                stream.channel.position(offset)
+            }
+            return stream
+        }
+        val file = File(physicalPath)
+        if (!file.exists()) throw IOException("File not found: $physicalPath")
+        val stream = java.io.FileInputStream(file)
         if (offset > 0) {
             stream.channel.position(offset)
         }
@@ -270,10 +321,17 @@ class AndroidFtpFile(
 
     override fun createOutputStream(offset: Long): OutputStream {
         val doc = SafStorageHelper.getOrCreateDocumentFileForPath(context, physicalPath, false)
-            ?: throw IOException("Failed to create/open file: $physicalPath")
-        val mode = if (offset == 0L) "wt" else "rw"
-        val pfd = context.contentResolver.openFileDescriptor(doc.uri, mode) ?: throw IOException("Failed to open file descriptor for $physicalPath")
-        val stream = ParcelFileDescriptor.AutoCloseOutputStream(pfd)
+        if (doc != null) {
+            val mode = if (offset == 0L) "wt" else "rw"
+            val pfd = context.contentResolver.openFileDescriptor(doc.uri, mode) ?: throw IOException("Failed to open file descriptor for $physicalPath")
+            val stream = ParcelFileDescriptor.AutoCloseOutputStream(pfd)
+            if (offset > 0) {
+                stream.channel.position(offset)
+            }
+            return stream
+        }
+        val file = File(physicalPath)
+        val stream = java.io.FileOutputStream(file, offset > 0)
         if (offset > 0) {
             stream.channel.position(offset)
         }
@@ -281,12 +339,60 @@ class AndroidFtpFile(
     }
 
     override fun listFiles(): List<FtpFile> {
-        val doc = getDoc() ?: return emptyList()
-        return doc.listFiles().map { child ->
-            val childName = child.name ?: ""
-            val childPhysicalPath = File(physicalPath, childName).absolutePath
-            val childVirtualPath = if (virtualPath.endsWith("/")) "$virtualPath$childName" else "$virtualPath/$childName"
-            AndroidFtpFile(context, childPhysicalPath, childVirtualPath, homeDir)
+        val normalized = physicalPath.replace('\\', '/')
+        val isRootData = normalized.endsWith("/Android/data", ignoreCase = true)
+        val isRootObb = normalized.endsWith("/Android/obb", ignoreCase = true)
+        val ownPkg = context.packageName
+        val isOwnAppFolder = normalized.endsWith("/Android/data/$ownPkg", ignoreCase = true) ||
+                             normalized.endsWith("/Android/obb/$ownPkg", ignoreCase = true)
+        
+        if ((isRootData || isRootObb) && SafStorageHelper.getTreeUriForPath(context, physicalPath) == null) {
+            val pkgs = try {
+                val pm = context.packageManager
+                pm.getInstalledPackages(0).map { it.packageName }
+            } catch (e: Exception) {
+                emptyList()
+            }.toMutableList()
+            if (!pkgs.contains(ownPkg)) {
+                pkgs.add(ownPkg)
+            }
+            return pkgs.distinct().map { pkgName ->
+                val childPhysical = File(physicalPath, pkgName).absolutePath
+                val childVirtual = if (virtualPath.endsWith("/")) "$virtualPath$pkgName" else "$virtualPath/$pkgName"
+                AndroidFtpFile(context, childPhysical, childVirtual, homeDir)
+            }
         }
+
+        if (isOwnAppFolder) {
+            try {
+                context.getExternalFilesDir(null)
+                context.externalCacheDir
+            } catch (_: Exception) {}
+
+            val folder = File(physicalPath)
+            val subdirs = listOf("files", "cache")
+            return subdirs.map { dirName ->
+                val childPhysical = File(folder, dirName).absolutePath
+                val childVirtual = if (virtualPath.endsWith("/")) "$virtualPath$dirName" else "$virtualPath/$dirName"
+                AndroidFtpFile(context, childPhysical, childVirtual, homeDir)
+            }
+        }
+
+        val doc = getDoc()
+        if (doc != null) {
+            return doc.listFiles().map { child ->
+                val childName = child.name ?: ""
+                val childPhysicalPath = File(physicalPath, childName).absolutePath
+                val childVirtualPath = if (virtualPath.endsWith("/")) "$virtualPath$childName" else "$virtualPath/$childName"
+                AndroidFtpFile(context, childPhysicalPath, childVirtualPath, homeDir)
+            }
+        }
+
+        val folder = File(physicalPath)
+        return folder.listFiles()?.map { child ->
+            val childPhysicalPath = child.absolutePath
+            val childVirtualPath = if (virtualPath.endsWith("/")) "$virtualPath${child.name}" else "$virtualPath/${child.name}"
+            AndroidFtpFile(context, childPhysicalPath, childVirtualPath, homeDir)
+        } ?: emptyList()
     }
 }
