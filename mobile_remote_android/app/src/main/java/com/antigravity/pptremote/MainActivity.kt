@@ -216,6 +216,61 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun launchSystemFilesApp() {
+        var launched = false
+        // Try Action 1: android.provider.action.BROWSE with primary storage URI
+        try {
+            val intent = Intent("android.provider.action.BROWSE").apply {
+                val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:")
+                setDataAndType(uri, "vnd.android.document/directory")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            launched = true
+        } catch (_: Exception) {}
+
+        if (!launched) {
+            // Try Action 2: try com.google.android.documentsui directly
+            try {
+                val intent = Intent(Intent.ACTION_MAIN).apply {
+                    setClassName("com.google.android.documentsui", "com.android.documentsui.files.FilesActivity")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+                launched = true
+            } catch (_: Exception) {}
+        }
+
+        if (!launched) {
+            // Try Action 3: try com.android.documentsui directly
+            try {
+                val intent = Intent(Intent.ACTION_MAIN).apply {
+                    setClassName("com.android.documentsui", "com.android.documentsui.files.FilesActivity")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+                launched = true
+            } catch (_: Exception) {}
+        }
+
+        if (!launched) {
+            // Try Action 4: Fallback to ACTION_VIEW on general storage
+            try {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    val uri = Uri.parse("content://com.android.externalstorage.documents/root/primary")
+                    setDataAndType(uri, "vnd.android.document/directory")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+                launched = true
+            } catch (_: Exception) {}
+        }
+
+        if (!launched) {
+            android.widget.Toast.makeText(this, "Could not open system Files app", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         SafStorageHelper.appPackageName = packageName
         // Install splash screen before calling super.onCreate()
@@ -282,7 +337,8 @@ class MainActivity : ComponentActivity() {
                                 onOpenFile = { path -> openFile(path) },
                                 onFilesSearchQueryChange = viewModel::updateFilesSearchQuery,
                                 onJumpToFileLocation = viewModel::jumpToFileLocation,
-                                onFilesSortChange = viewModel::setFilesSort
+                                onFilesSortChange = viewModel::setFilesSort,
+                                onLaunchSystemFilesApp = { launchSystemFilesApp() }
                             )
                         } else {
                             RemoteScreen(
@@ -944,7 +1000,8 @@ private fun FilesScreen(
     onOpenFile: (String) -> Unit,
     onFilesSearchQueryChange: (String) -> Unit,
     onJumpToFileLocation: (FileEntry) -> Unit,
-    onFilesSortChange: (SortCategory, SortOrder) -> Unit
+    onFilesSortChange: (SortCategory, SortOrder) -> Unit,
+    onLaunchSystemFilesApp: () -> Unit
 ) {
     val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
     var showHelp by remember { mutableStateOf(false) }
@@ -960,6 +1017,7 @@ private fun FilesScreen(
                 },
                 actions = {
                     IconButton(onClick = onRefreshFiles) { Icon(Icons.Default.Refresh, contentDescription = "Refresh") }
+                    IconButton(onClick = onLaunchSystemFilesApp) { Icon(Icons.Default.OpenInNew, contentDescription = "Open system Files") }
                     IconButton(onClick = onOpenCurrentFilesFolderOnPc) { Icon(Icons.Default.OpenInBrowser, contentDescription = "Open on PC") }
                     IconButton(onClick = { showSortMenu = true }) {
                         Icon(Icons.Default.Sort, contentDescription = "Sort files")
@@ -1262,6 +1320,21 @@ private fun FilesScreen(
                                         colors = ButtonDefaults.buttonColors(containerColor = iOSRed, contentColor = Color.White)
                                     ) {
                                         Text("Grant Folder Access")
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "Alternatively, you can open the hidden system native Files app directly to manage files manually:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = colorScheme.textSecondary
+                                    )
+                                    Spacer(Modifier.height(6.dp))
+                                    OutlinedButton(
+                                        onClick = onLaunchSystemFilesApp,
+                                        border = BorderStroke(1.dp, colorScheme.primary)
+                                    ) {
+                                        Icon(Icons.Default.OpenInNew, contentDescription = null, tint = colorScheme.primary)
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Open Native Files App")
                                     }
                                 }
                             }
