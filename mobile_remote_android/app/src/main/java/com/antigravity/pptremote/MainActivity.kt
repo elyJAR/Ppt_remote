@@ -437,7 +437,7 @@ class MainActivity : ComponentActivity() {
 
     private fun openFile(path: String) {
         try {
-            val isRestricted = SafStorageHelper.isPathRestricted(path)
+            val isRestricted = SafStorageHelper.isPathRestricted(this, path)
             val uri = if (isRestricted) {
                 val doc = SafStorageHelper.getDocumentFileForPath(this, path) ?: throw Exception("File not found under restricted path")
                 doc.uri
@@ -1220,7 +1220,8 @@ private fun FilesScreen(
                                 var accum = root
                                 segments.forEachIndexed { idx, seg ->
                                     accum = if (accum.endsWith('/')) "$accum$seg" else "$accum/$seg"
-                                    AssistChip(onClick = { onNavigateFilesTo(accum) }, label = { Text(seg) })
+                                    val targetPath = accum
+                                    AssistChip(onClick = { onNavigateFilesTo(targetPath) }, label = { Text(seg) })
                                 }
                             }
                         }
@@ -1228,7 +1229,7 @@ private fun FilesScreen(
                         Spacer(Modifier.height(8.dp))
                         Text(currentFilesPath, style = MaterialTheme.typography.labelSmall)
 
-                        val isCurrentRestricted = SafStorageHelper.isPathRestricted(currentFilesPath)
+                        val isCurrentRestricted = SafStorageHelper.isPathRestricted(LocalContext.current, currentFilesPath)
                         val hasRestrictedPermission = SafStorageHelper.getTreeUriForPath(LocalContext.current, currentFilesPath) != null
 
                         if (isCurrentRestricted && !hasRestrictedPermission) {
@@ -1421,7 +1422,7 @@ private fun FileIconOrThumbnail(
         LaunchedEffect(entry.path) {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 try {
-                    val isRestricted = SafStorageHelper.isPathRestricted(entry.path)
+                    val isRestricted = SafStorageHelper.isPathRestricted(context, entry.path)
                     val ext = entry.path.substringAfterLast('.', "").lowercase()
                     if (isRestricted) {
                         val doc = SafStorageHelper.getDocumentFileForPath(context, entry.path)

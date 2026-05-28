@@ -10,6 +10,18 @@ object SafStorageHelper {
     
     var appPackageName: String = "com.antigravity.pptremote"
 
+    fun isPathRestricted(context: Context, path: String): Boolean {
+        val packageName = context.packageName
+        appPackageName = packageName
+        val normalized = path.replace('\\', '/')
+        if (normalized.contains("/Android/data/$packageName", ignoreCase = true) || 
+            normalized.contains("/Android/obb/$packageName", ignoreCase = true)) {
+            return false
+        }
+        return normalized.contains("/Android/data", ignoreCase = true) || 
+               normalized.contains("/Android/obb", ignoreCase = true)
+    }
+
     fun isPathRestricted(path: String): Boolean {
         val normalized = path.replace('\\', '/')
         if (normalized.contains("/Android/data/$appPackageName", ignoreCase = true) || 

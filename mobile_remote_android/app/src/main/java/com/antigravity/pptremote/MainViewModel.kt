@@ -397,7 +397,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         filesSearchJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val results = mutableListOf<FileEntry>()
-                val isRestricted = SafStorageHelper.isPathRestricted(currentPath)
+                val isRestricted = SafStorageHelper.isPathRestricted(appContext, currentPath)
                 if (isRestricted) {
                     traverseAndSearch(currentPath, query, results)
                 } else {
@@ -426,7 +426,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!kotlinx.coroutines.currentCoroutineContext().isActive) return
 
         val normalized = path.replace('\\', '/')
-        if (SafStorageHelper.isPathRestricted(normalized)) {
+        if (SafStorageHelper.isPathRestricted(appContext, normalized)) {
             val hasPermission = SafStorageHelper.getTreeUriForPath(appContext, normalized) != null
             if (!hasPermission) return
             val docDir = SafStorageHelper.getDocumentFileForPath(appContext, normalized) ?: return
@@ -721,7 +721,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val normalizedPath = path.replace('\\', '/')
-                val isRestricted = SafStorageHelper.isPathRestricted(normalizedPath)
+                val isRestricted = SafStorageHelper.isPathRestricted(appContext, normalizedPath)
                 val hasPermission = SafStorageHelper.getTreeUriForPath(appContext, normalizedPath) != null
 
                 if (isRestricted) {
@@ -804,7 +804,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val folder = File(path)
+                val ownPkg = appContext.packageName
+                val isOwnAppFolder = normalizedPath.endsWith("/Android/data/$ownPkg", ignoreCase = true) || 
+                                     normalizedPath.endsWith("/Android/data/$ownPkg/", ignoreCase = true) ||
+                                     normalizedPath.endsWith("/Android/obb/$ownPkg", ignoreCase = true) ||
+                                     normalizedPath.endsWith("/Android/obb/$ownPkg/", ignoreCase = true)
+
+                if (isOwnAppFolder) {
+                    try {
+                        appContext.getExternalFilesDir(null)
+                        appContext.externalCacheDir
+                    } catch (_: Exception) {}
+                }
+
                 if (!folder.exists() || !folder.isDirectory) {
+                    if (isOwnAppFolder) {
+                        val virtualEntries = listOf(
+                            FileEntry(
+                                name = "files",
+                                path = File(folder, "files").absolutePath,
+                                isDirectory = true,
+                                sizeBytes = null,
+                                lastModifiedMillis = null
+                            ),
+                            FileEntry(
+                                name = "cache",
+                                path = File(folder, "cache").absolutePath,
+                                isDirectory = true,
+                                sizeBytes = null,
+                                lastModifiedMillis = null
+                            )
+                        )
+                        _state.value = _state.value.copy(
+                            currentFilesPath = folder.absolutePath,
+                            fileEntries = virtualEntries,
+                            filesLoading = false,
+                            filesError = null
+                        )
+                        return@launch
+                    }
                     _state.value = _state.value.copy(
                         filesLoading = false,
                         filesError = "Folder does not exist.",
@@ -813,17 +851,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                val rawEntries = folder.listFiles()
-                    ?.map {
-                        FileEntry(
-                            name = it.name.ifBlank { it.absolutePath },
-                            path = it.absolutePath,
-                            isDirectory = it.isDirectory,
-                            sizeBytes = if (it.isFile) it.length() else null,
-                            lastModifiedMillis = it.lastModified()
+                val list = folder.listFiles()
+                var rawEntries = list?.map {
+                    FileEntry(
+                        name = it.name.ifBlank { it.absolutePath },
+                        path = it.absolutePath,
+                        isDirectory = it.isDirectory,
+                        sizeBytes = if (it.isFile) it.length() else null,
+                        lastModifiedMillis = it.lastModified()
+                    )
+                } ?: emptyList()
+
+                if (isOwnAppFolder) {
+                    val hasFiles = rawEntries.any { it.name.equals("files", ignoreCase = true) }
+                    val hasCache = rawEntries.any { it.name.equals("cache", ignoreCase = true) }
+                    val mutableEntries = rawEntries.toMutableList()
+                    if (!hasFiles) {
+                        mutableEntries.add(
+                            FileEntry(
+                                name = "files",
+                                path = File(folder, "files").absolutePath,
+                                isDirectory = true,
+                                sizeBytes = null,
+                                lastModifiedMillis = null
+                            )
                         )
                     }
-                    ?: emptyList()
+                    if (!hasCache) {
+                        mutableEntries.add(
+                            FileEntry(
+                                name = "cache",
+                                path = File(folder, "cache").absolutePath,
+                                isDirectory = true,
+                                sizeBytes = null,
+                                lastModifiedMillis = null
+                            )
+                        )
+                    }
+                    rawEntries = mutableEntries
+                }
 
                 val sorted = sortFileEntries(
                     rawEntries,

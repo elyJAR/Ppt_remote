@@ -72,7 +72,7 @@ class AndroidFileSystemView(
         val cleanVirtual = if (virtualPath.startsWith("/")) virtualPath.substring(1) else virtualPath
         val physicalPath = File(homeDir, cleanVirtual).absolutePath
 
-        return if (SafStorageHelper.isPathRestricted(physicalPath)) {
+        return if (SafStorageHelper.isPathRestricted(context, physicalPath)) {
             AndroidFtpFile(context, physicalPath, virtualPath, homeDir)
         } else {
             delegateView.getFile(virtualPath)
