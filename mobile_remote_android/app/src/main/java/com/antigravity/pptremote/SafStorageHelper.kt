@@ -116,16 +116,38 @@ object SafStorageHelper {
 
     fun getDocumentFileForPath(context: Context, path: String): DocumentFile? {
         val match = findMatchingTree(context, path) ?: return null
-        val rootDoc = DocumentFile.fromTreeUri(context, match.treeUri) ?: return null
-        if (match.relativePath.isEmpty()) {
-            return rootDoc
+        val doc = if (match.relativePath.isEmpty()) {
+            DocumentFile.fromTreeUri(context, match.treeUri)
+        } else {
+            try {
+                val uriStr = match.treeUri.toString()
+                val treePart = uriStr.substringAfter("/tree/", "")
+                if (treePart.isEmpty()) return null
+                
+                val decodedPart = Uri.decode(treePart)
+                val colonIdx = decodedPart.indexOf(':')
+                if (colonIdx == -1) return null
+                
+                val rootId = decodedPart.substring(0, colonIdx)
+                val treeRelPath = decodedPart.substring(colonIdx + 1).trim('/')
+                
+                val fullRelPath = if (treeRelPath.isEmpty()) {
+                    match.relativePath
+                } else {
+                    "$treeRelPath/${match.relativePath}"
+                }
+                
+                val documentId = "$rootId:$fullRelPath"
+                val subTreeUri = android.provider.DocumentsContract.buildTreeDocumentUri(
+                    match.treeUri.authority,
+                    documentId
+                )
+                DocumentFile.fromTreeUri(context, subTreeUri)
+            } catch (e: Exception) {
+                null
+            }
         }
-        var currentDoc = rootDoc
-        for (segment in match.relativePath.split('/')) {
-            if (segment.isEmpty()) continue
-            currentDoc = currentDoc.findFile(segment) ?: return null
-        }
-        return currentDoc
+        return if (doc != null && doc.exists()) doc else null
     }
 
     fun getOrCreateDocumentFileForPath(context: Context, path: String, isDirectory: Boolean): DocumentFile? {
