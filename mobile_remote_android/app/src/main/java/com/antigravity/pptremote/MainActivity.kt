@@ -1191,8 +1191,13 @@ private fun FilesScreen(
                     }
                 } else {
                     if (currentFilesPath != null) {
-                        val root = filesRootPath ?: currentFilesPath
-                        val relative = if (currentFilesPath.startsWith(root)) currentFilesPath.removePrefix(root).trimStart('/') else currentFilesPath
+                        val currentFilesPathNormalized = currentFilesPath.replace('\\', '/')
+                        val rootNormalized = (filesRootPath ?: currentFilesPath).replace('\\', '/')
+                        val relative = if (currentFilesPathNormalized.startsWith(rootNormalized)) {
+                            currentFilesPathNormalized.removePrefix(rootNormalized).trimStart('/')
+                        } else {
+                            currentFilesPathNormalized
+                        }
                         val segments = relative.split('/').filter { it.isNotBlank() }
 
                         Row(
@@ -1202,13 +1207,13 @@ private fun FilesScreen(
                         ) {
                             IconButton(
                                 onClick = onNavigateFilesUp,
-                                enabled = currentFilesPath != root,
+                                enabled = currentFilesPathNormalized != rootNormalized,
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ArrowUpward,
                                     contentDescription = "Up",
-                                    tint = if (currentFilesPath != root) colorScheme.primary else colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                    tint = if (currentFilesPathNormalized != rootNormalized) colorScheme.primary else colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                                 )
                             }
 
@@ -1216,8 +1221,8 @@ private fun FilesScreen(
                                 modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                AssistChip(onClick = { onSelectFilesRoot(root) }, label = { Text("Root") })
-                                var accum = root
+                                AssistChip(onClick = { onSelectFilesRoot(rootNormalized) }, label = { Text("Root") })
+                                var accum = rootNormalized
                                 segments.forEachIndexed { idx, seg ->
                                     accum = if (accum.endsWith('/')) "$accum$seg" else "$accum/$seg"
                                     val targetPath = accum
