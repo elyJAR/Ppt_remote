@@ -4,63 +4,119 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color as AndroidColor
+import android.graphics.RenderEffect
+import android.graphics.Shader
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.Settings
+import android.util.LruCache
+import android.util.Size
 import android.view.KeyEvent
-import android.app.Activity
+import android.webkit.MimeTypeMap
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.activity.viewModels
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.runtime.*
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.core.content.FileProvider
+import androidx.core.graphics.createBitmap
+import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
 import kotlinx.coroutines.launch
 import java.io.File
-import android.webkit.MimeTypeMap
-import androidx.core.content.FileProvider
+import kotlin.math.log
+import kotlin.math.pow
 
 // ---  Colour palette — iOS Dark Inspired ───────────────────────────────────────
 private val iOSBlack     = Color(0xFF000000)
@@ -77,12 +133,10 @@ private val iOSRed        = Color(0xFFFF453A)
 
 private val DarkTextPrimary   = Color(0xFFFFFFFF)
 private val DarkTextSecondary = Color(0xFFEBEBF5).copy(alpha = 0.6f)
-private val DarkTextMuted     = Color(0xFFEBEBF5).copy(alpha = 0.3f)
 
 // ---  Colour palette — light ──────────────────────────────────────────────────
 private val LightTextPrimary   = Color(0xFF000000)
 private val LightTextSecondary = Color(0xFF3C3C43).copy(alpha = 0.85f)
-private val LightTextMuted     = Color(0xFF3C3C43).copy(alpha = 0.6f)
 
 private val DarkColorScheme = darkColorScheme(
     primary          = iOSAccent,
@@ -111,13 +165,13 @@ private val LightColorScheme = lightColorScheme(
 )
 
 // ---  Theme-aware color shorthand ────────
-private val androidx.compose.material3.ColorScheme.textPrimary    inline get() = onBackground
-private val androidx.compose.material3.ColorScheme.textSecondary  inline get() = onSurfaceVariant
-private val androidx.compose.material3.ColorScheme.textMuted      inline get() = onSurfaceVariant.copy(alpha = 0.5f)
-private val androidx.compose.material3.ColorScheme.cardBg         inline get() = surface
-private val androidx.compose.material3.ColorScheme.cardBgSelected inline get() = surfaceVariant
-private val androidx.compose.material3.ColorScheme.screenBg       inline get() = background
-private val androidx.compose.material3.ColorScheme.divider        inline get() = outline.copy(alpha = 0.3f)
+private val ColorScheme.textPrimary    inline get() = onBackground
+private val ColorScheme.textSecondary  inline get() = onSurfaceVariant
+private val ColorScheme.textMuted      inline get() = onSurfaceVariant.copy(alpha = 0.5f)
+private val ColorScheme.cardBg         inline get() = surface
+private val ColorScheme.cardBgSelected inline get() = surfaceVariant
+private val ColorScheme.screenBg       inline get() = background
+private val ColorScheme.divider        inline get() = outline.copy(alpha = 0.3f)
 
 private fun Color.isLight() = (0.299 * red + 0.587 * green + 0.114 * blue) > 0.5
 
@@ -126,7 +180,7 @@ private val iOSSquircle = RoundedCornerShape(32.dp)
 private val iOSSquircleSmall = RoundedCornerShape(16.dp)
 
 @Composable
-private fun PPTLogo(size: androidx.compose.ui.unit.Dp = 44.dp, tint: Color = iOSAccent) {
+private fun PPTLogo(size: Dp = 44.dp, tint: Color = iOSAccent) {
     Box(
         modifier = Modifier
             .size(size)
@@ -144,13 +198,13 @@ private fun PPTLogo(size: androidx.compose.ui.unit.Dp = 44.dp, tint: Color = iOS
 }
 
 @Composable
-private fun iOSIcon(
-    imageVector: androidx.compose.ui.graphics.vector.ImageVector,
+private fun IOSIcon(
+    imageVector: ImageVector,
     contentDescription: String?,
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.textSecondary,
     backgroundColor: Color = Color.Transparent,
-    size: androidx.compose.ui.unit.Dp = 24.dp
+    size: Dp = 24.dp
 ) {
     Box(
         modifier = Modifier
@@ -209,7 +263,7 @@ class MainActivity : ComponentActivity() {
                 if (isObb) "Android/obb" else "Android/data"
             }
             val escapedRelPath = relPathFromRoot.replace("/", "%2F")
-            val documentUri = Uri.parse("content://com.android.externalstorage.documents/tree/$rootId%3A$escapedRelPath")
+            val documentUri = "content://com.android.externalstorage.documents/tree/$rootId%3A$escapedRelPath".toUri()
             openDocumentTreeLauncher.launch(documentUri)
         } catch (_: Exception) {
             openDocumentTreeLauncher.launch(null)
@@ -221,7 +275,7 @@ class MainActivity : ComponentActivity() {
         // Try Action 1: android.provider.action.BROWSE with primary storage URI
         try {
             val intent = Intent("android.provider.action.BROWSE").apply {
-                val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary:")
+                val uri = "content://com.android.externalstorage.documents/document/primary:".toUri()
                 setDataAndType(uri, "vnd.android.document/directory")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
@@ -257,7 +311,7 @@ class MainActivity : ComponentActivity() {
             // Try Action 4: Fallback to ACTION_VIEW on general storage
             try {
                 val intent = Intent(Intent.ACTION_VIEW).apply {
-                    val uri = Uri.parse("content://com.android.externalstorage.documents/root/primary")
+                    val uri = "content://com.android.externalstorage.documents/root/primary".toUri()
                     setDataAndType(uri, "vnd.android.document/directory")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
@@ -267,7 +321,7 @@ class MainActivity : ComponentActivity() {
         }
 
         if (!launched) {
-            android.widget.Toast.makeText(this, "Could not open system Files app", android.widget.Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Could not open system Files app", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -289,7 +343,7 @@ class MainActivity : ComponentActivity() {
                 val view = LocalView.current
                 if (!view.isInEditMode) {
                     SideEffect {
-                        val window = (view.context as Activity).window
+                        val window = (view.context as ComponentActivity).window
                         WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !state.isDarkTheme
                         WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !state.isDarkTheme
                     }
@@ -343,26 +397,16 @@ class MainActivity : ComponentActivity() {
                         } else {
                             RemoteScreen(
                                 state = state,
-                                onBridgeUrlChange = viewModel::setBridgeUrl,
                                 onPresentationSelect = viewModel::selectPresentation,
                                 onStartSlideshow = viewModel::startSelectedSlideshow,
                                 onStopSlideshow = viewModel::stopSelectedSlideshow,
                                 onNext = viewModel::nextSlide,
                                 onPrevious = viewModel::previousSlide,
                                 onRefresh = viewModel::refreshPresentations,
-                                onToggleService = viewModel::toggleService,
                                 onShowSettings = viewModel::showSettings,
                                 onShowNotes = viewModel::showNotes,
                                 onSelectBridge = viewModel::selectBridge,
-                                onSearchQueryChange = viewModel::updateSearchQuery,
-                                onToggleFtp = { viewModel.toggleFtp(it) },
-                                onSelectFilesRoot = viewModel::selectFilesRoot,
-                                onNavigateFilesTo = viewModel::navigateToFilesFolder,
-                                onNavigateFilesUp = viewModel::navigateUpFilesFolder,
-                                onRefreshFiles = viewModel::refreshFiles,
-                                onOpenCurrentFilesFolderOnPc = viewModel::openCurrentFilesFolderOnPc,
                                 onShowFiles = viewModel::showFiles
-                                , onRequestStorageAccess = { requestStorageAccess() }
                             )
                         }
                     }
@@ -389,35 +433,30 @@ class MainActivity : ComponentActivity() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 // Android 12+ - Use VibratorManager
-                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                val vibratorManager = getSystemService(VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 val vibrator = vibratorManager?.defaultVibrator
                 vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
             } else {
                 @Suppress("DEPRECATION")
                 val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
-                } else {
-                    vibrator?.vibrate(50)
-                }
+                vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Haptic feedback is not critical, silently ignore errors
         }
     }
 
     private fun requestBatteryOptimizationExemption() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                val pm = getSystemService(POWER_SERVICE) as PowerManager
-                if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                    startActivity(
-                        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                            .apply { data = Uri.parse("package:$packageName") }
-                    )
-                }
-            } catch (_: Exception) {}
-        }
+        try {
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                @Suppress("InlinedApi", "BatteryLife")
+                startActivity(
+                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                        .apply { data = "package:$packageName".toUri() }
+                )
+            }
+        } catch (_: Exception) {}
         
         // Request storage permissions for FTP server
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -425,9 +464,9 @@ class MainActivity : ComponentActivity() {
             if (!Environment.isExternalStorageManager()) {
                 try {
                     val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                    intent.data = Uri.parse("package:$packageName")
+                    intent.data = "package:$packageName".toUri()
                     startActivity(intent)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
                     startActivity(intent)
                 }
@@ -473,7 +512,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
                 val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                intent.data = Uri.parse("package:$packageName")
+                intent.data = "package:$packageName".toUri()
                 startActivity(intent)
                 return
             } catch (_: Exception) {
@@ -508,7 +547,7 @@ class MainActivity : ComponentActivity() {
             }
             startActivity(Intent.createChooser(intent, "Open file with"))
         } catch (e: Exception) {
-            android.widget.Toast.makeText(this, "Failed to open file: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Failed to open file: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 }
@@ -519,26 +558,16 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun RemoteScreen(
     state: RemoteState,
-    onBridgeUrlChange: (String) -> Unit,
     onPresentationSelect: (String) -> Unit,
     onStartSlideshow: () -> Unit,
     onStopSlideshow: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onRefresh: () -> Unit,
-    onToggleService: () -> Unit,
     onShowSettings: () -> Unit,
     onShowNotes: () -> Unit,
     onSelectBridge: (BridgeInfo) -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onToggleFtp: (String?) -> Unit,
-    onSelectFilesRoot: (String) -> Unit,
-    onNavigateFilesTo: (String) -> Unit,
-    onNavigateFilesUp: () -> Unit,
-    onRefreshFiles: () -> Unit,
-    onOpenCurrentFilesFolderOnPc: () -> Unit,
     onShowFiles: () -> Unit,
-    onRequestStorageAccess: () -> Unit,
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -561,9 +590,7 @@ private fun RemoteScreen(
             } else {
                 @Suppress("DEPRECATION")
                 val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
-                }
+                vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
             }
         } catch (_: Exception) {}
     }
@@ -590,8 +617,8 @@ private fun RemoteScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer {
-                                    renderEffect = android.graphics.RenderEffect.createBlurEffect(
-                                        50f, 50f, android.graphics.Shader.TileMode.CLAMP
+                                    renderEffect = RenderEffect.createBlurEffect(
+                                        50f, 50f, Shader.TileMode.CLAMP
                                     ).asComposeRenderEffect()
                                 }
                                 .background(MaterialTheme.colorScheme.screenBg.copy(alpha = 0.4f))
@@ -635,13 +662,13 @@ private fun RemoteScreen(
                                         letterSpacing = 1.sp
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        iOSIcon(
-                                            imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
-                                            contentDescription = null,
-                                            tint = if (connected) iOSGreen else MaterialTheme.colorScheme.textSecondary,
-                                            backgroundColor = if (connected) iOSGreen.copy(alpha = 0.1f) else MaterialTheme.colorScheme.cardBgSelected,
-                                            size = 20.dp
-                                        )
+                                    IOSIcon(
+                                        imageVector = if (connected) Icons.Default.CheckCircle else Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = if (connected) iOSGreen else MaterialTheme.colorScheme.textSecondary,
+                                        backgroundColor = if (connected) iOSGreen.copy(alpha = 0.1f) else MaterialTheme.colorScheme.cardBgSelected,
+                                        size = 20.dp
+                                    )
                                         Text(
                                             text = if (connected) "Connected" else state.statusMessage,
                                             style = MaterialTheme.typography.titleMedium,
@@ -692,11 +719,11 @@ private fun RemoteScreen(
                                                     .fillMaxWidth()
                                                     .clickable {
                                                         onSelectBridge(bridge)
-                                                        if (isSelected) expanded = !expanded else expanded = true
+                                                        expanded = if (isSelected) !expanded else true
                                                     }
                                                     .padding(12.dp)
                                             ) {
-                                                iOSIcon(
+                                                IOSIcon(
                                                     imageVector = Icons.Default.Computer, 
                                                     contentDescription = null,
                                                     tint = if (isSelected) iOSAccent else MaterialTheme.colorScheme.textSecondary,
@@ -858,7 +885,6 @@ private fun RemoteScreen(
                             if (activePres != null) {
                                 PresentationHero(
                                     presentation = activePres,
-                                    onNotesClick = onShowNotes,
                                     modifier = Modifier.pointerInput(Unit) {
                                         var totalDrag = 0f
                                         detectHorizontalDragGestures(
@@ -914,7 +940,7 @@ private fun RemoteScreen(
                                         
                                         if (noteText != null) {
                                             Text(
-                                                text = if (noteText.isBlank()) "(No notes for this slide)" else noteText,
+                                                text = noteText.ifBlank { "(No notes for this slide)" },
                                                 style = MaterialTheme.typography.bodyLarge,
                                                 color = if (noteText.isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
                                                 lineHeight = 24.sp
@@ -1169,7 +1195,6 @@ private fun FilesScreen(
                 if (state.availableStorages.isNotEmpty()) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         state.availableStorages.forEach { storage ->
-                            val isActive = filesRootPath == storage.path
                             Button(onClick = { onSelectFilesRoot(storage.path) }, modifier = Modifier.weight(1f)) {
                                 Icon(if (storage.isSdCard) Icons.Default.SdCard else Icons.Default.Smartphone, contentDescription = null)
                                 Spacer(Modifier.width(6.dp))
@@ -1225,7 +1250,7 @@ private fun FilesScreen(
                     }
 
                     if (state.filesSearchResults.isEmpty() && !state.isSearchingFiles) {
-                        EmptyStateCard(connected = true, isFiltered = true)
+                        EmptyStateCard()
                     } else {
                         Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
                             state.filesSearchResults.forEach { entry ->
@@ -1292,11 +1317,11 @@ private fun FilesScreen(
                             ) {
                                 AssistChip(onClick = { onSelectFilesRoot(rootNormalized) }, label = { Text("Root") })
                                 var accum = rootNormalized
-                                segments.forEachIndexed { idx, seg ->
-                                    accum = if (accum.endsWith('/')) "$accum$seg" else "$accum/$seg"
-                                    val targetPath = accum
-                                    AssistChip(onClick = { onNavigateFilesTo(targetPath) }, label = { Text(seg) })
-                                }
+                                segments.forEach { seg ->
+                            accum = if (accum.endsWith('/')) "$accum$seg" else "$accum/$seg"
+                            val targetPath = accum
+                            AssistChip(onClick = { onNavigateFilesTo(targetPath) }, label = { Text(seg) })
+                        }
                             }
                         }
 
@@ -1390,9 +1415,9 @@ private fun FilesScreen(
                                         fun formatSize(bytes: Long?): String {
                                             if (bytes == null) return ""
                                             if (bytes < 1024) return "$bytes B"
-                                            val exp = (Math.log(bytes.toDouble()) / Math.log(1024.0)).toInt()
+                                            val exp = (kotlin.math.log(bytes.toDouble(), 1024.0)).toInt()
                                             val pre = "KMGTPE"[exp - 1]
-                                            return String.format(java.util.Locale.US, "%.1f %cB", bytes / Math.pow(1024.0, exp.toDouble()), pre)
+                                            return String.format(java.util.Locale.US, "%.1f %cB", bytes / 1024.0.pow(exp.toDouble()), pre)
                                         }
 
                                         state.fileEntries.forEach { entry ->
@@ -1493,9 +1518,9 @@ private fun FilesScreen(
 }
 
 object ThumbnailCache {
-    private val cache = android.util.LruCache<String, android.graphics.Bitmap>(150)
-    fun get(path: String): android.graphics.Bitmap? = cache.get(path)
-    fun put(path: String, bitmap: android.graphics.Bitmap) {
+    private val cache = LruCache<String, Bitmap>(150)
+    fun get(path: String): Bitmap? = cache.get(path)
+    fun put(path: String, bitmap: Bitmap) {
         cache.put(path, bitmap)
     }
 }
@@ -1506,7 +1531,7 @@ private fun FileIconOrThumbnail(
     colorScheme: ColorScheme,
     size: androidx.compose.ui.unit.Dp = 36.dp
 ) {
-    var bitmap by remember(entry.path) { mutableStateOf<android.graphics.Bitmap?>(ThumbnailCache.get(entry.path)) }
+    var bitmap by remember(entry.path) { mutableStateOf(ThumbnailCache.get(entry.path)) }
     val isThumbnailCandidate = remember(entry.path) {
         val ext = entry.path.substringAfterLast('.', "").lowercase()
         ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "mp4", "mkv", "avi", "3gp", "webm", "pdf")
@@ -1522,13 +1547,13 @@ private fun FileIconOrThumbnail(
                     if (isRestricted) {
                         val doc = SafStorageHelper.getDocumentFileForPath(context, entry.path)
                         if (doc != null && doc.isFile) {
-                            val generatedBitmap = when {
-                                ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp") -> {
-                                    val options = android.graphics.BitmapFactory.Options().apply {
+                            val generatedBitmap = when (ext) {
+                                "jpg", "jpeg", "png", "webp", "gif", "bmp" -> {
+                                    val options = BitmapFactory.Options().apply {
                                         inJustDecodeBounds = true
                                     }
                                     context.contentResolver.openInputStream(doc.uri)?.use { stream ->
-                                        android.graphics.BitmapFactory.decodeStream(stream, null, options)
+                                        BitmapFactory.decodeStream(stream, null, options)
                                     }
                                     val reqSize = 128
                                     var inSampleSize = 1
@@ -1542,14 +1567,14 @@ private fun FileIconOrThumbnail(
                                     options.inSampleSize = inSampleSize
                                     options.inJustDecodeBounds = false
                                     context.contentResolver.openInputStream(doc.uri)?.use { stream ->
-                                        android.graphics.BitmapFactory.decodeStream(stream, null, options)
+                                        BitmapFactory.decodeStream(stream, null, options)
                                     }
                                 }
-                                ext in setOf("mp4", "mkv", "avi", "3gp", "webm") -> {
+                                "mp4", "mkv", "avi", "3gp", "webm" -> {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                         try {
-                                            context.contentResolver.loadThumbnail(doc.uri, android.util.Size(128, 128), null)
-                                        } catch (e: Exception) {
+                                            context.contentResolver.loadThumbnail(doc.uri, Size(128, 128), null)
+                                        } catch (_: Exception) {
                                             val retriever = android.media.MediaMetadataRetriever()
                                             try {
                                                 retriever.setDataSource(context, doc.uri)
@@ -1568,24 +1593,24 @@ private fun FileIconOrThumbnail(
                                         }
                                     }
                                 }
-                                ext == "pdf" -> {
+                                "pdf" -> {
                                     var pdfRenderer: android.graphics.pdf.PdfRenderer? = null
                                     var fileDescriptor: android.os.ParcelFileDescriptor? = null
                                     try {
                                         fileDescriptor = context.contentResolver.openFileDescriptor(doc.uri, "r")
                                         if (fileDescriptor != null) {
-                                            pdfRenderer = android.graphics.pdf.PdfRenderer(fileDescriptor)
+                                            pdfRenderer = PdfRenderer(fileDescriptor)
                                             if (pdfRenderer.pageCount > 0) {
                                                 val page = pdfRenderer.openPage(0)
-                                                val destBitmap = android.graphics.Bitmap.createBitmap(128, 128, android.graphics.Bitmap.Config.ARGB_8888)
-                                                val canvas = android.graphics.Canvas(destBitmap)
-                                                canvas.drawColor(android.graphics.Color.WHITE)
-                                                page.render(destBitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                                val destBitmap = createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+                                                val canvas = Canvas(destBitmap)
+                                                canvas.drawColor(AndroidColor.WHITE)
+                                                page.render(destBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                                                 page.close()
                                                 destBitmap
                                             } else null
                                         } else null
-                                    } catch (e: Exception) {
+                                    } catch (_: Exception) {
                                         null
                                     } finally {
                                         pdfRenderer?.close()
@@ -1602,12 +1627,12 @@ private fun FileIconOrThumbnail(
                     } else {
                         val file = File(entry.path)
                         if (file.exists() && file.isFile) {
-                            val generatedBitmap = when {
-                                ext in setOf("jpg", "jpeg", "png", "webp", "gif", "bmp") -> {
-                                    val options = android.graphics.BitmapFactory.Options().apply {
+                            val generatedBitmap = when (ext) {
+                                "jpg", "jpeg", "png", "webp", "gif", "bmp" -> {
+                                    val options = BitmapFactory.Options().apply {
                                         inJustDecodeBounds = true
                                     }
-                                    android.graphics.BitmapFactory.decodeFile(file.absolutePath, options)
+                                    BitmapFactory.decodeFile(file.absolutePath, options)
                                     val reqSize = 128
                                     var inSampleSize = 1
                                     if (options.outHeight > reqSize || options.outWidth > reqSize) {
@@ -1619,13 +1644,13 @@ private fun FileIconOrThumbnail(
                                     }
                                     options.inSampleSize = inSampleSize
                                     options.inJustDecodeBounds = false
-                                    android.graphics.BitmapFactory.decodeFile(file.absolutePath, options)
+                                    BitmapFactory.decodeFile(file.absolutePath, options)
                                 }
-                                ext in setOf("mp4", "mkv", "avi", "3gp", "webm") -> {
+                                "mp4", "mkv", "avi", "3gp", "webm" -> {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                         try {
                                             android.media.ThumbnailUtils.createVideoThumbnail(file, android.util.Size(128, 128), null)
-                                        } catch (e: Exception) {
+                                        } catch (_: Exception) {
                                             @Suppress("DEPRECATION")
                                             android.media.ThumbnailUtils.createVideoThumbnail(file.absolutePath, android.provider.MediaStore.Video.Thumbnails.MINI_KIND)
                                         }
@@ -1634,22 +1659,22 @@ private fun FileIconOrThumbnail(
                                         android.media.ThumbnailUtils.createVideoThumbnail(file.absolutePath, android.provider.MediaStore.Video.Thumbnails.MINI_KIND)
                                     }
                                 }
-                                ext == "pdf" -> {
+                                "pdf" -> {
                                     var pdfRenderer: android.graphics.pdf.PdfRenderer? = null
                                     var fileDescriptor: android.os.ParcelFileDescriptor? = null
                                     try {
                                         fileDescriptor = android.os.ParcelFileDescriptor.open(file, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
-                                        pdfRenderer = android.graphics.pdf.PdfRenderer(fileDescriptor)
+                                        pdfRenderer = PdfRenderer(fileDescriptor)
                                         if (pdfRenderer.pageCount > 0) {
                                             val page = pdfRenderer.openPage(0)
-                                            val destBitmap = android.graphics.Bitmap.createBitmap(128, 128, android.graphics.Bitmap.Config.ARGB_8888)
-                                            val canvas = android.graphics.Canvas(destBitmap)
-                                            canvas.drawColor(android.graphics.Color.WHITE)
-                                            page.render(destBitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                            val destBitmap = createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+                                            val canvas = Canvas(destBitmap)
+                                            canvas.drawColor(AndroidColor.WHITE)
+                                            page.render(destBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                                             page.close()
                                             destBitmap
                                         } else null
-                                    } catch (e: Exception) {
+                                    } catch (_: Exception) {
                                         null
                                     } finally {
                                         pdfRenderer?.close()
@@ -1664,7 +1689,7 @@ private fun FileIconOrThumbnail(
                             }
                         }
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Ignore decoding failures
                 }
             }
@@ -1691,8 +1716,8 @@ private fun FileIconOrThumbnail(
             ext in setOf("xls", "xlsx") -> Pair(Icons.Default.GridOn, iOSGreen)
             ext in setOf("mp3", "wav", "m4a", "ogg", "flac") -> Pair(Icons.Default.AudioFile, iOSAccent)
             ext in setOf("zip", "rar", "7z", "tar", "gz") -> Pair(Icons.Default.FolderZip, iOSAmber)
-            ext in setOf("txt", "html", "css", "js", "json", "kt", "java", "xml") -> Pair(Icons.Default.Article, iOSGray)
-            else -> Pair(Icons.Default.InsertDriveFile, colorScheme.textSecondary)
+            ext in setOf("txt", "html", "css", "js", "json", "kt", "java", "xml") -> Pair(Icons.AutoMirrored.Filled.Article, iOSGray)
+            else -> Pair(Icons.AutoMirrored.Filled.InsertDriveFile, colorScheme.textSecondary)
         }
         Box(
             modifier = Modifier
@@ -1872,106 +1897,8 @@ private fun SlideNavButton(
     }
 }
 
-// ---  Presentation card ────────────────────────────────────────────────────────
-
 @Composable
-private fun PresentationCard(
-    presentation: Presentation,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val progress by animateFloatAsState(
-        targetValue = if (presentation.totalSlides > 0)
-            (presentation.currentSlide?.toFloat() ?: 0f) / presentation.totalSlides
-        else 0f,
-        label = "progress"
-    )
-
-    Surface(
-        onClick = onClick,
-        color = if (selected) iOSAccent.copy(alpha = 0.1f) else MaterialTheme.colorScheme.cardBg,
-        shape = iOSSquircle,
-        border = BorderStroke(
-            if (selected) 2.dp else 0.5.dp,
-            if (selected) iOSAccent else Color.White.copy(alpha = 0.05f)
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(iOSSquircleSmall)
-                        .background(if (presentation.inSlideshow) iOSGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.cardBgSelected),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (presentation.inSlideshow) Icons.Default.PlayArrow else Icons.Default.Slideshow,
-                        contentDescription = null,
-                        tint = if (presentation.inSlideshow) iOSGreen else MaterialTheme.colorScheme.textSecondary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        presentation.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.textPrimary
-                    )
-                    Text(
-                        if (presentation.inSlideshow)
-                            "Presenting • Slide ${presentation.currentSlide} of ${presentation.totalSlides}"
-                        else
-                            "${presentation.totalSlides} slides",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (presentation.inSlideshow) iOSGreen else MaterialTheme.colorScheme.textSecondary
-                    )
-                }
-
-                if (selected) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = "Selected",
-                        tint = iOSAccent,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            // Preview thumbnail with premium framing
-            val thumbBytes = presentation.currentThumbnail
-            if (presentation.inSlideshow && thumbBytes != null && thumbBytes.isNotEmpty()) {
-                val bitmap = remember(thumbBytes) {
-                    BitmapFactory.decodeByteArray(thumbBytes, 0, thumbBytes.size)
-                }
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Preview",
-                        contentScale = ContentScale.FillWidth,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(iOSSquircleSmall)
-                            .border(0.5.dp, Color.White.copy(alpha = 0.1f), iOSSquircleSmall)
-                    )
-                }
-            }
-        }
-    }
-}
-
-// ---  Empty state ──────────────────────────────────────────────────────────────
-
-@Composable
-private fun EmptyStateCard(connected: Boolean, isFiltered: Boolean = false) {
+private fun EmptyStateCard(connected: Boolean = true, isFiltered: Boolean = true) {
     AppCard {
         Column(
             modifier = Modifier
@@ -2001,74 +1928,6 @@ private fun EmptyStateCard(connected: Boolean, isFiltered: Boolean = false) {
                 color = MaterialTheme.colorScheme.textSecondary,
                 textAlign = TextAlign.Center,
             )
-        }
-    }
-}
-
-// ---  Shimmer / Skeleton ──────────────────────────────────────────────────────
-
-@Composable
-fun ShimmerBrush(): Brush {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val translateAnim by transition.animateFloat(
-        initialValue = -1000f,
-        targetValue = 2000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "shimmer"
-    )
-
-    return Brush.linearGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-        ),
-        start = Offset(x = translateAnim, y = translateAnim),
-        end = Offset(x = translateAnim + 800f, y = translateAnim + 800f)
-    )
-}
-
-@Composable
-private fun PresentationSkeleton() {
-    val shimmer = ShimmerBrush()
-    AppCard {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Icon placeholder
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(shimmer)
-            )
-            
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Title placeholder
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.6f)
-                        .height(16.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(shimmer)
-                )
-                // Subtitle placeholder
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.4f)
-                        .height(12.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(shimmer)
-                )
-            }
         }
     }
 }
@@ -2304,7 +2163,7 @@ private fun SettingsScreen(
                 SettingsInputRow(
                     title = "Bridge API Key",
                     subtitle = "Required if PPT_API_KEY is set on PC",
-                    value = state.apiKey ?: "",
+                    value = state.apiKey,
                     onValueChange = onUpdateApiKey,
                     isPassword = true
                 )
@@ -2547,7 +2406,7 @@ private fun NotesScreen(
                                 // Notes
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = if (slideNote.isBlank()) "(No notes)" else slideNote,
+                                        text = slideNote.ifBlank { "(No notes)" },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = if (slideNote.isBlank()) MaterialTheme.colorScheme.textMuted else MaterialTheme.colorScheme.textPrimary,
                                         maxLines = 4,
@@ -2614,7 +2473,6 @@ private fun AppCard(
 @Composable
 private fun PresentationHero(
     presentation: Presentation,
-    onNotesClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isDark = !MaterialTheme.colorScheme.surface.isLight()

@@ -78,7 +78,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         checkStorageAccess()
 
         // Listen to FTP filesystem events (refresh UI when PC modifies files/folders)
-        FtpFileSystemEvents.onItemChangedListener = {
+        FtpFileSystemEvents.onItemChangedListener = FtpItemChangedListener {
             viewModelScope.launch(Dispatchers.Main) {
                 refreshFiles()
             }
