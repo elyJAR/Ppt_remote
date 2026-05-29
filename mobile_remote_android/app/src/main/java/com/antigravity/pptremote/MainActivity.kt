@@ -1119,6 +1119,16 @@ private fun FilesScreen(
                 )
             )
         },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onOpenCurrentFilesFolderOnPc,
+                icon = { Icon(Icons.Default.OpenInBrowser, contentDescription = null) },
+                text = { Text("Open current folder on PC") },
+                containerColor = colorScheme.primary,
+                contentColor = colorScheme.onPrimary,
+                shape = iOSSquircleSmall
+            )
+        },
         containerColor = colorScheme.screenBg
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
