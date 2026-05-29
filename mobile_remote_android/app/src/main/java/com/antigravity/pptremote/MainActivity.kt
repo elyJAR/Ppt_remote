@@ -1350,127 +1350,133 @@ private fun FilesScreen(
                             }
                         }
 
-                        Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
-                            when (viewMode) {
-                                FileViewMode.LIST -> {
-                                    state.fileEntries.forEach { entry ->
-                                        val isHighlighted = entry.path == state.highlightFilePath
-                                        val itemBg = if (isHighlighted) colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent
-                                        Surface(
-                                            onClick = {
-                                                if (entry.isDirectory) onNavigateFilesTo(entry.path)
-                                                else onOpenFile(entry.path)
-                                            },
-                                            color = itemBg,
-                                            shape = if (isHighlighted) RoundedCornerShape(8.dp) else RectangleShape,
-                                            border = if (isHighlighted) BorderStroke(1.dp, colorScheme.primary) else null,
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                FileIconOrThumbnail(entry = entry, colorScheme = colorScheme)
-                                                Spacer(Modifier.width(8.dp))
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(entry.name, fontWeight = FontWeight.SemiBold, color = colorScheme.textPrimary)
-                                                    Text(entry.path, style = MaterialTheme.typography.labelSmall, color = colorScheme.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                }
-                                                if (entry.isDirectory) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = colorScheme.textSecondary)
-                                            }
-                                        }
-                                    }
-                                }
-                                FileViewMode.DETAILED -> {
-                                    val formatter = remember { java.text.SimpleDateFormat("dd MMM yyyy HH:mm", java.util.Locale.getDefault()) }
-
-                                    fun formatSize(bytes: Long?): String {
-                                        if (bytes == null) return ""
-                                        if (bytes < 1024) return "$bytes B"
-                                        val exp = (Math.log(bytes.toDouble()) / Math.log(1024.0)).toInt()
-                                        val pre = "KMGTPE"[exp - 1]
-                                        return String.format(java.util.Locale.US, "%.1f %cB", bytes / Math.pow(1024.0, exp.toDouble()), pre)
-                                    }
-
-                                    state.fileEntries.forEach { entry ->
-                                        val dateStr = entry.lastModifiedMillis?.let { formatter.format(java.util.Date(it)) } ?: ""
-                                        val isHighlighted = entry.path == state.highlightFilePath
-                                        val itemBg = if (isHighlighted) colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent
-                                        Surface(
-                                            onClick = {
-                                                if (entry.isDirectory) onNavigateFilesTo(entry.path)
-                                                else onOpenFile(entry.path)
-                                            },
-                                            color = itemBg,
-                                            shape = if (isHighlighted) RoundedCornerShape(8.dp) else RectangleShape,
-                                            border = if (isHighlighted) BorderStroke(1.dp, colorScheme.primary) else null,
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                FileIconOrThumbnail(entry = entry, colorScheme = colorScheme)
-                                                Spacer(Modifier.width(12.dp))
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(entry.name, fontWeight = FontWeight.Bold, color = colorScheme.textPrimary)
-                                                    Text(entry.path, style = MaterialTheme.typography.bodySmall, color = colorScheme.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Spacer(Modifier.height(4.dp))
-                                                    Row(
-                                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        val sizeText = formatSize(entry.sizeBytes)
-                                                        if (sizeText.isNotEmpty()) {
-                                                            Text(sizeText, style = MaterialTheme.typography.labelSmall, color = colorScheme.textSecondary.copy(alpha = 0.7f))
-                                                        }
-                                                        Text(dateStr, style = MaterialTheme.typography.labelSmall, color = colorScheme.textSecondary.copy(alpha = 0.7f))
+                        SwipeRefresh(
+                            state = rememberSwipeRefreshState(isRefreshing = state.filesLoading),
+                            onRefresh = onRefreshFiles,
+                            modifier = Modifier.fillMaxWidth().weight(1f)
+                        ) {
+                            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                                when (viewMode) {
+                                    FileViewMode.LIST -> {
+                                        state.fileEntries.forEach { entry ->
+                                            val isHighlighted = entry.path == state.highlightFilePath
+                                            val itemBg = if (isHighlighted) colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent
+                                            Surface(
+                                                onClick = {
+                                                    if (entry.isDirectory) onNavigateFilesTo(entry.path)
+                                                    else onOpenFile(entry.path)
+                                                },
+                                                color = itemBg,
+                                                shape = if (isHighlighted) RoundedCornerShape(8.dp) else RectangleShape,
+                                                border = if (isHighlighted) BorderStroke(1.dp, colorScheme.primary) else null,
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                    FileIconOrThumbnail(entry = entry, colorScheme = colorScheme)
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(entry.name, fontWeight = FontWeight.SemiBold, color = colorScheme.textPrimary)
+                                                        Text(entry.path, style = MaterialTheme.typography.labelSmall, color = colorScheme.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                     }
+                                                    if (entry.isDirectory) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = colorScheme.textSecondary)
                                                 }
-                                                if (entry.isDirectory) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = colorScheme.textSecondary)
                                             }
                                         }
                                     }
-                                }
-                                FileViewMode.GRID -> {
-                                    val columns = 3
-                                    val chunks = state.fileEntries.chunked(columns)
-                                    chunks.forEach { rowEntries ->
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            for (i in 0 until columns) {
-                                                val entry = rowEntries.getOrNull(i)
-                                                if (entry != null) {
-                                                    val isHighlighted = entry.path == state.highlightFilePath
-                                                    Surface(
-                                                        onClick = {
-                                                            if (entry.isDirectory) onNavigateFilesTo(entry.path)
-                                                            else onOpenFile(entry.path)
-                                                        },
-                                                        modifier = Modifier.weight(1f),
-                                                        shape = iOSSquircleSmall,
-                                                        color = if (isHighlighted) colorScheme.primary.copy(alpha = 0.15f) else colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                                        border = BorderStroke(
-                                                            width = if (isHighlighted) 1.5.dp else 0.5.dp,
-                                                            color = if (isHighlighted) colorScheme.primary else colorScheme.outline.copy(alpha = 0.1f)
-                                                        )
-                                                    ) {
-                                                        Column(
-                                                            modifier = Modifier.padding(12.dp),
-                                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    FileViewMode.DETAILED -> {
+                                        val formatter = remember { java.text.SimpleDateFormat("dd MMM yyyy HH:mm", java.util.Locale.getDefault()) }
+
+                                        fun formatSize(bytes: Long?): String {
+                                            if (bytes == null) return ""
+                                            if (bytes < 1024) return "$bytes B"
+                                            val exp = (Math.log(bytes.toDouble()) / Math.log(1024.0)).toInt()
+                                            val pre = "KMGTPE"[exp - 1]
+                                            return String.format(java.util.Locale.US, "%.1f %cB", bytes / Math.pow(1024.0, exp.toDouble()), pre)
+                                        }
+
+                                        state.fileEntries.forEach { entry ->
+                                            val dateStr = entry.lastModifiedMillis?.let { formatter.format(java.util.Date(it)) } ?: ""
+                                            val isHighlighted = entry.path == state.highlightFilePath
+                                            val itemBg = if (isHighlighted) colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent
+                                            Surface(
+                                                onClick = {
+                                                    if (entry.isDirectory) onNavigateFilesTo(entry.path)
+                                                    else onOpenFile(entry.path)
+                                                },
+                                                color = itemBg,
+                                                shape = if (isHighlighted) RoundedCornerShape(8.dp) else RectangleShape,
+                                                border = if (isHighlighted) BorderStroke(1.dp, colorScheme.primary) else null,
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                    FileIconOrThumbnail(entry = entry, colorScheme = colorScheme)
+                                                    Spacer(Modifier.width(12.dp))
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(entry.name, fontWeight = FontWeight.Bold, color = colorScheme.textPrimary)
+                                                        Text(entry.path, style = MaterialTheme.typography.bodySmall, color = colorScheme.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        Spacer(Modifier.height(4.dp))
+                                                        Row(
+                                                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
                                                         ) {
-                                                            FileIconOrThumbnail(entry = entry, colorScheme = colorScheme, size = 44.dp)
-                                                            Text(
-                                                                entry.name,
-                                                                style = MaterialTheme.typography.labelMedium,
-                                                                fontWeight = FontWeight.SemiBold,
-                                                                color = colorScheme.textPrimary,
-                                                                textAlign = TextAlign.Center,
-                                                                maxLines = 2,
-                                                                overflow = TextOverflow.Ellipsis,
-                                                                modifier = Modifier.heightIn(min = 36.dp)
-                                                            )
+                                                            val sizeText = formatSize(entry.sizeBytes)
+                                                            if (sizeText.isNotEmpty()) {
+                                                                Text(sizeText, style = MaterialTheme.typography.labelSmall, color = colorScheme.textSecondary.copy(alpha = 0.7f))
+                                                            }
+                                                            Text(dateStr, style = MaterialTheme.typography.labelSmall, color = colorScheme.textSecondary.copy(alpha = 0.7f))
                                                         }
                                                     }
-                                                } else {
-                                                    Spacer(Modifier.weight(1f))
+                                                    if (entry.isDirectory) Icon(Icons.Default.ChevronRight, contentDescription = null, tint = colorScheme.textSecondary)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    FileViewMode.GRID -> {
+                                        val columns = 3
+                                        val chunks = state.fileEntries.chunked(columns)
+                                        chunks.forEach { rowEntries ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                for (i in 0 until columns) {
+                                                    val entry = rowEntries.getOrNull(i)
+                                                    if (entry != null) {
+                                                        val isHighlighted = entry.path == state.highlightFilePath
+                                                        Surface(
+                                                            onClick = {
+                                                                if (entry.isDirectory) onNavigateFilesTo(entry.path)
+                                                                else onOpenFile(entry.path)
+                                                            },
+                                                            modifier = Modifier.weight(1f),
+                                                            shape = iOSSquircleSmall,
+                                                            color = if (isHighlighted) colorScheme.primary.copy(alpha = 0.15f) else colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                                            border = BorderStroke(
+                                                                width = if (isHighlighted) 1.5.dp else 0.5.dp,
+                                                                color = if (isHighlighted) colorScheme.primary else colorScheme.outline.copy(alpha = 0.1f)
+                                                            )
+                                                        ) {
+                                                            Column(
+                                                                modifier = Modifier.padding(12.dp),
+                                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                            ) {
+                                                                FileIconOrThumbnail(entry = entry, colorScheme = colorScheme, size = 44.dp)
+                                                                Text(
+                                                                    entry.name,
+                                                                    style = MaterialTheme.typography.labelMedium,
+                                                                    fontWeight = FontWeight.SemiBold,
+                                                                    color = colorScheme.textPrimary,
+                                                                    textAlign = TextAlign.Center,
+                                                                    maxLines = 2,
+                                                                    overflow = TextOverflow.Ellipsis,
+                                                                    modifier = Modifier.heightIn(min = 36.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    } else {
+                                                        Spacer(Modifier.weight(1f))
+                                                    }
                                                 }
                                             }
                                         }

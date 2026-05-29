@@ -13,6 +13,31 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
+object FtpFileSystemEvents {
+    var onItemChangedListener: (() -> Unit)? = null
+    
+    fun notifyItemChanged() {
+        onItemChangedListener?.invoke()
+    }
+}
+
+class TriggerCloseOutputStream(
+    private val delegate: OutputStream,
+    private val onClose: () -> Unit
+) : OutputStream() {
+    override fun write(b: Int) = delegate.write(b)
+    override fun write(b: ByteArray) = delegate.write(b)
+    override fun write(b: ByteArray, off: Int, len: Int) = delegate.write(b, off, len)
+    override fun flush() = delegate.flush()
+    override fun close() {
+        try {
+            delegate.close()
+        } finally {
+            onClose()
+        }
+    }
+}
+
 class AndroidFileSystemView(
     private val context: Context,
     private val homeDir: String,
@@ -250,16 +275,24 @@ class AndroidFtpFile(
 
     override fun delete(): Boolean {
         val doc = getDoc()
-        if (doc != null) {
-            return doc.delete()
+        val success = if (doc != null) {
+            doc.delete()
+        } else {
+            File(physicalPath).delete()
         }
-        return File(physicalPath).delete()
+        if (success) {
+            FtpFileSystemEvents.notifyItemChanged()
+        }
+        return success
     }
 
     override fun mkdir(): Boolean {
         val doc = SafStorageHelper.getOrCreateDocumentFileForPath(context, physicalPath, true)
-        if (doc != null) return true
-        return File(physicalPath).mkdir()
+        val success = if (doc != null) true else File(physicalPath).mkdir()
+        if (success) {
+            FtpFileSystemEvents.notifyItemChanged()
+        }
+        return success
     }
 
     override fun move(destination: FtpFile): Boolean {
@@ -276,28 +309,32 @@ class AndroidFtpFile(
         val srcFile = File(physicalPath)
         val destFile = File(destPhysicalPath)
 
-        if (srcFile.parent == destFile.parent) {
-            return doc.renameTo(destFile.name)
-        }
-
-        val destParentDoc = SafStorageHelper.getOrCreateDocumentFileForPath(context, destFile.parent ?: "", true) ?: return false
-        return if (doc.isFile) {
-            val destDoc = destParentDoc.createFile(doc.type ?: "application/octet-stream", destFile.name) ?: return false
-            try {
-                context.contentResolver.openInputStream(doc.uri)?.use { input ->
-                    context.contentResolver.openOutputStream(destDoc.uri)?.use { output ->
-                        input.copyTo(output)
+        val success = if (srcFile.parent == destFile.parent) {
+            doc.renameTo(destFile.name)
+        } else {
+            val destParentDoc = SafStorageHelper.getOrCreateDocumentFileForPath(context, destFile.parent ?: "", true) ?: return false
+            if (doc.isFile) {
+                val destDoc = destParentDoc.createFile(doc.type ?: "application/octet-stream", destFile.name) ?: return false
+                try {
+                    context.contentResolver.openInputStream(doc.uri)?.use { input ->
+                        context.contentResolver.openOutputStream(destDoc.uri)?.use { output ->
+                            input.copyTo(output)
+                        }
                     }
+                    doc.delete()
+                } catch (e: Exception) {
+                    false
                 }
-                doc.delete()
-            } catch (e: Exception) {
+            } else if (doc.isDirectory) {
+                recursiveMove(doc, destParentDoc, destFile.name)
+            } else {
                 false
             }
-        } else if (doc.isDirectory) {
-            recursiveMove(doc, destParentDoc, destFile.name)
-        } else {
-            false
         }
+        if (success) {
+            FtpFileSystemEvents.notifyItemChanged()
+        }
+        return success
     }
 
     private fun recursiveMove(srcDir: DocumentFile, destParent: DocumentFile, name: String): Boolean {
@@ -353,21 +390,25 @@ class AndroidFtpFile(
 
     override fun createOutputStream(offset: Long): OutputStream {
         val doc = SafStorageHelper.getOrCreateDocumentFileForPath(context, physicalPath, false)
-        if (doc != null) {
+        val baseStream = if (doc != null) {
             val mode = if (offset == 0L) "wt" else "rw"
             val pfd = context.contentResolver.openFileDescriptor(doc.uri, mode) ?: throw IOException("Failed to open file descriptor for $physicalPath")
             val stream = ParcelFileDescriptor.AutoCloseOutputStream(pfd)
             if (offset > 0) {
                 stream.channel.position(offset)
             }
-            return stream
+            stream
+        } else {
+            val file = File(physicalPath)
+            val stream = java.io.FileOutputStream(file, offset > 0)
+            if (offset > 0) {
+                stream.channel.position(offset)
+            }
+            stream
         }
-        val file = File(physicalPath)
-        val stream = java.io.FileOutputStream(file, offset > 0)
-        if (offset > 0) {
-            stream.channel.position(offset)
+        return TriggerCloseOutputStream(baseStream) {
+            FtpFileSystemEvents.notifyItemChanged()
         }
-        return stream
     }
 
     override fun listFiles(): List<FtpFile> {

@@ -76,6 +76,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } catch (_: Exception) {}
         // Check storage access state
         checkStorageAccess()
+
+        // Listen to FTP filesystem events (refresh UI when PC modifies files/folders)
+        FtpFileSystemEvents.onItemChangedListener = {
+            viewModelScope.launch(Dispatchers.Main) {
+                refreshFiles()
+            }
+        }
     }
 
     fun updateSearchQuery(query: String) {
