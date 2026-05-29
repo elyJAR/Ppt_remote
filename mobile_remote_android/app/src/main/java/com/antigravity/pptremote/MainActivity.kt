@@ -36,7 +36,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,8 +57,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.google.accompanist.swiperefresh.SwipeRefresh
-import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.launch
 import java.io.File
 import android.webkit.MimeTypeMap
@@ -392,16 +392,14 @@ class MainActivity : ComponentActivity() {
                 val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 val vibrator = vibratorManager?.defaultVibrator
                 vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // Android 8+ - Use Vibrator with VibrationEffect
-                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
             } else {
-                // Legacy - Use deprecated vibrate method
                 @Suppress("DEPRECATION")
                 val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                @Suppress("DEPRECATION")
-                vibrator?.vibrate(50)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    vibrator?.vibrate(50)
+                }
             }
         } catch (e: Exception) {
             // Haptic feedback is not critical, silently ignore errors
@@ -560,9 +558,12 @@ private fun RemoteScreen(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 vibratorManager?.defaultVibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            } else {
+                @Suppress("DEPRECATION")
                 val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator?.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+                }
             }
         } catch (_: Exception) {}
     }
@@ -831,8 +832,8 @@ private fun RemoteScreen(
             },
             containerColor = MaterialTheme.colorScheme.screenBg
         ) { innerPadding ->
-            SwipeRefresh(
-                state = rememberSwipeRefreshState(state.isRefreshing),
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
                 onRefresh = onRefresh,
                 modifier = Modifier.fillMaxSize().padding(innerPadding)
             ) {
@@ -900,7 +901,7 @@ private fun RemoteScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Icon(Icons.Default.Notes, contentDescription = null, tint = iOSAccent, modifier = Modifier.size(20.dp))
+                                            Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = null, tint = iOSAccent, modifier = Modifier.size(20.dp))
                                             Text(
                                                 "Speaker Notes",
                                                 style = MaterialTheme.typography.labelLarge,
@@ -1013,14 +1014,14 @@ private fun FilesScreen(
             CenterAlignedTopAppBar(
                 title = { Text("Files", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onClose) { Icon(Icons.Default.ArrowBack, contentDescription = "Close") }
+                    IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close") }
                 },
                 actions = {
                     IconButton(onClick = onRefreshFiles) { Icon(Icons.Default.Refresh, contentDescription = "Refresh") }
-                    IconButton(onClick = onLaunchSystemFilesApp) { Icon(Icons.Default.OpenInNew, contentDescription = "Open system Files") }
+                    IconButton(onClick = onLaunchSystemFilesApp) { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open system Files") }
                     IconButton(onClick = onOpenCurrentFilesFolderOnPc) { Icon(Icons.Default.OpenInBrowser, contentDescription = "Open on PC") }
                     IconButton(onClick = { showSortMenu = true }) {
-                        Icon(Icons.Default.Sort, contentDescription = "Sort files")
+                        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort files")
                     }
                     DropdownMenu(
                         expanded = showSortMenu,
@@ -1103,14 +1104,14 @@ private fun FilesScreen(
                             }
                         }
                     ) {
-                        Icon(
-                            imageVector = when (viewMode) {
-                                FileViewMode.LIST -> Icons.Default.List
-                                FileViewMode.DETAILED -> Icons.Default.ViewHeadline
-                                FileViewMode.GRID -> Icons.Default.GridView
-                            },
-                            contentDescription = "Change view mode"
-                        )
+                                Icon(
+                                    imageVector = when (viewMode) {
+                                        FileViewMode.LIST -> Icons.AutoMirrored.Filled.List
+                                        FileViewMode.DETAILED -> Icons.Default.ViewHeadline
+                                        FileViewMode.GRID -> Icons.Default.GridView
+                                    },
+                                    contentDescription = "Change view mode"
+                                )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -1342,7 +1343,7 @@ private fun FilesScreen(
                                         onClick = onLaunchSystemFilesApp,
                                         border = BorderStroke(1.dp, colorScheme.primary)
                                     ) {
-                                        Icon(Icons.Default.OpenInNew, contentDescription = null, tint = colorScheme.primary)
+                                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = colorScheme.primary)
                                         Spacer(Modifier.width(6.dp))
                                         Text("Open Native Files App")
                                     }
@@ -1350,8 +1351,8 @@ private fun FilesScreen(
                             }
                         }
 
-                        SwipeRefresh(
-                            state = rememberSwipeRefreshState(isRefreshing = state.filesLoading),
+                        PullToRefreshBox(
+                            isRefreshing = state.filesLoading,
                             onRefresh = onRefreshFiles,
                             modifier = Modifier.fillMaxWidth().weight(1f)
                         ) {
@@ -1731,14 +1732,14 @@ private fun SlideControlsCard(
             ) {
                 SlideNavButton(
                     label = "Prev",
-                    icon = Icons.Default.NavigateBefore,
+                    icon = Icons.AutoMirrored.Filled.NavigateBefore,
                     enabled = hasPresentation && inSlideshow,
                     modifier = Modifier.weight(1f),
                     onClick = onPrevious,
                 )
                 SlideNavButton(
                     label = "Next",
-                    icon = Icons.Default.NavigateNext,
+                    icon = Icons.AutoMirrored.Filled.NavigateNext,
                     enabled = hasPresentation && inSlideshow,
                     modifier = Modifier.weight(1f),
                     onClick = onNext,
@@ -1782,14 +1783,14 @@ private fun SlideControlsCard(
             ) {
                 SlideNavButton(
                     label = "Prev",
-                    icon = Icons.Default.ArrowBackIosNew,
+                    icon = Icons.AutoMirrored.Filled.ArrowBackIos,
                     enabled = hasPresentation && inSlideshow,
                     modifier = Modifier.weight(1f),
                     onClick = onPrevious,
                 )
                 SlideNavButton(
                     label = "Next",
-                    icon = Icons.Default.ArrowForwardIos,
+                    icon = Icons.AutoMirrored.Filled.ArrowForwardIos,
                     enabled = hasPresentation && inSlideshow,
                     modifier = Modifier.weight(1f),
                     onClick = onNext,
@@ -2258,7 +2259,7 @@ private fun SettingsScreen(
                 title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -2439,7 +2440,7 @@ private fun NotesScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
