@@ -564,6 +564,18 @@ class MainActivity : ComponentActivity() {
                         .show()
                 }
             }
+
+            override fun onRequestDownload(clientIp: String, fileName: String, onResponse: (Boolean) -> Unit) {
+                runOnUiThread {
+                    androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Download Request")
+                        .setMessage("A browser at $clientIp wants to download \"$fileName\". Allow download?")
+                        .setPositiveButton("Allow") { _, _ -> onResponse(true) }
+                        .setNegativeButton("Deny") { _, _ -> onResponse(false) }
+                        .setCancelable(false)
+                        .show()
+                }
+            }
         }
     }
 

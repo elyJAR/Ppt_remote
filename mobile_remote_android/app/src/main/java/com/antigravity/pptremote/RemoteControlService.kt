@@ -27,6 +27,39 @@ import kotlinx.coroutines.launch
 
 class RemoteControlService : Service() {
 
+    interface WebServerSecurityListener {
+        fun onRequestConnection(clientIp: String, onResponse: (Boolean) -> Unit)
+        fun onRequestDelete(clientIp: String, fileName: String, onResponse: (Boolean) -> Unit)
+        fun onRequestUpload(clientIp: String, fileName: String, onResponse: (Boolean) -> Unit)
+        fun onRequestDownload(clientIp: String, fileName: String, onResponse: (Boolean) -> Unit)
+    }
+
+    class SecurityDecision {
+        private var approved: Boolean? = null
+
+        @Synchronized
+        fun setDecision(value: Boolean) {
+            approved = value
+            (this as Object).notifyAll()
+        }
+
+        @Synchronized
+        fun getDecision(): Boolean {
+            val start = System.currentTimeMillis()
+            while (approved == null) {
+                val remaining = 20000 - (System.currentTimeMillis() - start)
+                if (remaining <= 0) break
+                try {
+                    (this as Object).wait(remaining)
+                } catch (e: InterruptedException) {
+                    break
+                }
+            }
+            return approved ?: false
+        }
+    }
+
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val client = BridgeClient()
     private var wakeLock: PowerManager.WakeLock? = null
@@ -53,38 +86,7 @@ class RemoteControlService : Service() {
         private val ftpManager = FtpServerManager()
         private var webFileServer: WebFileServer? = null
 
-        interface WebServerSecurityListener {
-            fun onRequestConnection(clientIp: String, onResponse: (Boolean) -> Unit)
-            fun onRequestDelete(clientIp: String, fileName: String, onResponse: (Boolean) -> Unit)
-            fun onRequestUpload(clientIp: String, fileName: String, onResponse: (Boolean) -> Unit)
-        }
-
         var securityListener: WebServerSecurityListener? = null
-
-        class SecurityDecision {
-            private var approved: Boolean? = null
-
-            @Synchronized
-            fun setDecision(value: Boolean) {
-                approved = value
-                (this as Object).notifyAll()
-            }
-
-            @Synchronized
-            fun getDecision(): Boolean {
-                val start = System.currentTimeMillis()
-                while (approved == null) {
-                    val remaining = 20000 - (System.currentTimeMillis() - start)
-                    if (remaining <= 0) break
-                    try {
-                        (this as Object).wait(remaining)
-                    } catch (e: InterruptedException) {
-                        break
-                    }
-                }
-                return approved ?: false
-            }
-        }
 
         fun toggleWebServer(context: Context, rootDir: String, pin: String) {
             val intent = Intent(context, RemoteControlService::class.java).apply {
