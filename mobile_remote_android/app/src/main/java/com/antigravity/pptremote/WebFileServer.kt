@@ -1,5 +1,7 @@
 package com.antigravity.pptremote
 
+import android.content.Context
+import android.content.Intent
 import android.util.Log
 import java.io.BufferedInputStream
 import java.io.BufferedReader
@@ -29,6 +31,7 @@ import java.util.zip.ZipOutputStream
  * Uses only standard Java socket APIs ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â no sun.* or external dependencies.
  */
 class WebFileServer(
+    private val context: Context,
     private val rootPath: String,
     private val pin: String,
     preferredPort: Int = 8686,
@@ -124,7 +127,7 @@ class WebFileServer(
             val path = if (questionMark >= 0) rawUri.substring(0, questionMark) else rawUri
             val query = if (questionMark >= 0) rawUri.substring(questionMark + 1) else ""
 
-            val exchange = HttpCtx(method, path, query, headers, ins, out)
+            val exchange = HttpCtx(method, path, query, headers, ins, out, socket.inetAddress.hostAddress ?: "unknown")
 
             when {
                 path == "/" || path.startsWith("/?") -> handleRoot(exchange)
@@ -150,7 +153,8 @@ class WebFileServer(
         val query: String,
         val requestHeaders: Map<String, String>,
         val bodyStream: InputStream,
-        private val out: OutputStream
+        private val out: OutputStream,
+        val clientIp: String
     ) {
         var responseCode: Int = 200
         val responseHeaders = mutableMapOf<String, MutableList<String>>()
@@ -306,6 +310,10 @@ class WebFileServer(
                     ?.let { URLDecoder.decode(it, "UTF-8") }
                     .orEmpty()
                 if (submitted == pin) {
+                    if (!requestConnectionPermission(exchange.clientIp)) {
+                        sendHtml(exchange, 401, buildLoginHtml(false, "Connection request denied by user."))
+                        return
+                    }
                     val token = UUID.randomUUID().toString()
                     activeSessionToken = token
                     exchange.addResponseHeader("Set-Cookie", "session=$token; Path=/; HttpOnly")
@@ -528,6 +536,58 @@ class WebFileServer(
         return dest.name
     }
 
+    private fun requestConnectionPermission(clientIp: String): Boolean {
+        val listener = RemoteControlService.securityListener
+        if (listener == null) {
+            try {
+                val intent = Intent(context, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra("LAUNCHED_FOR_AUTH", true)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.w("WebFileServer", "Could not start MainActivity for auth", e)
+            }
+            for (i in 0..15) {
+                if (RemoteControlService.securityListener != null) break
+                Thread.sleep(200)
+            }
+        }
+
+        val activeListener = RemoteControlService.securityListener ?: return false
+        val decision = RemoteControlService.SecurityDecision()
+        activeListener.onRequestConnection(clientIp) { approved ->
+            decision.setDecision(approved)
+        }
+        return decision.getDecision()
+    }
+
+    private fun requestDeletePermission(clientIp: String, fileName: String): Boolean {
+        val listener = RemoteControlService.securityListener
+        if (listener == null) {
+            try {
+                val intent = Intent(context, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra("LAUNCHED_FOR_AUTH", true)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.w("WebFileServer", "Could not start MainActivity for delete permission", e)
+            }
+            for (i in 0..15) {
+                if (RemoteControlService.securityListener != null) break
+                Thread.sleep(200)
+            }
+        }
+
+        val activeListener = RemoteControlService.securityListener ?: return false
+        val decision = RemoteControlService.SecurityDecision()
+        activeListener.onRequestDelete(clientIp, fileName) { approved ->
+            decision.setDecision(approved)
+        }
+        return decision.getDecision()
+    }
+
     private fun handleDelete(exchange: HttpCtx) {
         if (!requireAuth(exchange)) return
         if (exchange.method != "DELETE") {
@@ -544,6 +604,10 @@ class WebFileServer(
         }
         if (file.canonicalPath == File(rootPath).canonicalPath) {
             sendJson(exchange, 400, """{"error":"Cannot delete root"}""")
+            return
+        }
+        if (!requestDeletePermission(exchange.clientIp, file.name)) {
+            sendJson(exchange, 403, """{"error":"Delete request denied by user."}""")
             return
         }
         val deleted = if (file.isDirectory) file.deleteRecursively() else file.delete()
@@ -585,8 +649,12 @@ class WebFileServer(
     // ------------------------------------------------------------------
     // HTML generation
     // ------------------------------------------------------------
-    private fun buildLoginHtml(error: Boolean): String {
-        val errorMsg = if (error) "<p class='err'>&#x274C; Incorrect PIN, please try again.</p>" else ""
+    private fun buildLoginHtml(error: Boolean, customError: String? = null): String {
+        val errorMsg = when {
+            customError != null -> "<p class='err'>&#x274C; $customError</p>"
+            error -> "<p class='err'>&#x274C; Incorrect PIN, please try again.</p>"
+            else -> ""
+        }
         return """<!DOCTYPE html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PPT Remote &mdash; Unlock Files</title>

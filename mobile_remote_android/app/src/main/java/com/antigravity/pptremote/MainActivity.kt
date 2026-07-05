@@ -517,6 +517,44 @@ class MainActivity : ComponentActivity() {
         try { RemoteControlService.start(this) } catch (_: Exception) {}
     }
 
+    override fun onStart() {
+        super.onStart()
+        setupWebServerSecurityListener()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        RemoteControlService.securityListener = null
+    }
+
+    private fun setupWebServerSecurityListener() {
+        RemoteControlService.securityListener = object : RemoteControlService.WebServerSecurityListener {
+            override fun onRequestConnection(clientIp: String, onResponse: (Boolean) -> Unit) {
+                runOnUiThread {
+                    androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Connection Request")
+                        .setMessage("A browser at $clientIp wants to connect to the file transfer server. Allow access?")
+                        .setPositiveButton("Allow") { _, _ -> onResponse(true) }
+                        .setNegativeButton("Deny") { _, _ -> onResponse(false) }
+                        .setCancelable(false)
+                        .show()
+                }
+            }
+
+            override fun onRequestDelete(clientIp: String, fileName: String, onResponse: (Boolean) -> Unit) {
+                runOnUiThread {
+                    androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Delete Request")
+                        .setMessage("A browser at $clientIp wants to delete \"$fileName\". Approve deletion?")
+                        .setPositiveButton("Approve") { _, _ -> onResponse(true) }
+                        .setNegativeButton("Deny") { _, _ -> onResponse(false) }
+                        .setCancelable(false)
+                        .show()
+                }
+            }
+        }
+    }
+
     override fun onDestroy() { super.onDestroy() }
 
     override fun onResume() {
