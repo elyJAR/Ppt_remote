@@ -1,4 +1,4 @@
-﻿package com.antigravity.pptremote
+package com.antigravity.pptremote
 
 import android.util.Log
 import java.io.BufferedInputStream
@@ -551,7 +551,11 @@ $errorMsg
             "xls","xlsx","csv" -> "&#x1F4CA;"
             "ppt","pptx" -> "&#x1F4CA;"
             "txt","md","log","json","xml","yaml","yml" -> "&#x1F4C4;"
-            e    private fun getDriveName(path: String): String {
+            else -> "&#x1F4C4;"
+        }
+    }
+
+    private fun getDriveName(path: String): String {
         return if (path.contains("emulated") || path.endsWith("/0")) {
             "&#x1F4F1; Internal Storage"
         } else {
