@@ -42,7 +42,15 @@ jobs:
 
       - name: Generate Gradle Wrapper
         shell: bash
-        run: gradle wrapper --gradle-version 8.10.2
+        run: |
+          mkdir -p temp_gradle
+          cd temp_gradle
+          gradle wrapper --gradle-version 8.10.2
+          cd ..
+          cp -r temp_gradle/gradle .
+          cp temp_gradle/gradlew .
+          cp temp_gradle/gradlew.bat .
+          rm -rf temp_gradle
 
       # Keep the fallback signing key stable across workflow runs so release
       # APKs can update previously installed prerelease builds.
