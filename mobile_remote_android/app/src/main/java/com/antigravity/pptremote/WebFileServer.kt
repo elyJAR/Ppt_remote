@@ -1,4 +1,4 @@
-﻿package com.antigravity.pptremote
+package com.antigravity.pptremote
 
 import android.util.Log
 import java.io.BufferedInputStream
@@ -486,7 +486,8 @@ class WebFileServer(
 
     // ------------------------------------------------------------------
     // HTML generation
-    // ------------------------------------------------------------    private fun buildLoginHtml(error: Boolean): String {
+    // ------------------------------------------------------------
+    private fun buildLoginHtml(error: Boolean): String {
         val errorMsg = if (error) "<p class='err'>&#x274C; Incorrect PIN, please try again.</p>" else ""
         return """<!DOCTYPE html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
