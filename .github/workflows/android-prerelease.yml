@@ -53,6 +53,7 @@ jobs:
           cp temp_gradle/gradlew.bat .
           chmod +x gradlew
           rm -rf temp_gradle
+          rm -f gradle/gradle-daemon-jvm.properties
 
       # Keep the fallback signing key stable across workflow runs so release
       # APKs can update previously installed prerelease builds.
