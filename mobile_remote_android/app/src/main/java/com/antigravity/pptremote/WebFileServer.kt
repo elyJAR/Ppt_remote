@@ -449,12 +449,15 @@ class WebFileServer(
     }
 
     private fun parseMultipartAndSave(input: InputStream, boundary: String, dir: File): String? {
-        val separator = "\r\n--$boundary".toByteArray(StandardCharsets.ISO_8859_1)
+        val boundaryStr = "\r\n--$boundary"
+        val boundaryBytes = boundaryStr.toByteArray(StandardCharsets.ISO_8859_1)
+        val bis = java.io.BufferedInputStream(input, 64 * 1024)
+
         val headerStream = java.io.ByteArrayOutputStream()
         var b: Int
         var c1 = -1; var c2 = -1; var c3 = -1; var c4 = -1
         while (true) {
-            b = input.read()
+            b = bis.read()
             if (b == -1) break
             headerStream.write(b)
             c1 = c2; c2 = c3; c3 = c4; c4 = b
@@ -468,27 +471,55 @@ class WebFileServer(
 
         val out = FileOutputStream(dest)
         try {
-            val window = ByteArray(separator.size)
-            var windowLen = 0
-            while (windowLen < window.size) {
-                val next = input.read()
-                if (next == -1) break
-                window[windowLen++] = next.toByte()
-            }
+            val bufferSize = 64 * 1024
+            val buffer = ByteArray(bufferSize + boundaryBytes.size)
+            var bufferLen = 0
+
             while (true) {
-                if (windowLen == window.size && window.contentEquals(separator)) break
-                val endSep = "--$boundary--".toByteArray(StandardCharsets.ISO_8859_1)
-                if (windowLen >= endSep.size && window.sliceArray(0 until endSep.size).contentEquals(endSep)) break
-                if (windowLen == 0) break
-                out.write(window[0].toInt())
-                System.arraycopy(window, 1, window, 0, windowLen - 1)
-                val next = input.read()
-                if (next == -1) {
-                    windowLen--
-                    for (i in 0 until windowLen) out.write(window[i].toInt())
+                val space = bufferSize - bufferLen
+                if (space > 0) {
+                    val read = bis.read(buffer, bufferLen, space)
+                    if (read > 0) {
+                        bufferLen += read
+                    } else if (read == -1 && bufferLen == 0) {
+                        break
+                    }
+                }
+
+                if (bufferLen == 0) break
+
+                var boundaryIdx = -1
+                val searchLimit = bufferLen - boundaryBytes.size
+                for (i in 0..searchLimit) {
+                    var match = true
+                    for (j in boundaryBytes.indices) {
+                        if (buffer[i + j] != boundaryBytes[j]) {
+                            match = false
+                            break
+                        }
+                    }
+                    if (match) {
+                        boundaryIdx = i
+                        break
+                    }
+                }
+
+                if (boundaryIdx != -1) {
+                    if (boundaryIdx > 0) {
+                        out.write(buffer, 0, boundaryIdx)
+                    }
                     break
                 } else {
-                    window[window.size - 1] = next.toByte()
+                    val safeWriteLen = bufferLen - boundaryBytes.size + 1
+                    if (safeWriteLen > 0) {
+                        out.write(buffer, 0, safeWriteLen)
+                        val remaining = bufferLen - safeWriteLen
+                        System.arraycopy(buffer, safeWriteLen, buffer, 0, remaining)
+                        bufferLen = remaining
+                    } else {
+                        out.write(buffer, 0, bufferLen)
+                        break
+                    }
                 }
             }
         } finally {
