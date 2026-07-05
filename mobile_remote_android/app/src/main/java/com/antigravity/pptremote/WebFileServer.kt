@@ -1178,13 +1178,13 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
           <th class="cb-col"><input type="checkbox" id="selectAll" class="item-cb" onchange="toggleAll(this)" title="Select all"></th>
           <th>Name</th><th>Size</th><th>Modified</th><th></th>
         </tr></thead>
-        <tbody id="rows">$emptyRow$rows</tbody>
+        <tbody id="rows">$rows</tbody>
       </table>
     </div>
   </div>
   <!-- Grid view -->
   <div id="gridView" style="display:none">
-    <div class="grid-container" id="gridContainer">$emptyGrid$gridItems</div>
+    <div class="grid-container" id="gridContainer">$gridItems</div>
   </div>
   <!-- Upload area -->
   <div class="upload-area" id="dropZone">
