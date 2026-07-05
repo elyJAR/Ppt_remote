@@ -444,7 +444,7 @@ class WebFileServer(
             return
         }
         try {
-            val savedName = parseMultipartAndSave(exchange.bodyStream, boundary, dir)
+            val savedName = parseMultipartAndSave(exchange.bodyStream, boundary, dir, exchange.clientIp)
             if (savedName != null) {
                 sendJson(exchange, 200, """{"ok":true,"name":${jsonStr(savedName)}}""")
             } else {
@@ -452,11 +452,12 @@ class WebFileServer(
             }
         } catch (e: Exception) {
             Log.e("WebFileServer", "Upload failed", e)
-            sendJson(exchange, 500, """{"error":"Upload failed: ${e.message}"}""")
+            val msg = if (e.message == "Upload request denied by user") "Upload request denied by user." else "Upload failed: ${e.message}"
+            sendJson(exchange, 403, """{"error":"$msg"}""")
         }
     }
 
-    private fun parseMultipartAndSave(input: InputStream, boundary: String, dir: File): String? {
+    private fun parseMultipartAndSave(input: InputStream, boundary: String, dir: File, clientIp: String): String? {
         val boundaryStr = "\r\n--$boundary"
         val boundaryBytes = boundaryStr.toByteArray(StandardCharsets.ISO_8859_1)
         val bis = java.io.BufferedInputStream(input, 64 * 1024)
@@ -475,6 +476,11 @@ class WebFileServer(
         val filenameMatch = Regex("""filename="([^"]+)"""").find(headers) ?: return null
         val filename = filenameMatch.groupValues[1]
         if (filename.isBlank()) return null
+
+        if (!requestUploadPermission(clientIp, filename)) {
+            throw java.io.IOException("Upload request denied by user")
+        }
+
         val dest = File(dir, File(filename).name)
 
         val out = FileOutputStream(dest)
@@ -583,6 +589,32 @@ class WebFileServer(
         val activeListener = RemoteControlService.securityListener ?: return false
         val decision = RemoteControlService.SecurityDecision()
         activeListener.onRequestDelete(clientIp, fileName) { approved ->
+            decision.setDecision(approved)
+        }
+        return decision.getDecision()
+    }
+
+    private fun requestUploadPermission(clientIp: String, fileName: String): Boolean {
+        val listener = RemoteControlService.securityListener
+        if (listener == null) {
+            try {
+                val intent = Intent(context, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra("LAUNCHED_FOR_AUTH", true)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.w("WebFileServer", "Could not start MainActivity for upload permission", e)
+            }
+            for (i in 0..15) {
+                if (RemoteControlService.securityListener != null) break
+                Thread.sleep(200)
+            }
+        }
+
+        val activeListener = RemoteControlService.securityListener ?: return false
+        val decision = RemoteControlService.SecurityDecision()
+        activeListener.onRequestUpload(clientIp, fileName) { approved ->
             decision.setDecision(approved)
         }
         return decision.getDecision()

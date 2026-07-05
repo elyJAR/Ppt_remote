@@ -552,6 +552,18 @@ class MainActivity : ComponentActivity() {
                         .show()
                 }
             }
+
+            override fun onRequestUpload(clientIp: String, fileName: String, onResponse: (Boolean) -> Unit) {
+                runOnUiThread {
+                    androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Upload Request")
+                        .setMessage("A browser at $clientIp wants to upload \"$fileName\". Allow upload?")
+                        .setPositiveButton("Allow") { _, _ -> onResponse(true) }
+                        .setNegativeButton("Deny") { _, _ -> onResponse(false) }
+                        .setCancelable(false)
+                        .show()
+                }
+            }
         }
     }
 

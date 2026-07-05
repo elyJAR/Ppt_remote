@@ -56,6 +56,7 @@ class RemoteControlService : Service() {
         interface WebServerSecurityListener {
             fun onRequestConnection(clientIp: String, onResponse: (Boolean) -> Unit)
             fun onRequestDelete(clientIp: String, fileName: String, onResponse: (Boolean) -> Unit)
+            fun onRequestUpload(clientIp: String, fileName: String, onResponse: (Boolean) -> Unit)
         }
 
         var securityListener: WebServerSecurityListener? = null
