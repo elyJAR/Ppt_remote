@@ -835,6 +835,9 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
       <button class="upload-btn" onclick="uploadFiles()">&#x2B06; Upload</button>
     </div>
     <div class="progress" id="prog">Drag &amp; drop files here or click Choose Files</div>
+    <div id="progContainer" style="display:none;margin:1rem auto 0;background:rgba(255,255,255,0.06);border-radius:6px;height:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);max-width:500px;">
+      <div id="progBar" style="width:0%;height:100%;background:linear-gradient(90deg, #1f6feb, #388bfd);transition:width 0.1s ease"></div>
+    </div>
   </div>
 </main>
 <!-- Floating action bar -->
@@ -935,29 +938,85 @@ function deleteSelected() {
   });
 }
 // --- Upload -------------------------------------------------
+function formatSizeJs(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  else if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  else return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
 function updateSelectedFilesText() {
   var inp = document.getElementById('fileInput');
   var prog = document.getElementById('prog');
-  if (inp.files.length) prog.textContent = inp.files.length + ' file(s) selected â€” click Upload to send';
+  if (inp.files.length === 0) {
+    prog.textContent = 'Drag & drop files here or click Choose Files';
+    return;
+  }
+  var html = '<div style="text-align:left;max-width:500px;margin:0 auto;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:1rem;border-radius:8px;">';
+  html += '<div style="font-weight:600;margin-bottom:0.5rem;color:#58a6ff;">Selected ' + inp.files.length + ' file(s):</div>';
+  html += '<ul style="list-style:none;padding-left:0;max-height:150px;overflow-y:auto;font-size:0.85rem;line-height:1.5;">';
+  for (var i = 0; i < inp.files.length; i++) {
+    var f = inp.files[i];
+    html += '<li style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.03);padding:3px 0;"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:1rem;">&#x1F4C4; ' + f.name + '</span><span style="color:#8b949e;flex-shrink:0;">' + formatSizeJs(f.size) + '</span></li>';
+  }
+  html += '</ul>';
+  html += '<div style="margin-top:0.75rem;font-size:0.8rem;color:#8b949e;text-align:center;">Click <strong>Upload</strong> to start sending.</div>';
+  html += '</div>';
+  prog.innerHTML = html;
 }
 function uploadFiles() {
   var inp = document.getElementById('fileInput');
   var prog = document.getElementById('prog');
+  var container = document.getElementById('progContainer');
+  var bar = document.getElementById('progBar');
   if (!inp.files.length) { toast('Select at least one file', false); return; }
-  var files = Array.from(inp.files); var done = 0;
-  prog.textContent = 'Uploading ' + files.length + ' file(s)...';
-  files.forEach(function(file) {
-    var fd = new FormData(); fd.append('file', file);
-    fetch('/upload?path=' + encodeURIComponent(currentPath), {method:'POST', body:fd})
-      .then(function(r){ return r.json(); })
-      .then(function(j){
-        done++;
-        if (j.ok) prog.textContent = 'Uploaded ' + done + '/' + files.length + ' â€” ' + j.name;
-        else prog.textContent = 'Error: ' + j.error;
-        if (done === files.length) { toast('Upload complete!', true); setTimeout(function(){ location.reload(); }, 900); }
-      })
-      .catch(function(){ done++; prog.textContent = 'Upload failed for ' + file.name; });
-  });
+  
+  var files = Array.from(inp.files);
+  var currentIndex = 0;
+  
+  container.style.display = 'block';
+  bar.style.width = '0%';
+  
+  function uploadNext() {
+    if (currentIndex >= files.length) {
+      toast('Upload complete!', true);
+      setTimeout(function(){ location.reload(); }, 900);
+      return;
+    }
+    
+    var file = files[currentIndex];
+    var fd = new FormData();
+    fd.append('file', file);
+    
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/upload?path=' + encodeURIComponent(currentPath), true);
+    
+    xhr.upload.onprogress = function(e) {
+      if (e.lengthComputable) {
+        var pct = Math.round((e.loaded / e.total) * 100);
+        bar.style.width = pct + '%';
+        prog.innerHTML = '<div style="text-align:center;font-weight:500;">Uploading file ' + (currentIndex + 1) + ' of ' + files.length + ':<br><span style="color:#58a6ff;">' + file.name + '</span> (' + pct + '%)</div>';
+      }
+    };
+    
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        currentIndex++;
+        uploadNext();
+      } else {
+        var res = JSON.parse(xhr.responseText || '{}');
+        prog.innerHTML = '<span style="color:#f85149">Upload failed: ' + (res.error || 'Server error') + '</span>';
+        container.style.display = 'none';
+      }
+    };
+    
+    xhr.onerror = function() {
+      prog.innerHTML = '<span style="color:#f85149">Upload network failure</span>';
+      container.style.display = 'none';
+    };
+    
+    xhr.send(fd);
+  }
+  
+  uploadNext();
 }
 // --- Drag & drop upload -------------------------------------
 var dropZone = document.getElementById('dropZone');
