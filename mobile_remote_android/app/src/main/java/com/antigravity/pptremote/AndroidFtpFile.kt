@@ -261,21 +261,23 @@ class AndroidFtpFile(
 
     override fun createInputStream(offset: Long): InputStream {
         val doc = getDoc()
-        if (doc != null) {
+        val baseStream = if (doc != null) {
             val pfd = context.contentResolver.openFileDescriptor(doc.uri, "r") ?: throw IOException("Failed to open file descriptor for $physicalPath")
             val stream = ParcelFileDescriptor.AutoCloseInputStream(pfd)
             if (offset > 0) {
                 stream.channel.position(offset)
             }
-            return stream
+            stream
+        } else {
+            val file = File(physicalPath)
+            if (!file.exists()) throw IOException("File not found: $physicalPath")
+            val stream = java.io.FileInputStream(file)
+            if (offset > 0) {
+                stream.channel.position(offset)
+            }
+            stream
         }
-        val file = File(physicalPath)
-        if (!file.exists()) throw IOException("File not found: $physicalPath")
-        val stream = java.io.FileInputStream(file)
-        if (offset > 0) {
-            stream.channel.position(offset)
-        }
-        return stream
+        return java.io.BufferedInputStream(baseStream, 64 * 1024)
     }
 
     override fun createOutputStream(offset: Long): OutputStream {
@@ -296,7 +298,8 @@ class AndroidFtpFile(
             }
             stream
         }
-        return TriggerCloseOutputStream(baseStream) {
+        val buffered = java.io.BufferedOutputStream(baseStream, 64 * 1024)
+        return TriggerCloseOutputStream(buffered) {
             FtpFileSystemEvents.notifyItemChanged()
         }
     }
