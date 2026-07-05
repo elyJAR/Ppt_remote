@@ -100,6 +100,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -1019,7 +1020,7 @@ private enum class FileViewMode {
 @Composable
 private fun WebServerCard(
     state: RemoteState,
-    colorScheme: AppColorScheme,
+    colorScheme: ColorScheme,
     onToggle: () -> Unit,
     onPinChange: (String) -> Unit
 ) {
@@ -1143,7 +1144,7 @@ private fun WebServerCard(
                         modifier = Modifier.weight(1f),
                         label = { Text("PIN (digits only, leave blank for open)") },
                         singleLine = true,
-                        keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword),
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         shape = iOSSquircleSmall,
                         colors = OutlinedTextFieldDefaults.colors(
