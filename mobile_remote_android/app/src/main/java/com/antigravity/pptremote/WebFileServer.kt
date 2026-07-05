@@ -739,19 +739,108 @@ input:focus{outline:none;border-color:#58a6ff;box-shadow:0 0 0 3px rgba(88, 166,
 button{width:100%;padding:.8rem;background:linear-gradient(135deg, #1f6feb, #388bfd);border:none;border-radius:8px;color:#fff;font-size:1rem;font-weight:600;cursor:pointer;margin-top:.8rem;transition:transform 0.1s, filter 0.2s}
 button:hover{filter:brightness(1.15)}
 button:active{transform:scale(0.98)}
-.err{color:#f85149;margin:.5rem 0;font-size:.9rem;background:rgba(248, 81, 73, 0.1);padding:0.5rem;border-radius:6px;border:1px solid rgba(248, 81, 73, 0.2)}
-p.hint{color:#8b949e;font-size:.8rem;margin-top:1.5rem;line-height:1.4}
+
+.overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(10, 13, 22, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+.overlay-card {
+  background: rgba(22, 27, 34, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  width: 320px;
+  text-align: center;
+  box-shadow: 0 24px 50px rgba(0,0,0,0.5);
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.overlay-card h3 {
+  color: #58a6ff;
+  font-size: 1.3rem;
+  margin: 1rem 0 0.5rem;
+  font-weight: 700;
+}
+.overlay-card p {
+  color: #8b949e;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+.overlay-close-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #8b949e;
+  padding: 0.5rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.overlay-close-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(88, 166, 255, 0.1);
+  border-left-color: #58a6ff;
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scaleUp {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
 </style></head><body>
 <div class="card">
 <h2>&#x1F4C1; File Transfer</h2>
 <p class="subtitle">Access files on this device</p>
 $errorMsg
-<form method="post" action="/login">
+<form method="post" action="/login" onsubmit="showApprovalOverlay('Waiting for Connection','Please approve the connection request on your phone app.')">
 <input type="password" name="pin" placeholder="PIN" autofocus inputmode="numeric" maxlength="8">
 <button type="submit">Unlock Files</button>
 </form>
 <p class="hint">Enter the access PIN displayed on the PPT Remote mobile app.</p>
-</div></body></html>"""
+</div>
+<div id="approvalOverlay" class="overlay" style="display:none;">
+  <div class="overlay-card">
+    <div class="spinner"></div>
+    <h3 id="approvalTitle">Waiting for Approval</h3>
+    <p id="approvalMsg">Please approve the connection request on your phone app.</p>
+    <button class="overlay-close-btn" onclick="hideApprovalOverlay()">Dismiss</button>
+  </div>
+</div>
+<script>
+function showApprovalOverlay(actionText, msg) {
+  var overlay = document.getElementById('approvalOverlay');
+  var title = document.getElementById('approvalTitle');
+  var p = document.getElementById('approvalMsg');
+  if (actionText) title.textContent = actionText;
+  if (msg) p.textContent = msg;
+  overlay.style.display = 'flex';
+}
+function hideApprovalOverlay() {
+  document.getElementById('approvalOverlay').style.display = 'none';
+}
+</script>
+</body></html>"""
     }
 
     private fun formatSize(bytes: Long): String = when {
@@ -826,14 +915,14 @@ $errorMsg
             else
                 "<span class='file-name'>$icon ${f.name}</span>"
             val actions = if (f.isDirectory)
-                "<a class='btn' href='/download-zip?path=$enc' download>&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',true)\">&#x1F5D1;</button>"
+                "<a class='btn' href='/download-zip?path=$enc' download onclick=\"showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.'); setTimeout(hideApprovalOverlay, 6000);\">&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',true)\">&#x1F5D1;</button>"
             else
-                "<a class='btn' href='/download?path=$enc' download>&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',false)\">&#x1F5D1;</button>"
+                "<a class='btn' href='/download?path=$enc' download onclick=\"showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.'); setTimeout(hideApprovalOverlay, 6000);\">&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',false)\">&#x1F5D1;</button>"
             tableRows.append("<tr><td class='cb-col'><input type='checkbox' class='item-cb' data-path='$enc' data-name='$safeName' data-type='$type' onchange='updateActionBar()'></td><td>$nameCell</td><td>$size</td><td>$date</td><td class='act'>$actions</td></tr>\n")
 
             // Grid item
             val gridClick = if (f.isDirectory) "if(!event.target.matches('input,a,button')){window.location='/?path=$enc'}" else ""
-            val gridDownload = "<a class='btn-sm' href='${if (f.isDirectory) "/download-zip?path=" else "/download?path="}$enc' download onclick='event.stopPropagation()'>&#x2B07;</a><button class='del-sm' onclick=\"event.stopPropagation();delItem('$enc','$safeName',${f.isDirectory})\">&#x1F5D1;</button>"
+            val gridDownload = "<a class='btn-sm' href='${if (f.isDirectory) "/download-zip?path=" else "/download?path="}$enc' download onclick=\"event.stopPropagation(); showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.'); setTimeout(hideApprovalOverlay, 6000);\">&#x2B07;</a><button class='del-sm' onclick=\"event.stopPropagation();delItem('$enc','$safeName',${f.isDirectory})\">&#x1F5D1;</button>"
             gridItems.append("<div class='grid-item $type' onclick=\"$gridClick\"><input type='checkbox' class='item-cb grid-cb' data-path='$enc' data-name='$safeName' data-type='$type' onchange='event.stopPropagation();updateActionBar()'><div class='grid-icon'>$icon</div><div class='grid-name' title='${f.name}'>${f.name}</div><div class='grid-size'>$size</div><div class='grid-actions'>$gridDownload</div></div>\n")
         }
 
@@ -962,6 +1051,75 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
 .toast{animation:none}@keyframes toastIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
 .toast.show{animation:toastIn 0.3s ease}
 @media(max-width:600px){.grid-container{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}.root-badge{display:none}}
+
+.overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(10, 13, 22, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+.overlay-card {
+  background: rgba(22, 27, 34, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  width: 320px;
+  text-align: center;
+  box-shadow: 0 24px 50px rgba(0,0,0,0.5);
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.overlay-card h3 {
+  color: #58a6ff;
+  font-size: 1.3rem;
+  margin: 1rem 0 0.5rem;
+  font-weight: 700;
+}
+.overlay-card p {
+  color: #8b949e;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+.overlay-close-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #8b949e;
+  padding: 0.5rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.overlay-close-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(88, 166, 255, 0.1);
+  border-left-color: #58a6ff;
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scaleUp {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
 </style></head>
 <body>
 <header>
@@ -1015,7 +1173,26 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   <button class="bar-btn bar-clear" onclick="clearSelection()">&#x2715; Clear</button>
 </div>
 <div class="toast" id="toast"></div>
+<div id="approvalOverlay" class="overlay" style="display:none;">
+  <div class="overlay-card">
+    <div class="spinner"></div>
+    <h3 id="approvalTitle">Waiting for Approval</h3>
+    <p id="approvalMsg">Please approve this action on your phone.</p>
+    <button class="overlay-close-btn" onclick="hideApprovalOverlay()">Dismiss</button>
+  </div>
+</div>
 <script>
+function showApprovalOverlay(actionText, msg) {
+  var overlay = document.getElementById('approvalOverlay');
+  var title = document.getElementById('approvalTitle');
+  var p = document.getElementById('approvalMsg');
+  if (actionText) title.textContent = actionText;
+  if (msg) p.textContent = msg;
+  overlay.style.display = 'flex';
+}
+function hideApprovalOverlay() {
+  document.getElementById('approvalOverlay').style.display = 'none';
+}
 var currentPath = decodeURIComponent("$encodedPath");
 // --- Toast --------------------------------------------------
 function toast(msg, ok) {
@@ -1066,6 +1243,9 @@ function downloadSelected() {
   var checked = Array.from(document.querySelectorAll('.item-cb:checked'));
   if (!checked.length) return;
   
+  showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.');
+  setTimeout(hideApprovalOverlay, 6000);
+
   if (checked.length === 1 && checked[0].dataset.type === 'file') {
     var a = document.createElement('a');
     a.href = '/download?path=' + checked[0].dataset.path;
@@ -1084,24 +1264,27 @@ function downloadSelected() {
 function delItem(enc, name, isDir) {
   var what = isDir ? 'folder' : 'file';
   if (!confirm('Delete ' + what + ' "' + name + '"? This cannot be undone.')) return;
+  showApprovalOverlay('Approving Deletion', 'Please approve deleting "' + name + '" on your phone.');
   fetch('/delete?path=' + enc, {method:'DELETE'})
     .then(function(r){ return r.json(); })
     .then(function(j){
+      hideApprovalOverlay();
       if (j.ok) { toast('Deleted: ' + name, true); setTimeout(function(){ location.reload(); }, 700); }
       else { toast('Error: ' + j.error, false); }
     })
-    .catch(function(){ toast('Delete failed', false); });
+    .catch(function(){ hideApprovalOverlay(); toast('Delete failed', false); });
 }
 function deleteSelected() {
   var checked = Array.from(document.querySelectorAll('.item-cb:checked'));
   if (!checked.length) return;
   if (!confirm('Delete ' + checked.length + ' item(s)? This cannot be undone.')) return;
   var total = checked.length; var done = 0;
+  showApprovalOverlay('Approving Deletion', 'Please approve the deletion requests on your phone.');
   checked.forEach(function(cb) {
     fetch('/delete?path=' + cb.dataset.path, {method:'DELETE'})
       .then(function(r){ return r.json(); })
-      .then(function(){ done++; if (done === total) { toast('Deleted ' + total + ' item(s)', true); setTimeout(function(){ location.reload(); }, 700); } })
-      .catch(function(){ done++; });
+      .then(function(){ done++; if (done === total) { hideApprovalOverlay(); toast('Deleted ' + total + ' item(s)', true); setTimeout(function(){ location.reload(); }, 700); } })
+      .catch(function(){ done++; if (done === total) { hideApprovalOverlay(); } });
   });
 }
 // --- Upload -------------------------------------------------
@@ -1141,6 +1324,7 @@ function uploadFiles() {
   
   container.style.display = 'block';
   bar.style.width = '0%';
+  showApprovalOverlay('Approving Upload', 'Please approve uploading files on your phone.');
   
   function uploadNext() {
     if (currentIndex >= files.length) {
@@ -1157,6 +1341,7 @@ function uploadFiles() {
     xhr.open('POST', '/upload?path=' + encodeURIComponent(currentPath), true);
     
     xhr.upload.onprogress = function(e) {
+      hideApprovalOverlay();
       if (e.lengthComputable) {
         var pct = Math.round((e.loaded / e.total) * 100);
         bar.style.width = pct + '%';
