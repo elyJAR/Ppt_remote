@@ -51,6 +51,7 @@ jobs:
           cp -r temp_gradle/gradle .
           cp temp_gradle/gradlew .
           cp temp_gradle/gradlew.bat .
+          chmod +x gradlew
           rm -rf temp_gradle
 
       # Keep the fallback signing key stable across workflow runs so release
