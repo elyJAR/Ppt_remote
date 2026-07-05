@@ -1,4 +1,4 @@
-package com.antigravity.pptremote
+﻿package com.antigravity.pptremote
 
 import android.util.Log
 import java.io.BufferedInputStream
@@ -24,7 +24,7 @@ import java.util.concurrent.Executors
  * Lightweight HTTP server that lets any browser on the LAN browse, download,
  * upload and delete files from the phone's storage. Protected by a PIN.
  *
- * Uses only standard Java socket APIs Ã¢â‚¬â€ no sun.* or external dependencies.
+ * Uses only standard Java socket APIs ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â no sun.* or external dependencies.
  */
 class WebFileServer(
     private val rootPath: String,
@@ -139,7 +139,7 @@ class WebFileServer(
         }
     }
 
-    /** Minimal HTTP context passed to each handler Ã¢â‚¬â€ mirrors com.sun.net.httpserver.HttpExchange */
+    /** Minimal HTTP context passed to each handler ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â mirrors com.sun.net.httpserver.HttpExchange */
     private inner class HttpCtx(
         val method: String,
         val path: String,
@@ -829,7 +829,7 @@ function deleteSelected() {
 function updateSelectedFilesText() {
   var inp = document.getElementById('fileInput');
   var prog = document.getElementById('prog');
-  if (inp.files.length) prog.textContent = inp.files.length + ' file(s) selected â€” click Upload to send';
+  if (inp.files.length) prog.textContent = inp.files.length + ' file(s) selected Ã¢â‚¬â€ click Upload to send';
 }
 function uploadFiles() {
   var inp = document.getElementById('fileInput');
@@ -843,7 +843,7 @@ function uploadFiles() {
       .then(function(r){ return r.json(); })
       .then(function(j){
         done++;
-        if (j.ok) prog.textContent = 'Uploaded ' + done + '/' + files.length + ' â€” ' + j.name;
+        if (j.ok) prog.textContent = 'Uploaded ' + done + '/' + files.length + ' Ã¢â‚¬â€ ' + j.name;
         else prog.textContent = 'Error: ' + j.error;
         if (done === files.length) { toast('Upload complete!', true); setTimeout(function(){ location.reload(); }, 900); }
       })
@@ -864,3 +864,5 @@ dropZone.addEventListener('drop', function(e){
 }, false);
 </script>
 </body></html>"""
+}
+}
