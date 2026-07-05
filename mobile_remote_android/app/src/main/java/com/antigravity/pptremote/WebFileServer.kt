@@ -926,8 +926,8 @@ function hideApprovalOverlay() {
             gridItems.append("<div class='grid-item $type' onclick=\"$gridClick\"><input type='checkbox' class='item-cb grid-cb' data-path='$enc' data-name='$safeName' data-type='$type' onchange='event.stopPropagation();updateActionBar()'><div class='grid-icon'>$icon</div><div class='grid-name' title='${f.name}'>${f.name}</div><div class='grid-size'>$size</div><div class='grid-actions'>$gridDownload</div></div>\n")
         }
 
-        val emptyRow = if (files.isEmpty()) "<tr><td></td><td colspan='4' class='empty'>&#x1F4C1; This folder is empty</td></tr>" else ""
-        val emptyGrid = if (files.isEmpty()) "<div class='grid-empty'>&#x1F4C1; This folder is empty</div>" else ""
+        val emptyRow = "<tr id='tableEmptyRow' style='${if (files.isEmpty()) "" else "display:none;"}'><td></td><td colspan='4' class='empty empty-text'>&#x1F4C1; This folder is empty</td></tr>"
+        val emptyGrid = "<div class='grid-empty' style='${if (files.isEmpty()) "display:flex;" else "display:none;"}'>&#x1F4C1; This folder is empty</div>"
 
         val parentLink = if (canonical.path != File(activeRootPath).canonicalPath) {
             val parentFile = canonical.parentFile ?: File(activeRootPath)
@@ -1051,6 +1051,39 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
 .toast{animation:none}@keyframes toastIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
 .toast.show{animation:toastIn 0.3s ease}
 @media(max-width:600px){.grid-container{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}.root-badge{display:none}}
+.search-bar-container {
+  display: flex;
+  align-items: center;
+  background: rgba(22, 27, 34, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 0.55rem 0.85rem;
+  margin: 1.25rem 1.25rem 0 1.25rem;
+  max-width: 400px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-bar-container:focus-within {
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+.search-icon {
+  color: #8b949e;
+  font-size: 0.95rem;
+  margin-right: 0.5rem;
+  user-select: none;
+}
+#searchInput {
+  background: transparent;
+  border: none;
+  color: #e6edf3;
+  font-family: inherit;
+  font-size: 0.9rem;
+  width: 100%;
+  outline: none;
+}
+#searchInput::placeholder {
+  color: #8b949e;
+}
 
 .overlay {
   position: fixed;
@@ -1132,6 +1165,10 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   </div>
 </header>
 <main>
+  <div class="search-bar-container">
+    <span class="search-icon">&#x1F50D;</span>
+    <input type="text" id="searchInput" placeholder="Search files and folders..." oninput="filterItems()">
+  </div>
   $drivesHtml
   <!-- List view -->
   <div id="listView">
@@ -1141,13 +1178,13 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
           <th class="cb-col"><input type="checkbox" id="selectAll" class="item-cb" onchange="toggleAll(this)" title="Select all"></th>
           <th>Name</th><th>Size</th><th>Modified</th><th></th>
         </tr></thead>
-        <tbody id="rows">$rows</tbody>
+        <tbody id="rows">$emptyRow$rows</tbody>
       </table>
     </div>
   </div>
   <!-- Grid view -->
   <div id="gridView" style="display:none">
-    <div class="grid-container" id="gridContainer">$gridItems</div>
+    <div class="grid-container" id="gridContainer">$emptyGrid$gridItems</div>
   </div>
   <!-- Upload area -->
   <div class="upload-area" id="dropZone">
@@ -1382,6 +1419,72 @@ var fileInput = document.getElementById('fileInput');
 dropZone.addEventListener('drop', function(e){
   fileInput.files = e.dataTransfer.files; updateSelectedFilesText();
 }, false);
+
+function filterItems() {
+  var query = document.getElementById('searchInput').value.toLowerCase().trim();
+  
+  // 1. Filter table rows
+  var rows = document.querySelectorAll('#rows tr');
+  var visibleRows = 0;
+  rows.forEach(function(row) {
+    if (row.id === 'tableEmptyRow') return;
+    var link = row.querySelector('.folder-link');
+    if (link && link.textContent.trim() === '..') return;
+    
+    var name = '';
+    var nameSpan = row.querySelector('.file-name');
+    if (nameSpan) name = nameSpan.textContent;
+    else if (link) name = link.textContent;
+    
+    name = name.toLowerCase();
+    if (name.includes(query)) {
+      row.style.display = '';
+      visibleRows++;
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  var tableEmptyRow = document.getElementById('tableEmptyRow');
+  if (tableEmptyRow) {
+    if (visibleRows === 0 && query !== "") {
+      tableEmptyRow.style.display = '';
+      tableEmptyRow.querySelector('.empty-text').textContent = '🔍 No matching files found';
+    } else if (rows.length === 0 || (rows.length === 1 && rows[0].querySelector('.folder-link') && rows[0].querySelector('.folder-link').textContent.trim() === '..')) {
+      tableEmptyRow.style.display = '';
+      tableEmptyRow.querySelector('.empty-text').innerHTML = '&#x1F4C1; This folder is empty';
+    } else {
+      tableEmptyRow.style.display = 'none';
+    }
+  }
+
+  // 2. Filter grid items
+  var gridItems = document.querySelectorAll('#gridContainer .grid-item');
+  var visibleGridItems = 0;
+  gridItems.forEach(function(item) {
+    var nameDiv = item.querySelector('.grid-name');
+    var name = nameDiv ? nameDiv.textContent.toLowerCase() : "";
+    if (name.includes(query)) {
+      item.style.display = '';
+      visibleGridItems++;
+    } else {
+      item.style.display = 'none';
+    }
+  });
+
+  var gridEmpty = document.querySelector('#gridContainer .grid-empty');
+  if (gridEmpty) {
+    if (visibleGridItems === 0 && query !== "") {
+      gridEmpty.style.display = 'flex';
+      gridEmpty.textContent = '🔍 No matching files found';
+    } else if (gridItems.length === 0) {
+      gridEmpty.style.display = 'flex';
+      gridEmpty.innerHTML = '&#x1F4C1; This folder is empty';
+    } else {
+      gridEmpty.style.display = 'none';
+    }
+  }
+}
 </script>
 </body></html>"""
 }
