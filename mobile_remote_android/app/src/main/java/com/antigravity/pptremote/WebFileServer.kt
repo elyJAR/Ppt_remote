@@ -24,12 +24,13 @@ import java.util.concurrent.Executors
  * Lightweight HTTP server that lets any browser on the LAN browse, download,
  * upload and delete files from the phone's storage. Protected by a PIN.
  *
- * Uses only standard Java socket APIs ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â no sun.* or external dependencies.
+ * Uses only standard Java socket APIs ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â no sun.* or external dependencies.
  */
 class WebFileServer(
     private val rootPath: String,
     private val pin: String,
-    preferredPort: Int = 8686
+    preferredPort: Int = 8686,
+    private val allowedRoots: List<String> = listOf(rootPath)
 ) {
     var port: Int = preferredPort
         private set
@@ -139,7 +140,7 @@ class WebFileServer(
         }
     }
 
-    /** Minimal HTTP context passed to each handler ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â mirrors com.sun.net.httpserver.HttpExchange */
+    /** Minimal HTTP context passed to each handler ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â mirrors com.sun.net.httpserver.HttpExchange */
     private inner class HttpCtx(
         val method: String,
         val path: String,
@@ -249,10 +250,19 @@ class WebFileServer(
     private fun safeResolve(rawPath: String?): File? {
         if (rawPath.isNullOrBlank()) return null
         val decoded = URLDecoder.decode(rawPath, "UTF-8")
-        val resolved = File(rootPath, decoded).canonicalFile
-        val root = File(rootPath).canonicalFile
-        val rootPathWithSeparator = if (root.path.endsWith(File.separator)) root.path else root.path + File.separator
-        return if (resolved.path == root.path || resolved.path.startsWith(rootPathWithSeparator)) resolved else null
+        val resolved = if (decoded.startsWith("/")) {
+            File(decoded).canonicalFile
+        } else {
+            File(rootPath, decoded).canonicalFile
+        }
+        for (allowed in allowedRoots) {
+            val rootFile = File(allowed).canonicalFile
+            val rootPathWithSeparator = if (rootFile.path.endsWith(File.separator)) rootFile.path else rootFile.path + File.separator
+            if (resolved.path == rootFile.path || resolved.path.startsWith(rootPathWithSeparator)) {
+                return resolved
+            }
+        }
+        return null
     }
 
     // ------------------------------------------------------------------
@@ -541,27 +551,33 @@ $errorMsg
             "xls","xlsx","csv" -> "&#x1F4CA;"
             "ppt","pptx" -> "&#x1F4CA;"
             "txt","md","log","json","xml","yaml","yml" -> "&#x1F4C4;"
-            else -> "&#x1F4C4;"
+            e    private fun getDriveName(path: String): String {
+        return if (path.contains("emulated") || path.endsWith("/0")) {
+            "&#x1F4F1; Internal Storage"
+        } else {
+            "&#x1F4BE; SD Card"
         }
     }
 
     private fun buildBrowserHtml(dir: File): String {
-        val root = File(rootPath).canonicalFile
         val canonical = dir.canonicalFile
-        val relPath = canonical.path.removePrefix(root.path).ifEmpty { "/" }
+        val activeRootPath = allowedRoots.firstOrNull { canonical.path.startsWith(File(it).canonicalPath) } ?: rootPath
+        val activeRootDisplay = getDriveName(activeRootPath).replace("&#x1F4F1; ", "").replace("&#x1F4BE; ", "")
+        val relPath = canonical.path.removePrefix(File(activeRootPath).canonicalPath).ifEmpty { "/" }
 
         val parts = relPath.split("/").filter { it.isNotEmpty() }
         val breadcrumbs = buildString {
-            append("<a href='/?path=' class='bc-item'>&#x1F4F1; Storage</a>")
-            var accumulated = ""
+            val rootEnc = URLEncoder.encode(activeRootPath, "UTF-8")
+            append("<a href='/?path=$rootEnc' class='bc-item'>&#x1F4F1; $activeRootDisplay</a>")
+            var accumulated = activeRootPath
             parts.forEach { seg ->
-                accumulated += "/$seg"
+                accumulated = File(accumulated, seg).path
                 val enc = URLEncoder.encode(accumulated, "UTF-8")
                 append("<span class='bc-sep'>/</span><a href='/?path=$enc' class='bc-item'>$seg</a>")
             }
         }
 
-        val encodedPath = URLEncoder.encode(relPath.ifEmpty { "/" }, "UTF-8")
+        val encodedPath = URLEncoder.encode(canonical.path, "UTF-8")
         val files = (canonical.listFiles() ?: emptyArray())
             .sortedWith(compareByDescending<File> { it.isDirectory }.thenBy { it.name.lowercase() })
 
@@ -569,8 +585,7 @@ $errorMsg
         val gridItems = StringBuilder()
 
         files.forEach { f ->
-            val fRelPath = f.canonicalPath.removePrefix(root.path)
-            val enc = URLEncoder.encode(fRelPath, "UTF-8")
+            val enc = URLEncoder.encode(f.canonicalPath, "UTF-8")
             val icon = if (f.isDirectory) "&#x1F4C1;" else fileIcon(f.name)
             val size = if (f.isDirectory) "&mdash;" else formatSize(f.length())
             val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
@@ -597,18 +612,41 @@ $errorMsg
 
         val emptyRow = if (files.isEmpty()) "<tr><td></td><td colspan='4' class='empty'>&#x1F4C1; This folder is empty</td></tr>" else ""
         val emptyGrid = if (files.isEmpty()) "<div class='grid-empty'>&#x1F4C1; This folder is empty</div>" else ""
-        val parentLink = if (relPath != "/" && relPath.isNotEmpty()) {
-            val parentRel = File(relPath).parent ?: "/"
-            val enc = URLEncoder.encode(parentRel, "UTF-8")
+
+        val parentLink = if (canonical.path != File(activeRootPath).canonicalPath) {
+            val parentFile = canonical.parentFile ?: File(activeRootPath)
+            val enc = URLEncoder.encode(parentFile.canonicalPath, "UTF-8")
             "<tr><td class='cb-col'></td><td><a href='/?path=$enc' class='folder-link'>&#x1F4C1; ..</a></td><td>&mdash;</td><td>&mdash;</td><td></td></tr>\n"
         } else ""
 
-        val rootDisplay = rootPath.let { if (it.length > 38) "&hellip;${it.takeLast(38)}" else it }
-        return buildBrowserHtmlPage(breadcrumbs, parentLink + tableRows + emptyRow, gridItems.toString() + emptyGrid, encodedPath, rootDisplay)
+        val rootDisplay = activeRootPath.let { if (it.length > 38) "&hellip;${it.takeLast(38)}" else it }
+
+        val drivesHtml = if (allowedRoots.size > 1) {
+            buildString {
+                append("<div class='drives-bar'>")
+                allowedRoots.forEach { path ->
+                    val driveName = getDriveName(path)
+                    val enc = URLEncoder.encode(path, "UTF-8")
+                    val isCurrent = canonical.path.startsWith(File(path).canonicalPath)
+                    val activeClass = if (isCurrent) "active-drive" else ""
+                    append("<a href='/?path=$enc' class='drive-btn $activeClass'>$driveName</a>")
+                }
+                append("</div>")
+            }
+        } else ""
+
+        return buildBrowserHtmlPage(breadcrumbs, parentLink + tableRows + emptyRow, gridItems.toString() + emptyGrid, encodedPath, rootDisplay, drivesHtml)
     }
 
     @Suppress("LongMethod")
-    private fun buildBrowserHtmlPage(breadcrumbs: String, rows: String, gridItems: String, encodedPath: String, rootDisplay: String): String = """<!DOCTYPE html>
+    private fun buildBrowserHtmlPage(
+        breadcrumbs: String,
+        rows: String,
+        gridItems: String,
+        encodedPath: String,
+        rootDisplay: String,
+        drivesHtml: String
+    ): String = """<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PPT Remote &mdash; Files</title>
@@ -629,6 +667,11 @@ header h1{color:#58a6ff;font-size:1.15rem;font-weight:700;letter-spacing:-0.01em
 .view-btn{background:transparent;border:none;color:#8b949e;padding:5px 9px;border-radius:5px;cursor:pointer;font-size:1rem;transition:all 0.2s;line-height:1}
 .view-btn.active{background:rgba(88,166,255,0.15);color:#58a6ff}
 main{max-width:1200px;margin:1.5rem auto;padding:0 1.5rem 6rem}
+/* Drives Bar */
+.drives-bar{display:flex;gap:0.6rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.drive-btn{background:rgba(22,27,34,0.6);border:1px solid rgba(255,255,255,0.08);color:#8b949e;padding:0.5rem 0.9rem;border-radius:8px;text-decoration:none;font-size:0.85rem;font-weight:500;transition:all 0.2s}
+.drive-btn:hover{background:rgba(255,255,255,0.1);color:#e6edf3;border-color:rgba(255,255,255,0.15)}
+.drive-btn.active-drive{background:rgba(88,166,255,0.12);border-color:#58a6ff;color:#58a6ff}
 .table-container{background:rgba(22,27,34,0.4);border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,0.25)}
 table{width:100%;border-collapse:collapse}
 th{text-align:left;padding:0.9rem 1.1rem;color:#8b949e;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em}
@@ -703,6 +746,7 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   </div>
 </header>
 <main>
+  $drivesHtml
   <!-- List view -->
   <div id="listView">
     <div class="table-container">
@@ -829,7 +873,7 @@ function deleteSelected() {
 function updateSelectedFilesText() {
   var inp = document.getElementById('fileInput');
   var prog = document.getElementById('prog');
-  if (inp.files.length) prog.textContent = inp.files.length + ' file(s) selected Ã¢â‚¬â€ click Upload to send';
+  if (inp.files.length) prog.textContent = inp.files.length + ' file(s) selected â€” click Upload to send';
 }
 function uploadFiles() {
   var inp = document.getElementById('fileInput');
@@ -843,7 +887,7 @@ function uploadFiles() {
       .then(function(r){ return r.json(); })
       .then(function(j){
         done++;
-        if (j.ok) prog.textContent = 'Uploaded ' + done + '/' + files.length + ' Ã¢â‚¬â€ ' + j.name;
+        if (j.ok) prog.textContent = 'Uploaded ' + done + '/' + files.length + ' â€” ' + j.name;
         else prog.textContent = 'Error: ' + j.error;
         if (done === files.length) { toast('Upload complete!', true); setTimeout(function(){ location.reload(); }, 900); }
       })

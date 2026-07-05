@@ -202,7 +202,13 @@ class RemoteControlService : Service() {
                 } else {
                     current?.stop()
                     val port = RemotePrefs.getWebServerPort(this)
-                    val srv = WebFileServer(rootDir, pin, port)
+                    val customFolder = RemotePrefs.getWebServerSharedFolder(this)
+                    val allowedRoots = if (customFolder != null) {
+                        listOf(customFolder)
+                    } else {
+                        ftpManager.getStorageVolumes(this).map { it.path }
+                    }
+                    val srv = WebFileServer(rootDir, pin, port, allowedRoots)
                     if (srv.start()) {
                         webFileServer = srv
                         RemotePrefs.setWebServerEnabled(this, true)

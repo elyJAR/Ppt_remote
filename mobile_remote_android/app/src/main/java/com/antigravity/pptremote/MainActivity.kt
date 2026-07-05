@@ -414,7 +414,8 @@ class MainActivity : ComponentActivity() {
                                 onLaunchSystemFilesApp = { launchSystemFilesApp() },
                                 onToggleWebServer = viewModel::toggleWebServer,
                                 onUpdateWebServerPin = viewModel::updateWebServerPin,
-                                onSelectSharedFolder = { selectWebServerFolderLauncher.launch(null) }
+                                onSelectSharedFolder = { selectWebServerFolderLauncher.launch(null) },
+                                onResetSharedFolder = { viewModel.setWebServerSharedFolder(null) }
                             )
                         } else {
                             RemoteScreen(
@@ -1041,7 +1042,8 @@ private fun WebServerCard(
     colorScheme: ColorScheme,
     onToggle: () -> Unit,
     onPinChange: (String) -> Unit,
-    onSelectFolder: () -> Unit
+    onSelectFolder: () -> Unit,
+    onResetFolder: () -> Unit
 ) {
     val context = LocalContext.current
     var showPinField by remember { mutableStateOf(false) }
@@ -1175,6 +1177,15 @@ private fun WebServerCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                if (state.webServerSharedFolder != null) {
+                    TextButton(
+                        onClick = onResetFolder,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.textButtonColors(contentColor = iOSRed)
+                    ) {
+                        Text("Reset", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
                 TextButton(
                     onClick = onSelectFolder,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
@@ -1237,7 +1248,8 @@ private fun FilesScreen(
     onLaunchSystemFilesApp: () -> Unit,
     onToggleWebServer: () -> Unit = {},
     onUpdateWebServerPin: (String) -> Unit = {},
-    onSelectSharedFolder: () -> Unit = {}
+    onSelectSharedFolder: () -> Unit = {},
+    onResetSharedFolder: () -> Unit = {}
 ) {
     val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
     var showHelp by remember { mutableStateOf(false) }
@@ -1377,7 +1389,8 @@ private fun FilesScreen(
                     colorScheme = colorScheme,
                     onToggle = onToggleWebServer,
                     onPinChange = onUpdateWebServerPin,
-                    onSelectFolder = onSelectSharedFolder
+                    onSelectFolder = onSelectSharedFolder,
+                    onResetFolder = onResetSharedFolder
                 )
                 // ────────────────────────────────────────────────────────────
                 val filesRootPath = state.filesRootPath ?: state.activeFtpPath

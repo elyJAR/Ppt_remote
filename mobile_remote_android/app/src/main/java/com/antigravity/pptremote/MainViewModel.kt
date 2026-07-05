@@ -634,8 +634,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun setWebServerSharedFolder(path: String) {
-        val normalized = java.io.File(path).absolutePath
+    fun setWebServerSharedFolder(path: String?) {
+        val normalized = path?.let { java.io.File(it).absolutePath }
         RemotePrefs.setWebServerSharedFolder(appContext, normalized)
         _state.value = _state.value.copy(webServerSharedFolder = normalized)
         if (_state.value.isWebServerRunning) {
