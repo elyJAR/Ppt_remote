@@ -415,7 +415,8 @@ class MainActivity : ComponentActivity() {
                                 onToggleWebServer = viewModel::toggleWebServer,
                                 onUpdateWebServerPin = viewModel::updateWebServerPin,
                                 onSelectSharedFolder = { selectWebServerFolderLauncher.launch(null) },
-                                onResetSharedFolder = { viewModel.setWebServerSharedFolder(null) }
+                                onResetSharedFolder = { viewModel.setWebServerSharedFolder(null) },
+                                onRefreshWebServerUrl = viewModel::refreshWebServerUrl
                             )
                         } else {
                             RemoteScreen(
@@ -1105,7 +1106,8 @@ private fun WebServerCard(
     onToggle: () -> Unit,
     onPinChange: (String) -> Unit,
     onSelectFolder: () -> Unit,
-    onResetFolder: () -> Unit
+    onResetFolder: () -> Unit,
+    onRefreshUrl: () -> Unit
 ) {
     val context = LocalContext.current
     var showPinField by remember { mutableStateOf(false) }
@@ -1186,7 +1188,21 @@ private fun WebServerCard(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy URL", tint = colorScheme.textSecondary, modifier = Modifier.size(16.dp))
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = "Copy URL",
+                            tint = colorScheme.textSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Refresh URL",
+                            tint = colorScheme.textSecondary,
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clickable { onRefreshUrl() }
+                        )
                     }
                 }
                 Text(
@@ -1311,7 +1327,8 @@ private fun FilesScreen(
     onToggleWebServer: () -> Unit = {},
     onUpdateWebServerPin: (String) -> Unit = {},
     onSelectSharedFolder: () -> Unit = {},
-    onResetSharedFolder: () -> Unit = {}
+    onResetSharedFolder: () -> Unit = {},
+    onRefreshWebServerUrl: () -> Unit = {}
 ) {
     val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
     var showHelp by remember { mutableStateOf(false) }
@@ -1452,7 +1469,8 @@ private fun FilesScreen(
                     onToggle = onToggleWebServer,
                     onPinChange = onUpdateWebServerPin,
                     onSelectFolder = onSelectSharedFolder,
-                    onResetFolder = onResetSharedFolder
+                    onResetFolder = onResetSharedFolder,
+                    onRefreshUrl = onRefreshWebServerUrl
                 )
                 // ────────────────────────────────────────────────────────────
                 val filesRootPath = state.filesRootPath ?: state.activeFtpPath

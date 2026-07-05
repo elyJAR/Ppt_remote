@@ -97,6 +97,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun updateNetworkType() {
         try {
             val currentNetworkType = NetworkDetector.getNetworkType(appContext)
+            updateServiceStatus()
             val current = _state.value
             if (current.networkType == currentNetworkType) return
             lastNetworkType = currentNetworkType
@@ -555,6 +556,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isWebServerRunning = isWebRunning,
             webServerUrl = webUrl
         )
+    }
+
+    fun refreshWebServerUrl() {
+        updateServiceStatus()
     }
 
     fun completeOnboarding() {

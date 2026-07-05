@@ -99,16 +99,58 @@ class RemoteControlService : Service() {
 
         fun isWebServerRunning(): Boolean = webFileServer?.isRunning() == true
 
+        private fun getLocalIpAddress(): String? {
+            try {
+                val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+                if (interfaces != null) {
+                    val list = java.util.Collections.list(interfaces)
+                    for (intf in list) {
+                        if (intf.isLoopback || !intf.isUp) continue
+                        val name = intf.name.lowercase()
+                        if (name.contains("wlan") || name.contains("ap") || name.contains("softap") || name.contains("rndis")) {
+                            for (addr in java.util.Collections.list(intf.inetAddresses)) {
+                                if (!addr.isLoopbackAddress && addr is java.net.Inet4Address) {
+                                    val host = addr.hostAddress
+                                    if (!host.isNullOrBlank() && host != "0.0.0.0") {
+                                        return host
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    for (intf in list) {
+                        if (intf.isLoopback || !intf.isUp) continue
+                        for (addr in java.util.Collections.list(intf.inetAddresses)) {
+                            if (!addr.isLoopbackAddress && addr is java.net.Inet4Address) {
+                                val host = addr.hostAddress
+                                if (!host.isNullOrBlank() && host != "0.0.0.0") {
+                                    return host
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (ex: Exception) {
+                android.util.Log.e("RemoteControlService", "Error getting local IP address", ex)
+            }
+            return null
+        }
+
         fun getWebServerUrl(context: Context): String? {
             val server = webFileServer ?: return null
             if (!server.isRunning()) return null
             return try {
-                @Suppress("DEPRECATION")
-                val wifiManager = context.applicationContext
-                    .getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
-                val ip = wifiManager.connectionInfo.ipAddress
-                val ipStr = android.text.format.Formatter.formatIpAddress(ip)
-                "http://$ipStr:${server.port}"
+                val ipStr = getLocalIpAddress()
+                if (!ipStr.isNullOrBlank() && ipStr != "0.0.0.0") {
+                    "http://$ipStr:${server.port}"
+                } else {
+                    @Suppress("DEPRECATION")
+                    val wifiManager = context.applicationContext
+                        .getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                    val ip = wifiManager.connectionInfo.ipAddress
+                    val ipStrLegacy = android.text.format.Formatter.formatIpAddress(ip)
+                    "http://$ipStrLegacy:${server.port}"
+                }
             } catch (_: Exception) { null }
         }
 
