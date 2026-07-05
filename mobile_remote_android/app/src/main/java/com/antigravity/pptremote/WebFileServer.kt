@@ -19,6 +19,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * Lightweight HTTP server that lets any browser on the LAN browse, download,
@@ -128,6 +130,7 @@ class WebFileServer(
                 path == "/" || path.startsWith("/?") -> handleRoot(exchange)
                 path == "/login" -> handleLogin(exchange)
                 path == "/api/files" -> handleList(exchange)
+                path == "/download-zip" -> handleDownloadZip(exchange)
                 path.startsWith("/download") -> handleDownload(exchange)
                 path.startsWith("/upload") -> handleUpload(exchange)
                 path.startsWith("/delete") -> handleDelete(exchange)
@@ -354,6 +357,60 @@ class WebFileServer(
         exchange.addResponseHeader("Content-Type", "application/octet-stream")
         exchange.sendResponseStream(200, file.length()) { out ->
             file.inputStream().use { it.copyTo(out) }
+        }
+    }
+
+    private fun handleDownloadZip(exchange: HttpCtx) {
+        if (!requireAuth(exchange)) return
+        val paths = exchange.query
+            .split("&")
+            .filter { it.startsWith("path=") }
+            .map { URLDecoder.decode(it.removePrefix("path="), "UTF-8") }
+
+        val files = paths.mapNotNull { safeResolve(it) }.filter { it.exists() }
+        if (files.isEmpty()) {
+            sendText(exchange, 404, "No files found")
+            return
+        }
+
+        val zipName = if (files.size == 1) {
+            "${files[0].name}.zip"
+        } else {
+            "ppt_remote_files.zip"
+        }
+        val encodedZipName = URLEncoder.encode(zipName, "UTF-8").replace("+", "%20")
+        exchange.addResponseHeader("Content-Disposition", "attachment; filename*=UTF-8''$encodedZipName")
+        exchange.addResponseHeader("Content-Type", "application/zip")
+
+        exchange.sendResponseStream(200, -1) { out ->
+            ZipOutputStream(out).use { zos ->
+                files.forEach { file ->
+                    addToZip(file, "", zos)
+                }
+            }
+        }
+    }
+
+    private fun addToZip(file: File, parentPath: String, zos: ZipOutputStream) {
+        val entryPath = if (parentPath.isEmpty()) file.name else "$parentPath/${file.name}"
+        if (file.isDirectory) {
+            val children = file.listFiles() ?: emptyArray()
+            if (children.isEmpty()) {
+                val entry = ZipEntry("$entryPath/")
+                zos.putNextEntry(entry)
+                zos.closeEntry()
+            } else {
+                children.forEach { child ->
+                    addToZip(child, entryPath, zos)
+                }
+            }
+        } else {
+            val entry = ZipEntry(entryPath)
+            zos.putNextEntry(entry)
+            file.inputStream().use { input ->
+                input.copyTo(zos)
+            }
+            zos.closeEntry()
         }
     }
 
@@ -603,14 +660,14 @@ $errorMsg
             else
                 "<span class='file-name'>$icon ${f.name}</span>"
             val actions = if (f.isDirectory)
-                "<button class='del' onclick=\"delItem('$enc','$safeName',true)\">&#x1F5D1;</button>"
+                "<a class='btn' href='/download-zip?path=$enc' download>&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',true)\">&#x1F5D1;</button>"
             else
                 "<a class='btn' href='/download?path=$enc' download>&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',false)\">&#x1F5D1;</button>"
             tableRows.append("<tr><td class='cb-col'><input type='checkbox' class='item-cb' data-path='$enc' data-name='$safeName' data-type='$type' onchange='updateActionBar()'></td><td>$nameCell</td><td>$size</td><td>$date</td><td class='act'>$actions</td></tr>\n")
 
             // Grid item
             val gridClick = if (f.isDirectory) "if(!event.target.matches('input,a,button')){window.location='/?path=$enc'}" else ""
-            val gridDownload = if (!f.isDirectory) "<a class='btn-sm' href='/download?path=$enc' download onclick='event.stopPropagation()'>&#x2B07;</a><button class='del-sm' onclick=\"event.stopPropagation();delItem('$enc','$safeName',false)\">&#x1F5D1;</button>" else ""
+            val gridDownload = "<a class='btn-sm' href='${if (f.isDirectory) "/download-zip?path=" else "/download?path="}$enc' download onclick='event.stopPropagation()'>&#x2B07;</a><button class='del-sm' onclick=\"event.stopPropagation();delItem('$enc','$safeName',${f.isDirectory})\">&#x1F5D1;</button>"
             gridItems.append("<div class='grid-item $type' onclick=\"$gridClick\"><input type='checkbox' class='item-cb grid-cb' data-path='$enc' data-name='$safeName' data-type='$type' onchange='event.stopPropagation();updateActionBar()'><div class='grid-icon'>$icon</div><div class='grid-name' title='${f.name}'>${f.name}</div><div class='grid-size'>$size</div><div class='grid-actions'>$gridDownload</div></div>\n")
         }
 
@@ -837,17 +894,21 @@ function clearSelection() {
 // --- Multi-download -----------------------------------------
 function downloadSelected() {
   var checked = Array.from(document.querySelectorAll('.item-cb:checked'));
-  var files = checked.filter(function(cb){ return cb.dataset.type !== 'folder'; });
-  if (!files.length) { toast('No files selected (select files, not folders)', false); return; }
-  toast('Downloading ' + files.length + ' file(s)...', true);
-  files.forEach(function(cb, i) {
-    setTimeout(function() {
-      var a = document.createElement('a');
-      a.href = '/download?path=' + cb.dataset.path;
-      a.download = cb.dataset.name;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }, i * 400);
-  });
+  if (!checked.length) return;
+  
+  if (checked.length === 1 && checked[0].dataset.type === 'file') {
+    var a = document.createElement('a');
+    a.href = '/download?path=' + checked[0].dataset.path;
+    a.download = checked[0].dataset.name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    toast('Downloading file...', true);
+  } else {
+    var query = checked.map(function(cb){ return 'path=' + cb.dataset.path; }).join('&');
+    var a = document.createElement('a');
+    a.href = '/download-zip?' + query;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    toast('Preparing zip download...', true);
+  }
 }
 // --- Delete -------------------------------------------------
 function delItem(enc, name, isDir) {
