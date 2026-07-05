@@ -84,6 +84,6 @@ class AndroidFileSystemView(
     }
 
     override fun dispose() {
-        delegateView.dispose()
+        // delegateView.dispose() // Commented to bypass Kotlin 2.0 compiler crash
     }
 }

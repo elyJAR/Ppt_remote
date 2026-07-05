@@ -363,6 +363,7 @@ class MainActivity : ComponentActivity() {
                             onUpdateNotificationText = viewModel::updateNotificationText,
                             onUpdateApiKey = viewModel::updateApiKey,
                             onUpdateFtpAutoStart = viewModel::updateFtpAutoStart,
+                            onUpdateWebServerPort = viewModel::updateWebServerPort,
                         )
                     }
                     state.showNotes -> {
@@ -392,7 +393,9 @@ class MainActivity : ComponentActivity() {
                                 onFilesSearchQueryChange = viewModel::updateFilesSearchQuery,
                                 onJumpToFileLocation = viewModel::jumpToFileLocation,
                                 onFilesSortChange = viewModel::setFilesSort,
-                                onLaunchSystemFilesApp = { launchSystemFilesApp() }
+                                onLaunchSystemFilesApp = { launchSystemFilesApp() },
+                                onToggleWebServer = viewModel::toggleWebServer,
+                                onUpdateWebServerPin = viewModel::updateWebServerPin
                             )
                         } else {
                             RemoteScreen(
@@ -1014,6 +1017,157 @@ private enum class FileViewMode {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun WebServerCard(
+    state: RemoteState,
+    colorScheme: AppColorScheme,
+    onToggle: () -> Unit,
+    onPinChange: (String) -> Unit
+) {
+    val context = LocalContext.current
+    var showPinField by remember { mutableStateOf(false) }
+    var pinInput by remember(state.webServerPin) { mutableStateOf(state.webServerPin) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (state.isWebServerRunning)
+                colorScheme.primary.copy(alpha = 0.08f)
+            else
+                colorScheme.surfaceVariant.copy(alpha = 0.2f)
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (state.isWebServerRunning) colorScheme.primary.copy(alpha = 0.4f)
+            else colorScheme.outline.copy(alpha = 0.2f)
+        ),
+        shape = iOSSquircleSmall
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(
+                        Icons.Default.Wifi,
+                        contentDescription = null,
+                        tint = if (state.isWebServerRunning) colorScheme.primary else colorScheme.textSecondary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Column {
+                        Text(
+                            "Browser File Transfer",
+                            fontWeight = FontWeight.SemiBold,
+                            color = colorScheme.textPrimary,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            if (state.isWebServerRunning) "Active — open URL in any browser"
+                            else "Share files with any device on this WiFi",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colorScheme.textSecondary
+                        )
+                    }
+                }
+                Switch(
+                    checked = state.isWebServerRunning,
+                    onCheckedChange = { onToggle() },
+                    colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = colorScheme.primary)
+                )
+            }
+
+            if (state.isWebServerRunning && state.webServerUrl != null) {
+                val clipboardManager = LocalClipboardManager.current
+                Surface(
+                    onClick = {
+                        clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(state.webServerUrl))
+                    },
+                    shape = iOSSquircleSmall,
+                    color = colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.Link, contentDescription = null, tint = colorScheme.primary, modifier = Modifier.size(16.dp))
+                        Text(
+                            text = state.webServerUrl,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colorScheme.primary,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy URL", tint = colorScheme.textSecondary, modifier = Modifier.size(16.dp))
+                    }
+                }
+                Text(
+                    "Tap the URL to copy it, then open it in any browser on the same WiFi.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colorScheme.textSecondary
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "PIN: ${if (state.webServerPin.isBlank()) "Not set (open access)" else "••••"}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colorScheme.textSecondary,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    onClick = { showPinField = !showPinField },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(if (showPinField) "Cancel" else "Set PIN", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            if (showPinField) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = pinInput,
+                        onValueChange = { if (it.length <= 8 && it.all { c -> c.isDigit() }) pinInput = it },
+                        modifier = Modifier.weight(1f),
+                        label = { Text("PIN (digits only, leave blank for open)") },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        shape = iOSSquircleSmall,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = colorScheme.primary,
+                            unfocusedBorderColor = colorScheme.outline.copy(alpha = 0.3f),
+                            focusedTextColor = colorScheme.textPrimary,
+                            unfocusedTextColor = colorScheme.textPrimary
+                        )
+                    )
+                    Button(
+                        onClick = {
+                            onPinChange(pinInput)
+                            showPinField = false
+                        },
+                        shape = iOSSquircleSmall
+                    ) { Text("Save") }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun FilesScreen(
     state: RemoteState,
     onClose: () -> Unit,
@@ -1028,7 +1182,9 @@ private fun FilesScreen(
     onFilesSearchQueryChange: (String) -> Unit,
     onJumpToFileLocation: (FileEntry) -> Unit,
     onFilesSortChange: (SortCategory, SortOrder) -> Unit,
-    onLaunchSystemFilesApp: () -> Unit
+    onLaunchSystemFilesApp: () -> Unit,
+    onToggleWebServer: () -> Unit = {},
+    onUpdateWebServerPin: (String) -> Unit = {}
 ) {
     val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
     var showHelp by remember { mutableStateOf(false) }
@@ -1161,6 +1317,15 @@ private fun FilesScreen(
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Mobile Files", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+
+                // ── Browser File Transfer card ───────────────────────────────
+                WebServerCard(
+                    state = state,
+                    colorScheme = colorScheme,
+                    onToggle = onToggleWebServer,
+                    onPinChange = onUpdateWebServerPin
+                )
+                // ────────────────────────────────────────────────────────────
                 val filesRootPath = state.filesRootPath ?: state.activeFtpPath
                 val currentFilesPath = state.currentFilesPath ?: filesRootPath
 
@@ -2110,6 +2275,7 @@ private fun SettingsScreen(
     onUpdateNotificationText: (String) -> Unit,
     onUpdateApiKey: (String) -> Unit,
     onUpdateFtpAutoStart: (Boolean) -> Unit,
+    onUpdateWebServerPort: (Int) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     Scaffold(
@@ -2172,6 +2338,12 @@ private fun SettingsScreen(
                     subtitle = "Automatically turn on Mobile Files when app starts",
                     checked = state.isFtpAutoStart,
                     onCheckedChange = onUpdateFtpAutoStart
+                )
+                SettingsInputRow(
+                    title = "Web Server Port",
+                    subtitle = "Port for browser file transfer (default is 8686)",
+                    value = state.webServerPort.toString(),
+                    onValueChange = { val p = it.toIntOrNull(); if (p != null) onUpdateWebServerPort(p) }
                 )
             }
 

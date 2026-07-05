@@ -32,6 +32,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val thumbnailCache = ConcurrentHashMap<String, ConcurrentHashMap<Int, ByteArray>>()
     private val thumbnailWarmupComplete = ConcurrentHashMap.newKeySet<String>()
     private val thumbnailWarmupInFlight = ConcurrentHashMap.newKeySet<String>()
+    // Tracks the last known slide count per presentation so we can detect structural changes
+    private val lastKnownSlideCount = ConcurrentHashMap<String, Int>()
     private var lastNetworkType: NetworkType = NetworkType.UNKNOWN
     private var networkChangeCallbackRegistered = false
     private var lastInteractionTime = 0L
@@ -51,7 +53,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isFtpEnabled = RemotePrefs.isFtpEnabled(appContext),
             isFtpAutoStart = RemotePrefs.isFtpAutoStart(appContext),
             filesSortCategory = try { SortCategory.valueOf(RemotePrefs.getFilesSortCategory(appContext)) } catch (_: Exception) { SortCategory.NAME },
-            filesSortOrder = try { SortOrder.valueOf(RemotePrefs.getFilesSortOrder(appContext)) } catch (_: Exception) { SortOrder.ASCENDING }
+            filesSortOrder = try { SortOrder.valueOf(RemotePrefs.getFilesSortOrder(appContext)) } catch (_: Exception) { SortOrder.ASCENDING },
+            webServerPin = RemotePrefs.getWebServerPin(appContext),
+            webServerPort = RemotePrefs.getWebServerPort(appContext)
         )
     )
     val state: StateFlow<RemoteState> = _state.asStateFlow()
@@ -540,11 +544,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val isRunning = RemoteControlService.isRunning(appContext)
         val isFtpRunning = RemoteControlService.isFtpRunning()
         val activePath = RemoteControlService.getActiveFtpPath()
-        
+        val isWebRunning = RemoteControlService.isWebServerRunning()
+        val webUrl = RemoteControlService.getWebServerUrl(appContext)
+
         _state.value = _state.value.copy(
             isServiceRunning = isRunning,
             isFtpEnabled = isFtpRunning,
-            activeFtpPath = activePath
+            activeFtpPath = activePath,
+            isWebServerRunning = isWebRunning,
+            webServerUrl = webUrl
         )
     }
 
@@ -611,6 +619,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun toggleWebServer() {
+        val current = _state.value
+        val rootDir = current.filesRootPath
+            ?: current.activeFtpPath
+            ?: current.availableStorages.firstOrNull()?.path
+            ?: return
+        RemoteControlService.toggleWebServer(appContext, rootDir, current.webServerPin)
+        viewModelScope.launch {
+            delay(400)
+            updateServiceStatus()
+        }
+    }
+
+    fun updateWebServerPin(pin: String) {
+        RemotePrefs.setWebServerPin(appContext, pin)
+        _state.value = _state.value.copy(webServerPin = pin)
+        // Restart server with new PIN if currently running
+        if (_state.value.isWebServerRunning) {
+            toggleWebServer() // stop
+            viewModelScope.launch {
+                delay(600)
+                toggleWebServer() // restart with new pin
+            }
+        }
+    }
+
+    fun updateWebServerPort(port: Int) {
+        if (port in 1024..65535) {
+            RemotePrefs.setWebServerPort(appContext, port)
+            _state.value = _state.value.copy(webServerPort = port)
+            // Restart server with new port if currently running
+            if (_state.value.isWebServerRunning) {
+                toggleWebServer() // stop
+                viewModelScope.launch {
+                    delay(600)
+                    toggleWebServer() // restart with new port
+                }
+            }
+        }
+    }
+
     fun getCachedThumbnail(presentationId: String, slideIndex: Int): ByteArray? {
         val bridgeUrl = _state.value.bridgeUrl
         if (bridgeUrl.isBlank()) return null
@@ -646,6 +695,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         presentations
             .filter { it.totalSlides > 0 }
             .forEach { presentation ->
+                val cKey = cacheKey(bridgeUrl, presentation.id)
+
+                // If the slide count changed, evict all stale cached thumbnails and
+                // remove all warmup-complete markers for this presentation so the
+                // full set gets re-fetched from the bridge (which re-renders from PowerPoint).
+                val prevCount = lastKnownSlideCount.put(cKey, presentation.totalSlides)
+                val slideCountChanged = prevCount != null && prevCount != presentation.totalSlides
+
+                // If the file has unsaved changes, also evict the cache so any content
+                // edits (text, images, layout) are reflected without waiting for a save.
+                if (slideCountChanged || presentation.hasUnsavedChanges) {
+                    thumbnailCache.remove(cKey)
+                    thumbnailWarmupComplete.removeIf { it.startsWith(cKey) }
+                    thumbnailWarmupInFlight.removeIf { it.startsWith(cKey) }
+                }
+
+                // Don't pre-warm thumbnails for unsaved presentations — the bridge bypasses
+                // its own cache for them too, so every warmup request causes a fresh
+                // PowerPoint export. We'll fetch on-demand instead.
+                if (presentation.hasUnsavedChanges) return@forEach
+
                 val key = thumbnailSetKey(bridgeUrl, presentation.id, presentation.totalSlides)
                 if (!thumbnailWarmupComplete.add(key) || !thumbnailWarmupInFlight.add(key)) return@forEach
 

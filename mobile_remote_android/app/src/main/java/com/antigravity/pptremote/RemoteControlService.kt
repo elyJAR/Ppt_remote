@@ -46,8 +46,36 @@ class RemoteControlService : Service() {
         const val ACTION_STOP_FTP      = "com.antigravity.pptremote.action.STOP_FTP"
         const val ACTION_TOGGLE_FTP    = "com.antigravity.pptremote.action.TOGGLE_FTP"
         const val EXTRA_FTP_HOME_DIR   = "com.antigravity.pptremote.action.FTP_HOME_DIR"
+        const val ACTION_TOGGLE_WEB_SERVER = "com.antigravity.pptremote.action.TOGGLE_WEB_SERVER"
+        const val EXTRA_WEB_ROOT_DIR   = "com.antigravity.pptremote.extra.WEB_ROOT_DIR"
+        const val EXTRA_WEB_PIN        = "com.antigravity.pptremote.extra.WEB_PIN"
 
         private val ftpManager = FtpServerManager()
+        private var webFileServer: WebFileServer? = null
+
+        fun toggleWebServer(context: Context, rootDir: String, pin: String) {
+            val intent = Intent(context, RemoteControlService::class.java).apply {
+                action = ACTION_TOGGLE_WEB_SERVER
+                putExtra(EXTRA_WEB_ROOT_DIR, rootDir)
+                putExtra(EXTRA_WEB_PIN, pin)
+            }
+            context.startService(intent)
+        }
+
+        fun isWebServerRunning(): Boolean = webFileServer?.isRunning() == true
+
+        fun getWebServerUrl(context: Context): String? {
+            val server = webFileServer ?: return null
+            if (!server.isRunning()) return null
+            return try {
+                @Suppress("DEPRECATION")
+                val wifiManager = context.applicationContext
+                    .getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+                val ip = wifiManager.connectionInfo.ipAddress
+                val ipStr = android.text.format.Formatter.formatIpAddress(ip)
+                "http://$ipStr:${server.port}"
+            } catch (_: Exception) { null }
+        }
 
         fun toggleFtp(context: Context, homeDir: String? = null) {
             val intent = Intent(context, RemoteControlService::class.java).apply {
@@ -158,8 +186,31 @@ class RemoteControlService : Service() {
             }
             ACTION_STOP_SERVICE  -> {
                 ftpManager.stop()
+                webFileServer?.stop()
+                webFileServer = null
                 stopSelf()
                 return START_NOT_STICKY
+            }
+            ACTION_TOGGLE_WEB_SERVER -> {
+                val rootDir = intent.getStringExtra(EXTRA_WEB_ROOT_DIR) ?: return START_STICKY
+                val pin = intent.getStringExtra(EXTRA_WEB_PIN).orEmpty()
+                val current = webFileServer
+                if (current != null && current.isRunning()) {
+                    current.stop()
+                    webFileServer = null
+                    RemotePrefs.setWebServerEnabled(this, false)
+                } else {
+                    current?.stop()
+                    val port = RemotePrefs.getWebServerPort(this)
+                    val srv = WebFileServer(rootDir, pin, port)
+                    if (srv.start()) {
+                        webFileServer = srv
+                        RemotePrefs.setWebServerEnabled(this, true)
+                        android.util.Log.i("RemoteControlService", "Web server started at port ${srv.port}")
+                    } else {
+                        android.util.Log.e("RemoteControlService", "Web server failed to start")
+                    }
+                }
             }
         }
 
@@ -171,6 +222,8 @@ class RemoteControlService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         ftpManager.stop()
+        webFileServer?.stop()
+        webFileServer = null
         mediaSession?.isActive = false
         mediaSession?.release()
         mediaSession = null

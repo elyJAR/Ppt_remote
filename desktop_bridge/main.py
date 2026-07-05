@@ -193,6 +193,7 @@ class PresentationDto(BaseModel):
     in_slideshow: bool
     current_slide: int | None
     total_slides: int
+    has_unsaved_changes: bool = False
 
 
 class HealthDto(BaseModel):

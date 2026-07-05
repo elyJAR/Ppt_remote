@@ -27,7 +27,8 @@ data class Presentation(
     val inSlideshow: Boolean,
     val currentSlide: Int?,
     val totalSlides: Int,
-    val currentThumbnail: ByteArray? = null
+    val currentThumbnail: ByteArray? = null,
+    val hasUnsavedChanges: Boolean = false
 ) {
     // ByteArray needs custom equals/hashCode to avoid identity comparison
     override fun equals(other: Any?): Boolean {
@@ -126,7 +127,12 @@ data class RemoteState(
     // Show dedicated Files screen
     val showFiles: Boolean = false,
     // Whether the app currently has storage access required to browse files
-    val hasStorageAccess: Boolean = true
+    val hasStorageAccess: Boolean = true,
+    // Browser-based file transfer server
+    val isWebServerRunning: Boolean = false,
+    val webServerUrl: String? = null,
+    val webServerPin: String = "",
+    val webServerPort: Int = 8686,
 )
 
 /** Represents a detected storage volume (Internal or SD Card). */

@@ -84,7 +84,8 @@ class BridgeClient {
                     currentSlide = if (item.has("current_slide") && !item.isNull("current_slide")) {
                         item.optInt("current_slide")
                     } else null,
-                    totalSlides = item.optInt("total_slides")
+                    totalSlides = item.optInt("total_slides"),
+                    hasUnsavedChanges = item.optBoolean("has_unsaved_changes", false)
                 )
             }
             return presentations

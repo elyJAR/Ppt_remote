@@ -51,6 +51,7 @@ class PresentationInfo:
     in_slideshow: bool
     current_slide: int | None
     total_slides: int
+    has_unsaved_changes: bool = False
 
 
 import queue as _queue
@@ -333,6 +334,13 @@ class PowerPointController:
                 except Exception:
                     read_only = False
 
+                # Check for unsaved changes — pres.Saved is False whenever the file
+                # has been modified since the last save, regardless of what changed.
+                try:
+                    has_unsaved = not bool(pres.Saved)
+                except Exception:
+                    has_unsaved = False
+
                 display_name = name
                 if read_only and not in_show:
                     display_name = (
@@ -347,6 +355,7 @@ class PowerPointController:
                         in_slideshow=in_show,
                         current_slide=current_slide,
                         total_slides=total_slides,
+                        has_unsaved_changes=has_unsaved,
                     )
                 )
 
@@ -564,6 +573,10 @@ class PowerPointController:
         with self._thumbnail_warmup_lock:
             if cache_key in self._thumbnail_warmup_complete or cache_key in self._thumbnail_warmup_inflight:
                 return
+            # Remove any stale "complete" entries for the same presentation with a different
+            # slide count — this happens when slides are added/removed between warmup runs.
+            stale = {k for k in self._thumbnail_warmup_complete if k[0] == presentation_id and k[2] == width and k[1] != total_slides}
+            self._thumbnail_warmup_complete -= stale
             self._thumbnail_warmup_inflight.add(cache_key)
 
         def _worker() -> None:
@@ -629,27 +642,42 @@ class PowerPointController:
 
         pres = self._find_presentation(app, presentation_id)
         
-        # Get last modified time to ensure cache freshness
+        # Determine whether the presentation has unsaved changes.
+        # pres.Saved is False the moment any edit is made (text, image, layout, etc.)
+        # and becomes True again only after a save.  When unsaved, we bypass all caches
+        # and re-export directly from PowerPoint so edits are visible immediately.
+        # For saved files we use (mtime + slide_count) as the cache key so that adding
+        # or removing slides still busts the cache even before the next save.
+        try:
+            is_saved = bool(pres.Saved)
+        except Exception:
+            is_saved = True  # safe default: treat as saved, use cache
+
         try:
             mtime = float(pres.LastSavedTime)
         except Exception:
             mtime = 0.0
 
-        cache_key = (presentation_id, slide_index, width, mtime)
-        
-        # 1. Check in-memory cache
-        cached = self._thumbnail_cache.get(cache_key)
-        if cached is not None:
-            self._thumbnail_cache.move_to_end(cache_key)
-            return cached
+        try:
+            current_slide_count = int(pres.Slides.Count)
+        except Exception:
+            current_slide_count = 0
 
-        # 2. Check disk cache
-        # Create a stable hash for the presentation path to use as a filename
+        cache_key = (presentation_id, slide_index, width, mtime, current_slide_count)
+
+        # 1. Check in-memory cache — only when the file has no unsaved changes
+        if is_saved:
+            cached = self._thumbnail_cache.get(cache_key)
+            if cached is not None:
+                self._thumbnail_cache.move_to_end(cache_key)
+                return cached
+
+        # 2. Check disk cache — only when the file has no unsaved changes
         path_hash = hashlib.md5(presentation_id.encode("utf-8")).hexdigest()
-        disk_filename = f"{path_hash}_{slide_index}_{width}_{int(mtime)}.png"
+        disk_filename = f"{path_hash}_{slide_index}_{width}_{int(mtime)}_{current_slide_count}.png"
         disk_path = self._cache_dir / disk_filename
-        
-        if disk_path.exists():
+
+        if is_saved and disk_path.exists():
             try:
                 with open(disk_path, "rb") as f:
                     png_bytes = f.read()
@@ -657,7 +685,7 @@ class PowerPointController:
                 self._thumbnail_cache[cache_key] = png_bytes
                 return png_bytes
             except Exception:
-                pass # Fallback to export if disk read fails
+                pass  # Fallback to export if disk read fails
 
         total = int(pres.Slides.Count)
         if slide_index < 1 or slide_index > total:
@@ -685,10 +713,17 @@ class PowerPointController:
             with open(tmp_path, "rb") as f:
                 png_bytes = f.read()
             
-            # Atomic move to final disk path
-            if disk_path.exists():
-                _os.remove(disk_path)
-            _os.rename(tmp_path, disk_path)
+            if is_saved:
+                # Atomic move to final disk path — only persist when the file is saved
+                if disk_path.exists():
+                    _os.remove(disk_path)
+                _os.rename(tmp_path, disk_path)
+            else:
+                # Unsaved — discard the temp file, don't pollute the disk cache
+                try:
+                    _os.remove(tmp_path)
+                except Exception:
+                    pass
 
             # Update in-memory cache
             self._thumbnail_cache[cache_key] = png_bytes

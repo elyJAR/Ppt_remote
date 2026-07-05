@@ -244,6 +244,9 @@ object RemotePrefs {
 
     private const val KEY_FILES_SORT_CATEGORY = "files_sort_category"
     private const val KEY_FILES_SORT_ORDER = "files_sort_order"
+    private const val KEY_WEB_SERVER_PIN = "web_server_pin"
+    private const val KEY_WEB_SERVER_ENABLED = "web_server_enabled"
+    private const val KEY_WEB_SERVER_PORT = "web_server_port"
 
     fun getFilesSortCategory(context: Context): String =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -261,5 +264,34 @@ object RemotePrefs {
     fun setFilesSortOrder(context: Context, order: String) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString(KEY_FILES_SORT_ORDER, order).apply()
+    }
+
+    // ── Web file server ───────────────────────────────────────────────────────
+
+    fun getWebServerPin(context: Context): String =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_WEB_SERVER_PIN, "").orEmpty()
+
+    fun setWebServerPin(context: Context, pin: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_WEB_SERVER_PIN, pin).apply()
+    }
+
+    fun isWebServerEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_WEB_SERVER_ENABLED, false)
+
+    fun setWebServerEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_WEB_SERVER_ENABLED, enabled).apply()
+    }
+
+    fun getWebServerPort(context: Context): Int =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getInt(KEY_WEB_SERVER_PORT, 8686)
+
+    fun setWebServerPort(context: Context, port: Int) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putInt(KEY_WEB_SERVER_PORT, port).apply()
     }
 }
