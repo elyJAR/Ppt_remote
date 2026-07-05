@@ -865,4 +865,3 @@ dropZone.addEventListener('drop', function(e){
 </script>
 </body></html>"""
 }
-}
