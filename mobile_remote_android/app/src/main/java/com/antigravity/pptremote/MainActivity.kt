@@ -247,6 +247,23 @@ class MainActivity : ComponentActivity() {
         } catch (_: Exception) {}
     }
 
+    private val selectWebServerFolderLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
+            val path = SafStorageHelper.convertUriToPath(uri)
+            if (path != null) {
+                viewModel.setWebServerSharedFolder(path)
+            }
+        }
+    }
+
     private fun requestRestrictedFolderAccess(path: String) {
         try {
             val volumeRoot = SafStorageHelper.getVolumeRoot(path) ?: Environment.getExternalStorageDirectory().absolutePath
@@ -396,7 +413,8 @@ class MainActivity : ComponentActivity() {
                                 onFilesSortChange = viewModel::setFilesSort,
                                 onLaunchSystemFilesApp = { launchSystemFilesApp() },
                                 onToggleWebServer = viewModel::toggleWebServer,
-                                onUpdateWebServerPin = viewModel::updateWebServerPin
+                                onUpdateWebServerPin = viewModel::updateWebServerPin,
+                                onSelectSharedFolder = { selectWebServerFolderLauncher.launch(null) }
                             )
                         } else {
                             RemoteScreen(
@@ -1022,7 +1040,8 @@ private fun WebServerCard(
     state: RemoteState,
     colorScheme: ColorScheme,
     onToggle: () -> Unit,
-    onPinChange: (String) -> Unit
+    onPinChange: (String) -> Unit,
+    onSelectFolder: () -> Unit
 ) {
     val context = LocalContext.current
     var showPinField by remember { mutableStateOf(false) }
@@ -1132,6 +1151,38 @@ private fun WebServerCard(
                 }
             }
 
+            val currentSharedFolder = state.webServerSharedFolder
+                ?: state.filesRootPath
+                ?: state.activeFtpPath
+                ?: state.availableStorages.firstOrNull()?.path
+                ?: "Internal Storage root"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Shared Folder:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colorScheme.textSecondary
+                    )
+                    Text(
+                        text = currentSharedFolder,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colorScheme.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                TextButton(
+                    onClick = onSelectFolder,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text("Change Folder", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
             if (showPinField) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1185,7 +1236,8 @@ private fun FilesScreen(
     onFilesSortChange: (SortCategory, SortOrder) -> Unit,
     onLaunchSystemFilesApp: () -> Unit,
     onToggleWebServer: () -> Unit = {},
-    onUpdateWebServerPin: (String) -> Unit = {}
+    onUpdateWebServerPin: (String) -> Unit = {},
+    onSelectSharedFolder: () -> Unit = {}
 ) {
     val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
     var showHelp by remember { mutableStateOf(false) }
@@ -1324,7 +1376,8 @@ private fun FilesScreen(
                     state = state,
                     colorScheme = colorScheme,
                     onToggle = onToggleWebServer,
-                    onPinChange = onUpdateWebServerPin
+                    onPinChange = onUpdateWebServerPin,
+                    onSelectFolder = onSelectSharedFolder
                 )
                 // ────────────────────────────────────────────────────────────
                 val filesRootPath = state.filesRootPath ?: state.activeFtpPath

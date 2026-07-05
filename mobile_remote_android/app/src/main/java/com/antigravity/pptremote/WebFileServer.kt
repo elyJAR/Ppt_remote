@@ -24,7 +24,7 @@ import java.util.concurrent.Executors
  * Lightweight HTTP server that lets any browser on the LAN browse, download,
  * upload and delete files from the phone's storage. Protected by a PIN.
  *
- * Uses only standard Java socket APIs â€” no sun.* or external dependencies.
+ * Uses only standard Java socket APIs Ã¢â‚¬â€ no sun.* or external dependencies.
  */
 class WebFileServer(
     private val rootPath: String,
@@ -139,7 +139,7 @@ class WebFileServer(
         }
     }
 
-    /** Minimal HTTP context passed to each handler â€” mirrors com.sun.net.httpserver.HttpExchange */
+    /** Minimal HTTP context passed to each handler Ã¢â‚¬â€ mirrors com.sun.net.httpserver.HttpExchange */
     private inner class HttpCtx(
         val method: String,
         val path: String,
@@ -486,13 +486,11 @@ class WebFileServer(
 
     // ------------------------------------------------------------------
     // HTML generation
-    // ------------------------------------------------------------------
-
-    private fun buildLoginHtml(error: Boolean): String {
-        val errorMsg = if (error) "<p class='err'>âŒ Incorrect PIN, please try again.</p>" else ""
+    // ------------------------------------------------------------    private fun buildLoginHtml(error: Boolean): String {
+        val errorMsg = if (error) "<p class='err'>&#x274C; Incorrect PIN, please try again.</p>" else ""
         return """<!DOCTYPE html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PPT Remote â€” Unlock Files</title>
+<title>PPT Remote &mdash; Unlock Files</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -511,7 +509,7 @@ button:active{transform:scale(0.98)}
 p.hint{color:#8b949e;font-size:.8rem;margin-top:1.5rem;line-height:1.4}
 </style></head><body>
 <div class="card">
-<h2>ðŸ“ File Transfer</h2>
+<h2>&#x1F4C1; File Transfer</h2>
 <p class="subtitle">Access files on this device</p>
 $errorMsg
 <form method="post" action="/login">
@@ -532,17 +530,17 @@ $errorMsg
     private fun fileIcon(name: String): String {
         val ext = name.substringAfterLast('.', "").lowercase()
         return when (ext) {
-            "jpg","jpeg","png","gif","webp","bmp","heic","svg" -> "ðŸ–¼ï¸"
-            "mp4","mkv","avi","mov","webm","3gp" -> "ðŸŽ¬"
-            "mp3","wav","flac","aac","ogg","m4a","opus" -> "ðŸŽµ"
-            "pdf" -> "ðŸ“•"
-            "zip","rar","7z","tar","gz","bz2" -> "ðŸ—œï¸"
-            "apk" -> "ðŸ“¦"
-            "doc","docx" -> "ðŸ“"
-            "xls","xlsx","csv" -> "ðŸ“Š"
-            "ppt","pptx" -> "ðŸ“Š"
-            "txt","md","log","json","xml","yaml","yml" -> "ðŸ“„"
-            else -> "ðŸ“„"
+            "jpg","jpeg","png","gif","webp","bmp","heic","svg" -> "&#x1F5BC;"
+            "mp4","mkv","avi","mov","webm","3gp" -> "&#x1F3AC;"
+            "mp3","wav","flac","aac","ogg","m4a","opus" -> "&#x1F3B5;"
+            "pdf" -> "&#x1F4D5;"
+            "zip","rar","7z","tar","gz","bz2" -> "&#x1F5DC;"
+            "apk" -> "&#x1F4E6;"
+            "doc","docx" -> "&#x1F4DD;"
+            "xls","xlsx","csv" -> "&#x1F4CA;"
+            "ppt","pptx" -> "&#x1F4CA;"
+            "txt","md","log","json","xml","yaml","yml" -> "&#x1F4C4;"
+            else -> "&#x1F4C4;"
         }
     }
 
@@ -553,7 +551,7 @@ $errorMsg
 
         val parts = relPath.split("/").filter { it.isNotEmpty() }
         val breadcrumbs = buildString {
-            append("<a href='/?path=' class='bc-item'>ðŸ“± Storage</a>")
+            append("<a href='/?path=' class='bc-item'>&#x1F4F1; Storage</a>")
             var accumulated = ""
             parts.forEach { seg ->
                 accumulated += "/$seg"
@@ -572,8 +570,8 @@ $errorMsg
         files.forEach { f ->
             val fRelPath = f.canonicalPath.removePrefix(root.path)
             val enc = URLEncoder.encode(fRelPath, "UTF-8")
-            val icon = if (f.isDirectory) "ðŸ“" else fileIcon(f.name)
-            val size = if (f.isDirectory) "â€”" else formatSize(f.length())
+            val icon = if (f.isDirectory) "&#x1F4C1;" else fileIcon(f.name)
+            val size = if (f.isDirectory) "&mdash;" else formatSize(f.length())
             val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
             val date = sdf.format(Date(f.lastModified()))
             val safeName = f.name.replace("\\", "\\\\").replace("'", "\\'")
@@ -585,26 +583,26 @@ $errorMsg
             else
                 "<span class='file-name'>$icon ${f.name}</span>"
             val actions = if (f.isDirectory)
-                "<button class='del' onclick=\"delItem('$enc','$safeName',true)\">ðŸ—‘</button>"
+                "<button class='del' onclick=\"delItem('$enc','$safeName',true)\">&#x1F5D1;</button>"
             else
-                "<a class='btn' href='/download?path=$enc' download>â¬‡ Download</a><button class='del' onclick=\"delItem('$enc','$safeName',false)\">ðŸ—‘</button>"
+                "<a class='btn' href='/download?path=$enc' download>&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',false)\">&#x1F5D1;</button>"
             tableRows.append("<tr><td class='cb-col'><input type='checkbox' class='item-cb' data-path='$enc' data-name='$safeName' data-type='$type' onchange='updateActionBar()'></td><td>$nameCell</td><td>$size</td><td>$date</td><td class='act'>$actions</td></tr>\n")
 
             // Grid item
             val gridClick = if (f.isDirectory) "if(!event.target.matches('input,a,button')){window.location='/?path=$enc'}" else ""
-            val gridDownload = if (!f.isDirectory) "<a class='btn-sm' href='/download?path=$enc' download onclick='event.stopPropagation()'>â¬‡</a><button class='del-sm' onclick=\"event.stopPropagation();delItem('$enc','$safeName',false)\">ðŸ—‘</button>" else ""
+            val gridDownload = if (!f.isDirectory) "<a class='btn-sm' href='/download?path=$enc' download onclick='event.stopPropagation()'>&#x2B07;</a><button class='del-sm' onclick=\"event.stopPropagation();delItem('$enc','$safeName',false)\">&#x1F5D1;</button>" else ""
             gridItems.append("<div class='grid-item $type' onclick=\"$gridClick\"><input type='checkbox' class='item-cb grid-cb' data-path='$enc' data-name='$safeName' data-type='$type' onchange='event.stopPropagation();updateActionBar()'><div class='grid-icon'>$icon</div><div class='grid-name' title='${f.name}'>${f.name}</div><div class='grid-size'>$size</div><div class='grid-actions'>$gridDownload</div></div>\n")
         }
 
-        val emptyRow = if (files.isEmpty()) "<tr><td></td><td colspan='4' class='empty'>ðŸ“ This folder is empty</td></tr>" else ""
-        val emptyGrid = if (files.isEmpty()) "<div class='grid-empty'>ðŸ“ This folder is empty</div>" else ""
+        val emptyRow = if (files.isEmpty()) "<tr><td></td><td colspan='4' class='empty'>&#x1F4C1; This folder is empty</td></tr>" else ""
+        val emptyGrid = if (files.isEmpty()) "<div class='grid-empty'>&#x1F4C1; This folder is empty</div>" else ""
         val parentLink = if (relPath != "/" && relPath.isNotEmpty()) {
             val parentRel = File(relPath).parent ?: "/"
             val enc = URLEncoder.encode(parentRel, "UTF-8")
-            "<tr><td class='cb-col'></td><td><a href='/?path=$enc' class='folder-link'>ðŸ“ ..</a></td><td>â€”</td><td>â€”</td><td></td></tr>\n"
+            "<tr><td class='cb-col'></td><td><a href='/?path=$enc' class='folder-link'>&#x1F4C1; ..</a></td><td>&mdash;</td><td>&mdash;</td><td></td></tr>\n"
         } else ""
 
-        val rootDisplay = rootPath.let { if (it.length > 38) "â€¦${it.takeLast(38)}" else it }
+        val rootDisplay = rootPath.let { if (it.length > 38) "&hellip;${it.takeLast(38)}" else it }
         return buildBrowserHtmlPage(breadcrumbs, parentLink + tableRows + emptyRow, gridItems.toString() + emptyGrid, encodedPath, rootDisplay)
     }
 
@@ -612,7 +610,7 @@ $errorMsg
     private fun buildBrowserHtmlPage(breadcrumbs: String, rows: String, gridItems: String, encodedPath: String, rootDisplay: String): String = """<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PPT Remote â€” Files</title>
+<title>PPT Remote &mdash; Files</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -695,12 +693,12 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
 </style></head>
 <body>
 <header>
-  <h1><span>ðŸ“</span> PPT Remote Files</h1>
+  <h1><span>&#x1F4C1;</span> PPT Remote Files</h1>
   <span class="breadcrumb">$breadcrumbs</span>
-  <span class="root-badge" title="Shared folder: $rootDisplay">ðŸ”’ $rootDisplay</span>
+  <span class="root-badge" title="Shared folder: $rootDisplay">&#x1F512; $rootDisplay</span>
   <div class="view-toggle">
-    <button class="view-btn" id="btnList" onclick="setViewMode('list')" title="List view">â˜°</button>
-    <button class="view-btn" id="btnGrid" onclick="setViewMode('grid')" title="Grid view">âŠž</button>
+    <button class="view-btn" id="btnList" onclick="setViewMode('list')" title="List view">&#x2630;</button>
+    <button class="view-btn" id="btnGrid" onclick="setViewMode('grid')" title="Grid view">&#x229E;</button>
   </div>
 </header>
 <main>
@@ -725,10 +723,10 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
     <h3>Upload Files to this Folder</h3>
     <div class="upload-row">
       <div class="file-input-wrapper">
-        <button class="file-input-btn">ðŸ“‚ Choose Files</button>
+        <button class="file-input-btn">&#x1F4C2; Choose Files</button>
         <input type="file" id="fileInput" multiple onchange="updateSelectedFilesText()">
       </div>
-      <button class="upload-btn" onclick="uploadFiles()">â¬† Upload</button>
+      <button class="upload-btn" onclick="uploadFiles()">&#x2B06; Upload</button>
     </div>
     <div class="progress" id="prog">Drag &amp; drop files here or click Choose Files</div>
   </div>
@@ -736,14 +734,14 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
 <!-- Floating action bar -->
 <div class="action-bar" id="actionBar">
   <span class="sel-count" id="selCount">0 selected</span>
-  <button class="bar-btn bar-dl" onclick="downloadSelected()">â¬‡ Download</button>
-  <button class="bar-btn bar-del" onclick="deleteSelected()">ðŸ—‘ Delete</button>
-  <button class="bar-btn bar-clear" onclick="clearSelection()">âœ• Clear</button>
+  <button class="bar-btn bar-dl" onclick="downloadSelected()">&#x2B07; Download</button>
+  <button class="bar-btn bar-del" onclick="deleteSelected()">&#x1F5D1; Delete</button>
+  <button class="bar-btn bar-clear" onclick="clearSelection()">&#x2715; Clear</button>
 </div>
 <div class="toast" id="toast"></div>
 <script>
 var currentPath = decodeURIComponent("$encodedPath");
-// â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Toast --------------------------------------------------
 function toast(msg, ok) {
   var t = document.getElementById('toast');
   t.textContent = msg;
@@ -754,7 +752,7 @@ function toast(msg, ok) {
   clearTimeout(t._timer);
   t._timer = setTimeout(function(){ t.style.display = 'none'; }, 2800);
 }
-// â”€â”€ View mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- View mode ----------------------------------------------
 var viewMode = localStorage.getItem('pptFileView') || 'list';
 function setViewMode(mode) {
   viewMode = mode;
@@ -766,7 +764,7 @@ function setViewMode(mode) {
   updateActionBar();
 }
 setViewMode(viewMode);
-// â”€â”€ Selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Selection ----------------------------------------------
 function updateActionBar() {
   var checked = document.querySelectorAll('.item-cb:checked');
   var bar = document.getElementById('actionBar');
@@ -787,12 +785,12 @@ function clearSelection() {
   document.querySelectorAll('.item-cb').forEach(function(cb){ cb.checked = false; });
   updateActionBar();
 }
-// â”€â”€ Multi-download â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Multi-download -----------------------------------------
 function downloadSelected() {
   var checked = Array.from(document.querySelectorAll('.item-cb:checked'));
   var files = checked.filter(function(cb){ return cb.dataset.type !== 'folder'; });
   if (!files.length) { toast('No files selected (select files, not folders)', false); return; }
-  toast('Downloading ' + files.length + ' file(s)â€¦', true);
+  toast('Downloading ' + files.length + ' file(s)...', true);
   files.forEach(function(cb, i) {
     setTimeout(function() {
       var a = document.createElement('a');
@@ -802,7 +800,7 @@ function downloadSelected() {
     }, i * 400);
   });
 }
-// â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Delete -------------------------------------------------
 function delItem(enc, name, isDir) {
   var what = isDir ? 'folder' : 'file';
   if (!confirm('Delete ' + what + ' "' + name + '"? This cannot be undone.')) return;
@@ -826,7 +824,7 @@ function deleteSelected() {
       .catch(function(){ done++; });
   });
 }
-// â”€â”€ Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Upload -------------------------------------------------
 function updateSelectedFilesText() {
   var inp = document.getElementById('fileInput');
   var prog = document.getElementById('prog');
@@ -837,7 +835,7 @@ function uploadFiles() {
   var prog = document.getElementById('prog');
   if (!inp.files.length) { toast('Select at least one file', false); return; }
   var files = Array.from(inp.files); var done = 0;
-  prog.textContent = 'Uploading ' + files.length + ' file(s)â€¦';
+  prog.textContent = 'Uploading ' + files.length + ' file(s)...';
   files.forEach(function(file) {
     var fd = new FormData(); fd.append('file', file);
     fetch('/upload?path=' + encodeURIComponent(currentPath), {method:'POST', body:fd})
@@ -851,7 +849,7 @@ function uploadFiles() {
       .catch(function(){ done++; prog.textContent = 'Upload failed for ' + file.name; });
   });
 }
-// â”€â”€ Drag & drop upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Drag & drop upload -------------------------------------
 var dropZone = document.getElementById('dropZone');
 var fileInput = document.getElementById('fileInput');
 ['dragenter','dragover'].forEach(function(ev){
@@ -865,5 +863,3 @@ dropZone.addEventListener('drop', function(e){
 }, false);
 </script>
 </body></html>"""
-}
-

@@ -133,6 +133,7 @@ data class RemoteState(
     val webServerUrl: String? = null,
     val webServerPin: String = "",
     val webServerPort: Int = 8686,
+    val webServerSharedFolder: String? = null,
 )
 
 /** Represents a detected storage volume (Internal or SD Card). */

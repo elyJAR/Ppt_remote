@@ -166,4 +166,25 @@ object SafStorageHelper {
             parentDoc.createFile(mime, file.name)
         }
     }
+
+    fun convertUriToPath(uri: Uri): String? {
+        val treePart = uri.toString().substringAfter("/tree/", "")
+        if (treePart.isEmpty()) return null
+        val decodedPart = Uri.decode(treePart)
+        val colonIdx = decodedPart.indexOf(':')
+        if (colonIdx == -1) return null
+        val rootId = decodedPart.substring(0, colonIdx)
+        val relPath = decodedPart.substring(colonIdx + 1)
+        val volumeRoot = if (rootId.equals("primary", ignoreCase = true)) {
+            Environment.getExternalStorageDirectory().absolutePath
+        } else {
+            "/storage/$rootId"
+        }
+        val cleanRelPath = relPath.trim('/')
+        return if (cleanRelPath.isEmpty()) {
+            File(volumeRoot).absolutePath
+        } else {
+            File(volumeRoot, cleanRelPath).absolutePath
+        }
+    }
 }

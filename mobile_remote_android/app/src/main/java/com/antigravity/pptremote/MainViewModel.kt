@@ -55,7 +55,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             filesSortCategory = try { SortCategory.valueOf(RemotePrefs.getFilesSortCategory(appContext)) } catch (_: Exception) { SortCategory.NAME },
             filesSortOrder = try { SortOrder.valueOf(RemotePrefs.getFilesSortOrder(appContext)) } catch (_: Exception) { SortOrder.ASCENDING },
             webServerPin = RemotePrefs.getWebServerPin(appContext),
-            webServerPort = RemotePrefs.getWebServerPort(appContext)
+            webServerPort = RemotePrefs.getWebServerPort(appContext),
+            webServerSharedFolder = RemotePrefs.getWebServerSharedFolder(appContext)
         )
     )
     val state: StateFlow<RemoteState> = _state.asStateFlow()
@@ -621,7 +622,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleWebServer() {
         val current = _state.value
-        val rootDir = current.filesRootPath
+        val rootDir = current.webServerSharedFolder
+            ?: current.filesRootPath
             ?: current.activeFtpPath
             ?: current.availableStorages.firstOrNull()?.path
             ?: return
@@ -629,6 +631,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             delay(400)
             updateServiceStatus()
+        }
+    }
+
+    fun setWebServerSharedFolder(path: String) {
+        val normalized = java.io.File(path).absolutePath
+        RemotePrefs.setWebServerSharedFolder(appContext, normalized)
+        _state.value = _state.value.copy(webServerSharedFolder = normalized)
+        if (_state.value.isWebServerRunning) {
+            toggleWebServer() // Stop
+            viewModelScope.launch {
+                delay(600)
+                toggleWebServer() // Restart
+            }
         }
     }
 

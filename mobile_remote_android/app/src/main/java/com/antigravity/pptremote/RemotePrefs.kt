@@ -247,6 +247,7 @@ object RemotePrefs {
     private const val KEY_WEB_SERVER_PIN = "web_server_pin"
     private const val KEY_WEB_SERVER_ENABLED = "web_server_enabled"
     private const val KEY_WEB_SERVER_PORT = "web_server_port"
+    private const val KEY_WEB_SERVER_SHARED_FOLDER = "web_server_shared_folder"
 
     fun getFilesSortCategory(context: Context): String =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -293,5 +294,14 @@ object RemotePrefs {
     fun setWebServerPort(context: Context, port: Int) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putInt(KEY_WEB_SERVER_PORT, port).apply()
+    }
+
+    fun getWebServerSharedFolder(context: Context): String? =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_WEB_SERVER_SHARED_FOLDER, null)
+
+    fun setWebServerSharedFolder(context: Context, folder: String?) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_WEB_SERVER_SHARED_FOLDER, folder).apply()
     }
 }
