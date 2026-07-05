@@ -44,6 +44,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p temp_gradle
+          echo "" > temp_gradle/settings.gradle.kts
           cd temp_gradle
           gradle wrapper --gradle-version 8.10.2
           cd ..
