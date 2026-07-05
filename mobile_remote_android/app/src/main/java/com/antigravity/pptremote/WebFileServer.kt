@@ -185,8 +185,16 @@ class WebFileServer(
         }
 
         fun sendRedirect(location: String) {
-            val sb = "HTTP/1.1 302 Found\r\nLocation: $location\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-            out.write(sb.toByteArray(StandardCharsets.US_ASCII))
+            val sb = StringBuilder()
+            sb.append("HTTP/1.1 302 Found\r\n")
+            sb.append("Location: $location\r\n")
+            sb.append("Content-Length: 0\r\n")
+            sb.append("Connection: close\r\n")
+            for ((k, values) in responseHeaders) {
+                for (v in values) sb.append("$k: $v\r\n")
+            }
+            sb.append("\r\n")
+            out.write(sb.toString().toByteArray(StandardCharsets.US_ASCII))
             out.flush()
         }
 
@@ -270,7 +278,14 @@ class WebFileServer(
             "POST" -> {
                 val contentLength = exchange.requestHeaders["content-length"]?.toIntOrNull() ?: 0
                 val body = if (contentLength > 0) {
-                    exchange.bodyStream.readNBytes(contentLength).toString(StandardCharsets.UTF_8)
+                    val buf = ByteArray(contentLength)
+                    var offset = 0
+                    while (offset < contentLength) {
+                        val read = exchange.bodyStream.read(buf, offset, contentLength - offset)
+                        if (read == -1) break
+                        offset += read
+                    }
+                    buf.toString(StandardCharsets.UTF_8)
                 } else ""
                 val submitted = body.split("&")
                     .firstOrNull { it.startsWith("pin=") }
