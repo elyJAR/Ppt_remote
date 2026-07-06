@@ -385,12 +385,17 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     state.showNotes -> {
+                        val activePres = state.presentations.find { it.id == state.selectedPresentationId }
                         NotesScreen(
                             state = state,
                             onBack = viewModel::hideNotes,
                             onGetThumbnail = viewModel::getCachedThumbnail,
                             onSelectSlide = { 
-                                viewModel.jumpToSlide(it)
+                                if (activePres?.inSlideshow == true) {
+                                    viewModel.jumpToSlide(it)
+                                } else {
+                                    viewModel.startSelectedSlideshow(it)
+                                }
                                 viewModel.hideNotes()
                             }
                         )
@@ -422,7 +427,7 @@ class MainActivity : ComponentActivity() {
                             RemoteScreen(
                                 state = state,
                                 onPresentationSelect = viewModel::selectPresentation,
-                                onStartSlideshow = viewModel::startSelectedSlideshow,
+                                onStartSlideshow = { viewModel.startSelectedSlideshow(it) },
                                 onStopSlideshow = viewModel::stopSelectedSlideshow,
                                 onNext = viewModel::nextSlide,
                                 onPrevious = viewModel::previousSlide,
@@ -430,7 +435,8 @@ class MainActivity : ComponentActivity() {
                                 onShowSettings = viewModel::showSettings,
                                 onShowNotes = viewModel::showNotes,
                                 onSelectBridge = viewModel::selectBridge,
-                                onShowFiles = viewModel::showFiles
+                                onShowFiles = viewModel::showFiles,
+                                onGetThumbnail = viewModel::getCachedThumbnail
                             )
                         }
                     }
@@ -645,7 +651,7 @@ class MainActivity : ComponentActivity() {
 private fun RemoteScreen(
     state: RemoteState,
     onPresentationSelect: (String) -> Unit,
-    onStartSlideshow: () -> Unit,
+    onStartSlideshow: (Int?) -> Unit,
     onStopSlideshow: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -654,6 +660,7 @@ private fun RemoteScreen(
     onShowNotes: () -> Unit,
     onSelectBridge: (BridgeInfo) -> Unit,
     onShowFiles: () -> Unit,
+    onGetThumbnail: (String, Int) -> ByteArray?,
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -952,7 +959,17 @@ private fun RemoteScreen(
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     val activePres = state.presentations.find { it.id == state.selectedPresentationId }
-                    val currentNotes = state.speakerNotes?.getOrNull((activePres?.currentSlide ?: 1) - 1)
+                    var previewSlideIndex by remember(activePres?.id, activePres?.inSlideshow) {
+                        mutableStateOf(activePres?.currentSlide ?: 1)
+                    }
+                    val currentNotes = if (activePres?.inSlideshow == true) {
+                        state.speakerNotes?.getOrNull((activePres.currentSlide ?: 1) - 1)
+                    } else {
+                        state.speakerNotes?.getOrNull(previewSlideIndex - 1)
+                    }
+                    val previewThumbnail = if (activePres != null && !activePres.inSlideshow) {
+                        onGetThumbnail(activePres.id, previewSlideIndex)
+                    } else null
                     
                     Column(
                         modifier = Modifier
@@ -971,6 +988,8 @@ private fun RemoteScreen(
                             if (activePres != null) {
                                 PresentationHero(
                                     presentation = activePres,
+                                    previewSlideIndex = if (activePres.inSlideshow) null else previewSlideIndex,
+                                    previewThumbnail = previewThumbnail,
                                     modifier = Modifier.pointerInput(Unit) {
                                         var totalDrag = 0f
                                         detectHorizontalDragGestures(
@@ -983,10 +1002,18 @@ private fun RemoteScreen(
                                                 val threshold = 150f
                                                 if (totalDrag > threshold) {
                                                     performGestureHapticFeedback()
-                                                    onPrevious()
+                                                    if (activePres.inSlideshow) {
+                                                        onPrevious()
+                                                    } else {
+                                                        previewSlideIndex = (previewSlideIndex - 1).coerceAtLeast(1)
+                                                    }
                                                 } else if (totalDrag < -threshold) {
                                                     performGestureHapticFeedback()
-                                                    onNext()
+                                                    if (activePres.inSlideshow) {
+                                                        onNext()
+                                                    } else {
+                                                        previewSlideIndex = (previewSlideIndex + 1).coerceAtMost(activePres.totalSlides)
+                                                    }
                                                 }
                                             }
                                         ) { _, dragAmount ->
@@ -1022,7 +1049,11 @@ private fun RemoteScreen(
                                             )
                                         }
                                         
-                                        val noteText = state.currentSlideNotes ?: state.speakerNotes?.getOrNull((activePres?.currentSlide ?: 1) - 1)
+                                        val noteText = if (activePres?.inSlideshow == true) {
+                                            state.currentSlideNotes ?: state.speakerNotes?.getOrNull((activePres.currentSlide ?: 1) - 1)
+                                        } else {
+                                            state.speakerNotes?.getOrNull(previewSlideIndex - 1)
+                                        }
                                         
                                         if (noteText != null) {
                                             Text(
@@ -1068,10 +1099,12 @@ private fun RemoteScreen(
                                 hasPresentation = state.selectedPresentationId != null,
                                 inSlideshow = activePres?.inSlideshow == true,
                                 useWideLayout = useWideLayout,
-                                onPrevious = onPrevious,
-                                onNext = onNext,
-                                onStart = onStartSlideshow,
+                                onPrevious = if (activePres?.inSlideshow == true) onPrevious else { { previewSlideIndex = (previewSlideIndex - 1).coerceAtLeast(1) } },
+                                onNext = if (activePres?.inSlideshow == true) onNext else { { previewSlideIndex = (previewSlideIndex + 1).coerceAtMost(activePres?.totalSlides ?: 1) } },
+                                onStart = { onStartSlideshow(if (activePres?.inSlideshow == true) null else previewSlideIndex) },
                                 onStop = onStopSlideshow,
+                                prevEnabled = if (activePres?.inSlideshow == true) true else (previewSlideIndex > 1),
+                                nextEnabled = if (activePres?.inSlideshow == true) true else (previewSlideIndex < (activePres?.totalSlides ?: 1))
                             )
                         }
                     }
@@ -2058,6 +2091,8 @@ private fun SlideControlsCard(
     onNext: () -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
+    prevEnabled: Boolean = hasPresentation && inSlideshow,
+    nextEnabled: Boolean = hasPresentation && inSlideshow,
 ) {
     AppCard {
         if (useWideLayout) {
@@ -2070,14 +2105,14 @@ private fun SlideControlsCard(
                 SlideNavButton(
                     label = "Prev",
                     icon = Icons.AutoMirrored.Filled.NavigateBefore,
-                    enabled = hasPresentation && inSlideshow,
+                    enabled = prevEnabled,
                     modifier = Modifier.weight(1f),
                     onClick = onPrevious,
                 )
                 SlideNavButton(
                     label = "Next",
                     icon = Icons.AutoMirrored.Filled.NavigateNext,
-                    enabled = hasPresentation && inSlideshow,
+                    enabled = nextEnabled,
                     modifier = Modifier.weight(1f),
                     onClick = onNext,
                 )
@@ -2121,14 +2156,14 @@ private fun SlideControlsCard(
                 SlideNavButton(
                     label = "Prev",
                     icon = Icons.AutoMirrored.Filled.ArrowBackIos,
-                    enabled = hasPresentation && inSlideshow,
+                    enabled = prevEnabled,
                     modifier = Modifier.weight(1f),
                     onClick = onPrevious,
                 )
                 SlideNavButton(
                     label = "Next",
                     icon = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                    enabled = hasPresentation && inSlideshow,
+                    enabled = nextEnabled,
                     modifier = Modifier.weight(1f),
                     onClick = onNext,
                 )
@@ -2792,9 +2827,14 @@ private fun AppCard(
 @Composable
 private fun PresentationHero(
     presentation: Presentation,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    previewSlideIndex: Int? = null,
+    previewThumbnail: ByteArray? = null
 ) {
     val isDark = !MaterialTheme.colorScheme.surface.isLight()
+    val thumbnailBytes = if (previewSlideIndex != null) previewThumbnail else presentation.currentThumbnail
+    val isLive = previewSlideIndex == null && presentation.inSlideshow
+    
     AppCard(
         modifier = modifier,
         backgroundColor = if (isDark) iOSGray900 else MaterialTheme.colorScheme.surfaceVariant,
@@ -2809,14 +2849,14 @@ private fun PresentationHero(
                     .clip(iOSSquircleSmall)
                     .background(Color.Black)
             ) {
-                if (presentation.currentThumbnail != null) {
-                    val bitmap = remember(presentation.currentThumbnail) {
-                        BitmapFactory.decodeByteArray(presentation.currentThumbnail, 0, presentation.currentThumbnail.size)
+                if (thumbnailBytes != null) {
+                    val bitmap = remember(thumbnailBytes) {
+                        BitmapFactory.decodeByteArray(thumbnailBytes, 0, thumbnailBytes.size)
                     }
                     if (bitmap != null) {
                         Image(
                             bitmap = bitmap.asImageBitmap(),
-                            contentDescription = "Current Slide",
+                            contentDescription = "Slide Preview",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Fit
                         )
@@ -2834,12 +2874,12 @@ private fun PresentationHero(
                 
                 // Overlay badge
                 Surface(
-                    color = iOSAccent,
+                    color = if (isLive) iOSAccent else iOSGray,
                     shape = RoundedCornerShape(topStart = 0.dp, bottomEnd = 16.dp, topEnd = 0.dp, bottomStart = 16.dp),
                     modifier = Modifier.align(Alignment.TopEnd)
                 ) {
                     Text(
-                        "LIVE",
+                        if (isLive) "LIVE" else "PREVIEW",
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
@@ -2862,8 +2902,9 @@ private fun PresentationHero(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val slideNum = previewSlideIndex ?: presentation.currentSlide ?: 0
                     Text(
-                        "Slide ${presentation.currentSlide ?: 0} of ${presentation.totalSlides}",
+                        "Slide $slideNum of ${presentation.totalSlides}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = iOSAccent
                     )

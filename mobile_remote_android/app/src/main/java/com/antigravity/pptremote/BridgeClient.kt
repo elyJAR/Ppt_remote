@@ -113,7 +113,14 @@ class BridgeClient {
         } catch (ex: Exception) { null }
     }
 
-    fun startSlideshow(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/start")
+    fun startSlideshow(url: String, presentationId: String, slideIndex: Int? = null) {
+        val path = if (slideIndex != null) {
+            "/api/presentations/${encodedId(presentationId)}/start?slide_index=$slideIndex"
+        } else {
+            "/api/presentations/${encodedId(presentationId)}/start"
+        }
+        post(url, path)
+    }
     fun stopSlideshow(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/stop")
     fun next(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/next")
     fun previous(url: String, presentationId: String) = post(url, "/api/presentations/${encodedId(presentationId)}/previous")

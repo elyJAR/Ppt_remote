@@ -448,9 +448,9 @@ def list_presentations() -> list[PresentationDto]:
     dependencies=[Depends(verify_api_key)],
 )
 @_limiter.limit("30/minute")
-def start_slideshow(request: Request, presentation_id: str):
+def start_slideshow(request: Request, presentation_id: str, slide_index: int | None = None):
     try:
-        controller.start_slideshow(_resolve_id(presentation_id))
+        controller.start_slideshow(_resolve_id(presentation_id), slide_index)
         return {"ok": True}
     except PowerPointControllerError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -104,6 +104,16 @@ class BridgeClientTest {
     }
 
     @Test
+    fun `startSlideshow with slideIndex sends POST to correct path with query param`() {
+        server.enqueue(MockResponse().setBody("""{"ok":true}""").setResponseCode(200))
+        client.startSlideshow(baseUrl, "C:\\Slides\\demo.pptx", 5)
+
+        val request = server.takeRequest()
+        assertEquals("POST", request.method)
+        assertTrue(request.path!!.endsWith("/start?slide_index=5"))
+    }
+
+    @Test
     fun `stopSlideshow sends POST to correct path`() {
         server.enqueue(MockResponse().setBody("""{"ok":true}""").setResponseCode(200))
         client.stopSlideshow(baseUrl, "C:\\Slides\\demo.pptx")

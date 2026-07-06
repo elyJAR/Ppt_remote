@@ -317,7 +317,11 @@ class TestStartSlideshow:
 
     def test_correct_id_forwarded_to_controller(self, client, mock_controller):
         client.post(f"/api/presentations/{PPTX_ENC}/start")
-        mock_controller.start_slideshow.assert_called_once_with(PPTX)
+        mock_controller.start_slideshow.assert_called_once_with(PPTX, None)
+
+    def test_slide_index_forwarded_to_controller(self, client, mock_controller):
+        client.post(f"/api/presentations/{PPTX_ENC}/start?slide_index=5")
+        mock_controller.start_slideshow.assert_called_once_with(PPTX, 5)
 
     def test_controller_error_returns_400(self, client, mock_controller):
         mock_controller.start_slideshow.side_effect = PowerPointControllerError(
@@ -337,7 +341,7 @@ class TestStartSlideshow:
 
     def test_second_presentation_forwarded_correctly(self, client, mock_controller):
         client.post(f"/api/presentations/{PPTX2_ENC}/start")
-        mock_controller.start_slideshow.assert_called_once_with(PPTX2)
+        mock_controller.start_slideshow.assert_called_once_with(PPTX2, None)
 
 
 # ===========================================================================
@@ -588,4 +592,4 @@ class TestResolveId:
     def test_url_encoded_path_decoded_before_forwarding(self, client, mock_controller):
         """The controller must receive the decoded path, not the percent-encoded one."""
         client.post(f"/api/presentations/{PPTX_ENC}/start")
-        mock_controller.start_slideshow.assert_called_once_with(PPTX)
+        mock_controller.start_slideshow.assert_called_once_with(PPTX, None)

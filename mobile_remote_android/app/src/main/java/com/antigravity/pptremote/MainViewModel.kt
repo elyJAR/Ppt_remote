@@ -210,9 +210,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(selectedPresentationId = id)
     }
 
-    fun startSelectedSlideshow() {
+    fun startSelectedSlideshow(startSlide: Int? = null) {
         val selected = _state.value.selectedPresentationId ?: return
-        runBridgeAction("Slideshow started") { url -> client.startSlideshow(url, selected) }
+        runBridgeAction("Slideshow started") { url -> client.startSlideshow(url, selected, startSlide) }
     }
 
     fun stopSelectedSlideshow() {
@@ -1234,17 +1234,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Pair(_state.value.currentSlideNotes, _state.value.currentSlideNotesIndex)
             }
 
-            // Fetch FULL speaker notes if missing for active presentation
-            val currentSpeakerNotes = if (activePres != null && (_state.value.speakerNotes == null || activePres.id != _state.value.presentations.firstOrNull { it.inSlideshow }?.id)) {
-                try {
-                    client.fetchFullNotes(effectiveUrl, activePres.id)
-                } catch (e: Exception) { null }
-            } else if (activePres == null) {
-                null
-            } else {
-                _state.value.speakerNotes
-            }
-
             // Read current state at write-time to avoid clobbering showSettings/showOnboarding
             val nowState = _state.value
             val selected = when {
@@ -1252,6 +1241,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     nowState.selectedPresentationId
                 else -> presentationsWithThumbnails.firstOrNull { it.inSlideshow }?.id
                     ?: presentationsWithThumbnails.firstOrNull()?.id
+            }
+
+            // Fetch FULL speaker notes if missing for selected presentation
+            val currentSpeakerNotes = if (selected != null && (_state.value.speakerNotes == null || selected != _state.value.selectedPresentationId)) {
+                try {
+                    client.fetchFullNotes(effectiveUrl, selected)
+                } catch (e: Exception) { null }
+            } else if (selected == null) {
+                null
+            } else {
+                _state.value.speakerNotes
             }
 
             RemotePrefs.setSelectedPresentationId(appContext, selected)

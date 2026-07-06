@@ -427,7 +427,7 @@ class PowerPointController:
         return None
 
     @_on_com_thread
-    def start_slideshow(self, presentation_id: str) -> None:
+    def start_slideshow(self, presentation_id: str, slide_index: int | None = None) -> None:
         if presentation_id.startswith("__protected__"):
             raise PowerPointControllerError(
                 "This file is in Protected View. Click 'Enable Editing' in PowerPoint first."
@@ -466,7 +466,12 @@ class PowerPointController:
                     f"If the file was downloaded from cloud, click 'Enable Editing' in PowerPoint first."
                 ) from exc
             # Wait for the slideshow window to actually open (important for OneDrive files)
-            self._wait_for_slideshow_window(app, presentation_id, timeout=6.0)
+            window = self._wait_for_slideshow_window(app, presentation_id, timeout=6.0)
+            if window is not None and slide_index is not None:
+                try:
+                    window.View.GotoSlide(slide_index)
+                except Exception:
+                    pass
 
     @_on_com_thread
     def stop_slideshow(self, presentation_id: str) -> None:
