@@ -190,6 +190,22 @@ def main() -> None:
                         _logger.warning("Tray action '%s' failed: %s", command, exc)
                 _threading.Thread(target=_run, daemon=True).start()
 
+            def _refresh_screenshots() -> None:
+                """Clear all thumbnail cache (in-memory & disk) and increment the global version (fire-and-forget thread)."""
+                import threading as _threading
+                def _run() -> None:
+                    try:
+                        from main import controller  # noqa: PLC0415
+                        controller.refresh_screenshots()
+                        tray.notify(
+                            "PPT Remote Bridge",
+                            "Screenshots refreshed successfully."
+                        )
+                        _logger.info("Tray action 'refresh_screenshots' executed successfully")
+                    except Exception as exc:
+                        _logger.warning("Tray action 'refresh_screenshots' failed: %s", exc)
+                _threading.Thread(target=_run, daemon=True).start()
+
             tray = TrayIconManager(
                 bridge_url=bridge_url,
                 on_quit=_on_quit,
@@ -197,6 +213,7 @@ def main() -> None:
                 on_previous=lambda: _tray_action("previous"),
                 on_start_slideshow=lambda: _tray_action("start"),
                 on_stop_slideshow=lambda: _tray_action("stop"),
+                on_refresh_screenshots=_refresh_screenshots,
             )
 
             # Start IP monitoring thread

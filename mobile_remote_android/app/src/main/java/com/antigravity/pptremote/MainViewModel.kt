@@ -34,6 +34,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val thumbnailWarmupInFlight = ConcurrentHashMap.newKeySet<String>()
     // Tracks the last known slide count per presentation so we can detect structural changes
     private val lastKnownSlideCount = ConcurrentHashMap<String, Int>()
+    // Tracks the last known thumbnail version per presentation to detect manual refreshes
+    private val lastKnownThumbnailVersion = ConcurrentHashMap<String, Int>()
     private var lastNetworkType: NetworkType = NetworkType.UNKNOWN
     private var networkChangeCallbackRegistered = false
     private var lastInteractionTime = 0L
@@ -755,9 +757,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val prevCount = lastKnownSlideCount.put(cKey, presentation.totalSlides)
                 val slideCountChanged = prevCount != null && prevCount != presentation.totalSlides
 
-                // If the file has unsaved changes, also evict the cache so any content
-                // edits (text, images, layout) are reflected without waiting for a save.
-                if (slideCountChanged || presentation.hasUnsavedChanges) {
+                // Track thumbnail version changes to detect manual refreshes from the bridge
+                val prevVersion = lastKnownThumbnailVersion.put(cKey, presentation.thumbnailVersion)
+                val versionChanged = prevVersion != null && prevVersion != presentation.thumbnailVersion
+
+                // If the slide count or thumbnail version changed, or if the file has unsaved changes,
+                // evict the cache so any content edits (text, images, layout) are reflected.
+                if (slideCountChanged || presentation.hasUnsavedChanges || versionChanged) {
                     thumbnailCache.remove(cKey)
                     thumbnailWarmupComplete.removeIf { it.startsWith(cKey) }
                     thumbnailWarmupInFlight.removeIf { it.startsWith(cKey) }
@@ -1191,14 +1197,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val bridgeNetworkWarning = client.getNetworkStatus(effectiveUrl)?.warning
             val bridgeReachable = true  // if fetchPresentations succeeded, bridge is reachable
 
-            // Kick off thumbnail warmup in the background so the bridge can cache
-            // every slide before the user starts browsing on the phone.
-            preloadThumbnailsIfNeeded(effectiveUrl, presentations)
-
             // Find the active slideshow presentation
             val activePres = presentations.firstOrNull { it.inSlideshow }
             val activeSlide = activePres?.currentSlide
             val prevSlide = _state.value.lastThumbnailSlide
+
+            // Check if the thumbnail version changed for the active presentation
+            val activePresCKey = activePres?.let { cacheKey(effectiveUrl, it.id) }
+            val activeVersionChanged = activePres?.let {
+                val prevVer = lastKnownThumbnailVersion[activePresCKey]
+                prevVer != null && prevVer != it.thumbnailVersion
+            } ?: false
+
+            // Kick off thumbnail warmup in the background so the bridge can cache
+            // every slide before the user starts browsing on the phone.
+            preloadThumbnailsIfNeeded(effectiveUrl, presentations)
+
             val activeCachedThumb = activePres?.currentSlide?.let {
                 cachedThumbnail(effectiveUrl, activePres.id, it)
             }
@@ -1208,9 +1222,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // if it's lagging behind (smaller than our optimistic index).
             val isInGracePeriod = System.currentTimeMillis() - lastInteractionTime < 3000L
             
-            // Only re-fetch thumbnail when the slide number actually changes (avoids
+            // Only re-fetch thumbnail when the slide number or version actually changes (avoids
             // a 1-3s PowerPoint export on every 2s poll tick)
-            val presentationsWithThumbnails = if (activePres != null && activeSlide != null && activeSlide != prevSlide) {
+            val presentationsWithThumbnails = if (activePres != null && activeSlide != null && (activeSlide != prevSlide || activeVersionChanged)) {
                 // If in grace period, preserve our optimistic currentSlide
                 if (isInGracePeriod) {
                      presentations.map { pres ->

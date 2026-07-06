@@ -52,6 +52,7 @@ class PresentationInfo:
     current_slide: int | None
     total_slides: int
     has_unsaved_changes: bool = False
+    thumbnail_version: int = 0
 
 
 import queue as _queue
@@ -180,6 +181,8 @@ class PowerPointController:
         self._thumbnail_warmup_complete: set[tuple[str, int, int]] = set()
         self._thumbnail_warmup_lock = _threading.Lock()
         self._thumbnail_warmup_width = 720
+        self._global_thumbnail_version = 0
+
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -356,6 +359,7 @@ class PowerPointController:
                         current_slide=current_slide,
                         total_slides=total_slides,
                         has_unsaved_changes=has_unsaved,
+                        thumbnail_version=self._global_thumbnail_version,
                     )
                 )
 
@@ -376,6 +380,7 @@ class PowerPointController:
                                 in_slideshow=False,
                                 current_slide=None,
                                 total_slides=0,
+                                thumbnail_version=0,
                             )
                         )
                     except Exception:
@@ -790,3 +795,27 @@ class PowerPointController:
         # Delegate to the internal undecorated method to avoid deadlocking the COM worker thread
         png_bytes = self._get_slide_thumbnail_impl(app, presentation_id, slide_index, width)
         return slide_index, png_bytes
+
+    def refresh_screenshots(self) -> None:
+        """Clear all thumbnail cache (in-memory & disk) and increment the global version."""
+        # 1. Clear in-memory cache
+        self._thumbnail_cache.clear()
+
+        # 2. Clear disk cache
+        if self._cache_dir.exists():
+            for child in self._cache_dir.iterdir():
+                if child.is_file():
+                    try:
+                        child.unlink()
+                    except Exception as e:
+                        _logger.debug("Failed to delete cached thumbnail file %s: %s", child, e)
+
+        # 3. Clear warmup control sets
+        with self._thumbnail_warmup_lock:
+            self._thumbnail_warmup_complete.clear()
+            self._thumbnail_warmup_inflight.clear()
+
+        # 4. Increment the global version
+        self._global_thumbnail_version += 1
+        _logger.info("Screenshots refreshed. Global version incremented to %d", self._global_thumbnail_version)
+

@@ -58,6 +58,7 @@ class TrayIconManager:
         on_previous: Callable[[], None] | None = None,
         on_start_slideshow: Callable[[], None] | None = None,
         on_stop_slideshow: Callable[[], None] | None = None,
+        on_refresh_screenshots: Callable[[], None] | None = None,
     ) -> None:
         self._bridge_url = bridge_url
         self._on_quit = on_quit
@@ -65,7 +66,9 @@ class TrayIconManager:
         self._on_previous = on_previous
         self._on_start_slideshow = on_start_slideshow
         self._on_stop_slideshow = on_stop_slideshow
+        self._on_refresh_screenshots = on_refresh_screenshots
         self._icon: "pystray.Icon | None" = None
+
 
     # ------------------------------------------------------------------
     # Public API
@@ -154,7 +157,7 @@ class TrayIconManager:
         ]
 
         # Quick controls — only shown when callbacks are provided
-        if any([self._on_previous, self._on_next, self._on_start_slideshow, self._on_stop_slideshow]):
+        if any([self._on_previous, self._on_next, self._on_start_slideshow, self._on_stop_slideshow, self._on_refresh_screenshots]):
             if self._on_previous:
                 menu_items.append(pystray.MenuItem("⏮  Previous Slide", self._handle_previous))
             if self._on_next:
@@ -163,6 +166,8 @@ class TrayIconManager:
                 menu_items.append(pystray.MenuItem("▶  Start Slideshow", self._handle_start_slideshow))
             if self._on_stop_slideshow:
                 menu_items.append(pystray.MenuItem("⏹  Stop Slideshow", self._handle_stop_slideshow))
+            if self._on_refresh_screenshots:
+                menu_items.append(pystray.MenuItem("🔄 Refresh Screenshots", self._handle_refresh_screenshots))
             menu_items.append(pystray.Menu.SEPARATOR)
 
         # FTP Feature - Multi-Client Support
@@ -235,3 +240,12 @@ class TrayIconManager:
                 self._on_stop_slideshow()
             except Exception as exc:
                 logger.warning("Tray stop slideshow failed: %s", exc)
+
+    def _handle_refresh_screenshots(self, icon: "pystray.Icon", item: "pystray.MenuItem") -> None:
+        logger.info("Refresh screenshots selected from tray menu")
+        if self._on_refresh_screenshots:
+            try:
+                self._on_refresh_screenshots()
+            except Exception as exc:
+                logger.warning("Tray refresh screenshots failed: %s", exc)
+

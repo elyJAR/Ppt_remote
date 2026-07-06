@@ -28,7 +28,8 @@ data class Presentation(
     val currentSlide: Int?,
     val totalSlides: Int,
     val currentThumbnail: ByteArray? = null,
-    val hasUnsavedChanges: Boolean = false
+    val hasUnsavedChanges: Boolean = false,
+    val thumbnailVersion: Int = 0
 ) {
     // ByteArray needs custom equals/hashCode to avoid identity comparison
     override fun equals(other: Any?): Boolean {
@@ -36,16 +37,24 @@ data class Presentation(
         if (other !is Presentation) return false
         return id == other.id &&
             name == other.name &&
+            path == other.path &&
             inSlideshow == other.inSlideshow &&
             currentSlide == other.currentSlide &&
             totalSlides == other.totalSlides &&
-            currentThumbnail.contentEquals(other.currentThumbnail)
+            currentThumbnail.contentEquals(other.currentThumbnail) &&
+            hasUnsavedChanges == other.hasUnsavedChanges &&
+            thumbnailVersion == other.thumbnailVersion
     }
     override fun hashCode(): Int {
         var result = id.hashCode()
+        result = 31 * result + name.hashCode()
+        result = 31 * result + path.hashCode()
         result = 31 * result + inSlideshow.hashCode()
         result = 31 * result + (currentSlide ?: 0)
+        result = 31 * result + totalSlides
         result = 31 * result + (currentThumbnail?.contentHashCode() ?: 0)
+        result = 31 * result + hasUnsavedChanges.hashCode()
+        result = 31 * result + thumbnailVersion
         return result
     }
 }
