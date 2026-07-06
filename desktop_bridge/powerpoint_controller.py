@@ -620,6 +620,7 @@ class PowerPointController:
                     text = str(
                         slide.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text
                     )
+                    text = text.replace("\r\n", "\n").replace("\r", "\n")
                     notes.append(text.strip())
                 except Exception:
                     notes.append("")
@@ -642,6 +643,7 @@ class PowerPointController:
                 text = str(
                     slide.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text
                 )
+                text = text.replace("\r\n", "\n").replace("\r", "\n")
             except Exception:
                 text = ""
             return slide_index, text.strip()
