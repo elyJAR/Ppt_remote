@@ -25,7 +25,7 @@ class FilePathUtilsTest {
     @Test
     fun relativePath_windowsStyleRoots_normalizesSlashes() {
         val root = File("C:/Photos").absolutePath
-        val current = File(root, "Album\Summer").absolutePath
+        val current = File(root, "Album\\Summer").absolutePath
         val rel = FilePathUtils.relativeFtpPath(root, current)
         assertEquals("Album/Summer", rel)
     }
