@@ -357,6 +357,13 @@ class MainActivity : ComponentActivity() {
             val state by viewModel.state.collectAsState()
             val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
 
+            val activePres = remember(state.presentations, state.selectedPresentationId) {
+                state.presentations.find { it.id == state.selectedPresentationId }
+            }
+            var previewSlideIndex by remember(activePres?.id, activePres?.inSlideshow) {
+                mutableStateOf(activePres?.currentSlide ?: 1)
+            }
+
             MaterialTheme(colorScheme = colorScheme) {
                 val view = LocalView.current
                 if (!view.isInEditMode) {
@@ -385,7 +392,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     state.showNotes -> {
-                        val activePres = state.presentations.find { it.id == state.selectedPresentationId }
                         NotesScreen(
                             state = state,
                             onBack = viewModel::hideNotes,
@@ -394,7 +400,7 @@ class MainActivity : ComponentActivity() {
                                 if (activePres?.inSlideshow == true) {
                                     viewModel.jumpToSlide(it)
                                 } else {
-                                    viewModel.startSelectedSlideshow(it)
+                                    previewSlideIndex = it
                                 }
                                 viewModel.hideNotes()
                             }
@@ -426,6 +432,8 @@ class MainActivity : ComponentActivity() {
                         } else {
                             RemoteScreen(
                                 state = state,
+                                previewSlideIndex = previewSlideIndex,
+                                onPreviewSlideIndexChange = { previewSlideIndex = it },
                                 onPresentationSelect = viewModel::selectPresentation,
                                 onStartSlideshow = { viewModel.startSelectedSlideshow(it) },
                                 onStopSlideshow = viewModel::stopSelectedSlideshow,
@@ -650,6 +658,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun RemoteScreen(
     state: RemoteState,
+    previewSlideIndex: Int,
+    onPreviewSlideIndexChange: (Int) -> Unit,
     onPresentationSelect: (String) -> Unit,
     onStartSlideshow: (Int?) -> Unit,
     onStopSlideshow: () -> Unit,
@@ -959,9 +969,6 @@ private fun RemoteScreen(
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     val activePres = state.presentations.find { it.id == state.selectedPresentationId }
-                    var previewSlideIndex by remember(activePres?.id, activePres?.inSlideshow) {
-                        mutableStateOf(activePres?.currentSlide ?: 1)
-                    }
                     val currentNotes = if (activePres?.inSlideshow == true) {
                         state.speakerNotes?.getOrNull((activePres.currentSlide ?: 1) - 1)
                     } else {
@@ -1005,14 +1012,14 @@ private fun RemoteScreen(
                                                     if (activePres.inSlideshow) {
                                                         onPrevious()
                                                     } else {
-                                                        previewSlideIndex = (previewSlideIndex - 1).coerceAtLeast(1)
+                                                        onPreviewSlideIndexChange((previewSlideIndex - 1).coerceAtLeast(1))
                                                     }
                                                 } else if (totalDrag < -threshold) {
                                                     performGestureHapticFeedback()
                                                     if (activePres.inSlideshow) {
                                                         onNext()
                                                     } else {
-                                                        previewSlideIndex = (previewSlideIndex + 1).coerceAtMost(activePres.totalSlides)
+                                                        onPreviewSlideIndexChange((previewSlideIndex + 1).coerceAtMost(activePres.totalSlides))
                                                     }
                                                 }
                                             }
@@ -1099,8 +1106,8 @@ private fun RemoteScreen(
                                 hasPresentation = state.selectedPresentationId != null,
                                 inSlideshow = activePres?.inSlideshow == true,
                                 useWideLayout = useWideLayout,
-                                onPrevious = if (activePres?.inSlideshow == true) onPrevious else { { previewSlideIndex = (previewSlideIndex - 1).coerceAtLeast(1) } },
-                                onNext = if (activePres?.inSlideshow == true) onNext else { { previewSlideIndex = (previewSlideIndex + 1).coerceAtMost(activePres?.totalSlides ?: 1) } },
+                                onPrevious = if (activePres?.inSlideshow == true) onPrevious else { { onPreviewSlideIndexChange((previewSlideIndex - 1).coerceAtLeast(1)) } },
+                                onNext = if (activePres?.inSlideshow == true) onNext else { { onPreviewSlideIndexChange((previewSlideIndex + 1).coerceAtMost(activePres?.totalSlides ?: 1)) } },
                                 onStart = { onStartSlideshow(if (activePres?.inSlideshow == true) null else previewSlideIndex) },
                                 onStop = onStopSlideshow,
                                 prevEnabled = if (activePres?.inSlideshow == true) true else (previewSlideIndex > 1),

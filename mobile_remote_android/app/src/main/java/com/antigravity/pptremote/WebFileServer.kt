@@ -918,12 +918,12 @@ function hideApprovalOverlay() {
                 "<a class='btn' href='/download-zip?path=$enc' download onclick=\"showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.'); setTimeout(hideApprovalOverlay, 6000);\">&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',true)\">&#x1F5D1;</button>"
             else
                 "<a class='btn' href='/download?path=$enc' download onclick=\"showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.'); setTimeout(hideApprovalOverlay, 6000);\">&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',false)\">&#x1F5D1;</button>"
-            tableRows.append("<tr><td class='cb-col'><input type='checkbox' class='item-cb' data-path='$enc' data-name='$safeName' data-type='$type' onchange='updateActionBar()'></td><td>$nameCell</td><td>$size</td><td>$date</td><td class='act'>$actions</td></tr>\n")
+            tableRows.append("<tr><td class='cb-col'><input type='checkbox' class='item-cb' data-path='$enc' data-name='$safeName' data-type='$type' data-size='${if (f.isDirectory) -1 else f.length()}' data-modified='${f.lastModified()}' onchange='updateActionBar()'></td><td>$nameCell</td><td>$size</td><td>$date</td><td class='act'>$actions</td></tr>\n")
 
             // Grid item
             val gridClick = if (f.isDirectory) "if(!event.target.matches('input,a,button')){window.location='/?path=$enc'}" else ""
             val gridDownload = "<a class='btn-sm' href='${if (f.isDirectory) "/download-zip?path=" else "/download?path="}$enc' download onclick=\"event.stopPropagation(); showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.'); setTimeout(hideApprovalOverlay, 6000);\">&#x2B07;</a><button class='del-sm' onclick=\"event.stopPropagation();delItem('$enc','$safeName',${f.isDirectory})\">&#x1F5D1;</button>"
-            gridItems.append("<div class='grid-item $type' onclick=\"$gridClick\"><input type='checkbox' class='item-cb grid-cb' data-path='$enc' data-name='$safeName' data-type='$type' onchange='event.stopPropagation();updateActionBar()'><div class='grid-icon'>$icon</div><div class='grid-name' title='${f.name}'>${f.name}</div><div class='grid-size'>$size</div><div class='grid-actions'>$gridDownload</div></div>\n")
+            gridItems.append("<div class='grid-item $type' onclick=\"$gridClick\"><input type='checkbox' class='item-cb grid-cb' data-path='$enc' data-name='$safeName' data-type='$type' data-size='${if (f.isDirectory) -1 else f.length()}' data-modified='${f.lastModified()}' onchange='event.stopPropagation();updateActionBar()'><div class='grid-icon'>$icon</div><div class='grid-name' title='${f.name}'>${f.name}</div><div class='grid-size'>$size</div><div class='grid-actions'>$gridDownload</div></div>\n")
         }
 
         val emptyRow = "<tr id='tableEmptyRow' style='${if (files.isEmpty()) "" else "display:none;"}'><td></td><td colspan='4' class='empty empty-text'>&#x1F4C1; This folder is empty</td></tr>"
@@ -989,15 +989,18 @@ main{max-width:1200px;margin:1.5rem auto;padding:0 1.5rem 6rem}
 .drive-btn{background:rgba(22,27,34,0.6);border:1px solid rgba(255,255,255,0.08);color:#8b949e;padding:0.5rem 0.9rem;border-radius:8px;text-decoration:none;font-size:0.85rem;font-weight:500;transition:all 0.2s}
 .drive-btn:hover{background:rgba(255,255,255,0.1);color:#e6edf3;border-color:rgba(255,255,255,0.15)}
 .drive-btn.active-drive{background:rgba(88,166,255,0.12);border-color:#58a6ff;color:#58a6ff}
-.table-container{background:rgba(22,27,34,0.4);border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,0.25)}
+.table-container{background:rgba(22,27,34,0.4);border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow-x:auto;box-shadow:0 8px 30px rgba(0,0,0,0.25)}
 table{width:100%;border-collapse:collapse}
 th{text-align:left;padding:0.9rem 1.1rem;color:#8b949e;border-bottom:1px solid rgba(255,255,255,0.08);font-weight:600;font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em}
+th.sortable{cursor:pointer;user-select:none;transition:background 0.2s,color 0.2s}
+th.sortable:hover{background:rgba(255,255,255,0.03);color:#e6edf3}
+.sort-icon{margin-left:0.35rem;font-size:0.75rem;opacity:0.6}
 td{padding:0.75rem 1.1rem;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:rgba(255,255,255,0.02)}
-td a.folder-link{color:#58a6ff;text-decoration:none;font-weight:500;transition:color 0.2s;display:inline-flex;align-items:center;gap:0.3rem}
+td a.folder-link{color:#58a6ff;text-decoration:none;font-weight:500;transition:color 0.2s;display:inline-flex;align-items:center;gap:0.3rem;word-break:break-all;white-space:normal;flex-wrap:wrap}
 td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
-.file-name{color:#e6edf3;font-weight:450;display:inline-flex;align-items:center;gap:0.3rem}
+.file-name{color:#e6edf3;font-weight:450;display:inline-flex;align-items:center;gap:0.3rem;word-break:break-all;white-space:normal;flex-wrap:wrap}
 .act{white-space:nowrap;text-align:right;display:flex;gap:0.4rem;justify-content:flex-end;align-items:center}
 .btn,.del{display:inline-flex;align-items:center;padding:.35rem .7rem;border-radius:6px;font-size:.82rem;font-weight:500;cursor:pointer;text-decoration:none;border:none;transition:all 0.2s;white-space:nowrap}
 .btn{background:linear-gradient(135deg,#238636,#2ea043);color:#fff}
@@ -1176,7 +1179,10 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
       <table>
         <thead><tr>
           <th class="cb-col"><input type="checkbox" id="selectAll" class="item-cb" onchange="toggleAll(this)" title="Select all"></th>
-          <th>Name</th><th>Size</th><th>Modified</th><th></th>
+          <th onclick="sortTable('name')" class="sortable" id="th-name">Name <span class="sort-icon">⇅</span></th>
+          <th onclick="sortTable('size')" class="sortable" id="th-size">Size <span class="sort-icon">⇅</span></th>
+          <th onclick="sortTable('modified')" class="sortable" id="th-modified">Modified <span class="sort-icon">⇅</span></th>
+          <th></th>
         </tr></thead>
         <tbody id="rows">$rows</tbody>
       </table>
@@ -1483,6 +1489,127 @@ function filterItems() {
     } else {
       gridEmpty.style.display = 'none';
     }
+  }
+}
+
+var currentSort = {
+  column: 'name',
+  asc: true
+};
+
+function sortTable(col) {
+  if (currentSort.column === col) {
+    currentSort.asc = !currentSort.asc;
+  } else {
+    currentSort.column = col;
+    currentSort.asc = true;
+  }
+  
+  // Update header icons
+  document.querySelectorAll('thead th .sort-icon').forEach(function(el) {
+    el.textContent = '⇅';
+  });
+  var activeHeaderIcon = document.querySelector('#th-' + col + ' .sort-icon');
+  if (activeHeaderIcon) {
+    activeHeaderIcon.textContent = currentSort.asc ? '▲' : '▼';
+  }
+
+  // 1. Sort Table List Rows
+  var tbody = document.getElementById('rows');
+  if (tbody) {
+    var rowsArray = Array.from(tbody.querySelectorAll('tr'));
+    var parentRow = null;
+    var emptyRow = null;
+    var itemRows = [];
+    
+    rowsArray.forEach(function(row) {
+      if (row.id === 'tableEmptyRow') {
+        emptyRow = row;
+      } else {
+        var link = row.querySelector('.folder-link');
+        if (link && link.textContent.trim().endsWith('..')) {
+          parentRow = row;
+        } else {
+          itemRows.push(row);
+        }
+      }
+    });
+
+    itemRows.sort(function(a, b) {
+      var cbA = a.querySelector('.item-cb');
+      var cbB = b.querySelector('.item-cb');
+      if (!cbA || !cbB) return 0;
+      
+      var isDirA = cbA.dataset.type === 'folder';
+      var isDirB = cbB.dataset.type === 'folder';
+      
+      if (isDirA && !isDirB) return -1;
+      if (!isDirA && isDirB) return 1;
+      
+      var valA, valB;
+      if (col === 'name') {
+        valA = cbA.dataset.name.toLowerCase();
+        valB = cbB.dataset.name.toLowerCase();
+      } else if (col === 'size') {
+        valA = parseInt(cbA.dataset.size || '0');
+        valB = parseInt(cbB.dataset.size || '0');
+      } else if (col === 'modified') {
+        valA = parseInt(cbA.dataset.modified || '0');
+        valB = parseInt(cbB.dataset.modified || '0');
+      }
+      
+      if (valA < valB) return currentSort.asc ? -1 : 1;
+      if (valA > valB) return currentSort.asc ? 1 : -1;
+      return 0;
+    });
+    
+    tbody.innerHTML = '';
+    if (parentRow) tbody.appendChild(parentRow);
+    itemRows.forEach(function(row) {
+      tbody.appendChild(row);
+    });
+    if (emptyRow) tbody.appendChild(emptyRow);
+  }
+
+  // 2. Sort Grid View Items
+  var gridContainer = document.getElementById('gridContainer');
+  if (gridContainer) {
+    var gridArray = Array.from(gridContainer.querySelectorAll('.grid-item'));
+    var gridEmpty = gridContainer.querySelector('.grid-empty');
+    
+    gridArray.sort(function(a, b) {
+      var cbA = a.querySelector('.item-cb');
+      var cbB = b.querySelector('.item-cb');
+      if (!cbA || !cbB) return 0;
+      
+      var isDirA = cbA.dataset.type === 'folder';
+      var isDirB = cbB.dataset.type === 'folder';
+      
+      if (isDirA && !isDirB) return -1;
+      if (!isDirA && isDirB) return 1;
+      
+      var valA, valB;
+      if (col === 'name') {
+        valA = cbA.dataset.name.toLowerCase();
+        valB = cbB.dataset.name.toLowerCase();
+      } else if (col === 'size') {
+        valA = parseInt(cbA.dataset.size || '0');
+        valB = parseInt(cbB.dataset.size || '0');
+      } else if (col === 'modified') {
+        valA = parseInt(cbA.dataset.modified || '0');
+        valB = parseInt(cbB.dataset.modified || '0');
+      }
+      
+      if (valA < valB) return currentSort.asc ? -1 : 1;
+      if (valA > valB) return currentSort.asc ? 1 : -1;
+      return 0;
+    });
+    
+    // Re-append items in order
+    gridArray.forEach(function(item) {
+      gridContainer.appendChild(item);
+    });
+    if (gridEmpty) gridContainer.appendChild(gridEmpty);
   }
 }
 </script>
