@@ -680,10 +680,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val activeThumbnailFetches = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    private fun triggerThumbnailFetch(bridgeUrl: String, presentationId: String, slideIndex: Int) {
+        val fetchKey = "$bridgeUrl $presentationId $slideIndex"
+        if (!activeThumbnailFetches.add(fetchKey)) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val thumbnail = client.fetchSlideThumbnail(
+                    bridgeUrl,
+                    presentationId,
+                    slideIndex,
+                    PRELOAD_THUMBNAIL_WIDTH
+                )
+                if (thumbnail != null) {
+                    cacheThumbnail(bridgeUrl, presentationId, slideIndex, thumbnail)
+                    // Trigger state refresh to notify Compose to redraw
+                    _state.value = _state.value.copy(
+                        presentations = _state.value.presentations.map { it.copy() }
+                    )
+                }
+            } catch (_: Exception) {
+            } finally {
+                activeThumbnailFetches.remove(fetchKey)
+            }
+        }
+    }
+
     fun getCachedThumbnail(presentationId: String, slideIndex: Int): ByteArray? {
         val bridgeUrl = _state.value.bridgeUrl
         if (bridgeUrl.isBlank()) return null
-        return cachedThumbnail(bridgeUrl, presentationId, slideIndex)
+        val cached = cachedThumbnail(bridgeUrl, presentationId, slideIndex)
+        if (cached == null) {
+            triggerThumbnailFetch(bridgeUrl, presentationId, slideIndex)
+        }
+        return cached
     }
 
     fun jumpToSlide(slideIndex: Int) {
