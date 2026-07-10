@@ -364,8 +364,11 @@ class WebFileServer(
             sendText(exchange, 403, "Download request denied by user")
             return
         }
+        val fallbackName = file.name.map { c ->
+            if (c.code in 32..126 && c != '"' && c != '\\' && c != ';') c else '_'
+        }.joinToString("")
         val encodedName = URLEncoder.encode(file.name, "UTF-8").replace("+", "%20")
-        exchange.addResponseHeader("Content-Disposition", "attachment; filename*=UTF-8''$encodedName")
+        exchange.addResponseHeader("Content-Disposition", "attachment; filename=\"$fallbackName\"; filename*=UTF-8''$encodedName")
         exchange.addResponseHeader("Content-Type", "application/octet-stream")
         exchange.sendResponseStream(200, file.length()) { out ->
             file.inputStream().use { it.copyTo(out) }
@@ -394,8 +397,11 @@ class WebFileServer(
             sendText(exchange, 403, "Download request denied by user")
             return
         }
+        val fallbackZipName = zipName.map { c ->
+            if (c.code in 32..126 && c != '"' && c != '\\' && c != ';') c else '_'
+        }.joinToString("")
         val encodedZipName = URLEncoder.encode(zipName, "UTF-8").replace("+", "%20")
-        exchange.addResponseHeader("Content-Disposition", "attachment; filename*=UTF-8''$encodedZipName")
+        exchange.addResponseHeader("Content-Disposition", "attachment; filename=\"$fallbackZipName\"; filename*=UTF-8''$encodedZipName")
         exchange.addResponseHeader("Content-Type", "application/zip")
 
         exchange.sendResponseStream(200, -1) { out ->
