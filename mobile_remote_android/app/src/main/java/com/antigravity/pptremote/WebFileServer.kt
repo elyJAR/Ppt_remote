@@ -462,7 +462,8 @@ class WebFileServer(
             return
         }
         try {
-            val savedName = parseMultipartAndSave(exchange.bodyStream, boundary, dir, exchange.clientIp)
+            val contentLength = exchange.requestHeaders["content-length"]?.toLongOrNull() ?: -1L
+            val savedName = parseMultipartAndSave(exchange.bodyStream, boundary, dir, exchange.clientIp, contentLength)
             if (savedName != null) {
                 sendJson(exchange, 200, """{"ok":true,"name":${jsonStr(savedName)}}""")
             } else {
@@ -475,7 +476,7 @@ class WebFileServer(
         }
     }
 
-    private fun parseMultipartAndSave(input: InputStream, boundary: String, dir: File, clientIp: String): String? {
+    private fun parseMultipartAndSave(input: InputStream, boundary: String, dir: File, clientIp: String, totalRequestBytes: Long): String? {
         val boundaryStr = "\r\n--$boundary"
         val boundaryBytes = boundaryStr.toByteArray(StandardCharsets.ISO_8859_1)
         val bis = java.io.BufferedInputStream(input, 64 * 1024)
@@ -500,8 +501,16 @@ class WebFileServer(
         }
 
         val dest = File(dir, File(filename).name)
-
         val out = FileOutputStream(dest)
+
+        RemoteControlService.isUploadCancelled = false
+        RemoteControlService.activeUploadName = filename
+        RemoteControlService.activeUploadTotal = totalRequestBytes
+        RemoteControlService.activeUploadBytes = 0L
+        RemoteControlService.activeUploadProgress = 0f
+
+        var totalBytesRead = headerStream.size().toLong()
+
         try {
             val bufferSize = 64 * 1024
             val buffer = ByteArray(bufferSize + boundaryBytes.size)
@@ -513,9 +522,19 @@ class WebFileServer(
                     val read = bis.read(buffer, bufferLen, space)
                     if (read > 0) {
                         bufferLen += read
+                        totalBytesRead += read
+                        RemoteControlService.activeUploadBytes = totalBytesRead
+                        if (totalRequestBytes > 0) {
+                            val progress = totalBytesRead.toFloat() / totalRequestBytes.toFloat()
+                            RemoteControlService.activeUploadProgress = progress.coerceIn(0f, 1f)
+                        }
                     } else if (read == -1 && bufferLen == 0) {
                         break
                     }
+                }
+
+                if (RemoteControlService.isUploadCancelled) {
+                    throw java.io.IOException("Upload cancelled by user on phone")
                 }
 
                 if (bufferLen == 0) break
@@ -555,7 +574,14 @@ class WebFileServer(
                 }
             }
         } finally {
-            out.close()
+            try { out.close() } catch (_: Exception) {}
+            if (RemoteControlService.isUploadCancelled) {
+                try { dest.delete() } catch (_: Exception) {}
+            }
+            RemoteControlService.activeUploadName = null
+            RemoteControlService.activeUploadTotal = 0L
+            RemoteControlService.activeUploadBytes = 0L
+            RemoteControlService.activeUploadProgress = 0f
         }
         return dest.name
     }

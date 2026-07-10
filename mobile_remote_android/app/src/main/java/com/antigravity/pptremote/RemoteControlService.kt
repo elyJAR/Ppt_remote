@@ -83,6 +83,12 @@ class RemoteControlService : Service() {
         const val EXTRA_WEB_ROOT_DIR   = "com.antigravity.pptremote.extra.WEB_ROOT_DIR"
         const val EXTRA_WEB_PIN        = "com.antigravity.pptremote.extra.WEB_PIN"
 
+        @Volatile var activeUploadName: String? = null
+        @Volatile var activeUploadProgress: Float = 0f
+        @Volatile var activeUploadBytes: Long = 0L
+        @Volatile var activeUploadTotal: Long = 0L
+        @Volatile var isUploadCancelled: Boolean = false
+
         private val ftpManager = FtpServerManager()
         private var webFileServer: WebFileServer? = null
 

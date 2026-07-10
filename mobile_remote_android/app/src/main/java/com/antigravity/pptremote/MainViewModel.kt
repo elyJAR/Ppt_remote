@@ -556,8 +556,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isFtpEnabled = isFtpRunning,
             activeFtpPath = activePath,
             isWebServerRunning = isWebRunning,
-            webServerUrl = webUrl
+            webServerUrl = webUrl,
+            activeUploadName = RemoteControlService.activeUploadName,
+            activeUploadProgress = RemoteControlService.activeUploadProgress,
+            activeUploadBytes = RemoteControlService.activeUploadBytes,
+            activeUploadTotal = RemoteControlService.activeUploadTotal,
+            isUploadCancelled = RemoteControlService.isUploadCancelled
         )
+    }
+
+    fun cancelUpload() {
+        RemoteControlService.isUploadCancelled = true
+        updateServiceStatus()
     }
 
     fun refreshWebServerUrl() {

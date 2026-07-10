@@ -143,6 +143,11 @@ data class RemoteState(
     val webServerPin: String = "",
     val webServerPort: Int = 8686,
     val webServerSharedFolder: String? = null,
+    val activeUploadName: String? = null,
+    val activeUploadProgress: Float = 0f,
+    val activeUploadBytes: Long = 0L,
+    val activeUploadTotal: Long = 0L,
+    val isUploadCancelled: Boolean = false,
 )
 
 /** Represents a detected storage volume (Internal or SD Card). */

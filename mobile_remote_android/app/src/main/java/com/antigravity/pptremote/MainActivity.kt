@@ -374,78 +374,164 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 
-                when {
-                    state.showOnboarding -> {
-                        OnboardingScreen(onComplete = viewModel::completeOnboarding)
-                    }
-                    state.showSettings -> {
-                        SettingsScreen(
-                            state = state,
-                            onBack = viewModel::hideSettings,
-                            onUpdateBridgePort = viewModel::updateBridgePort,
-                            onUpdatePollingInterval = viewModel::updatePollingInterval,
-                            onUpdateTheme = viewModel::updateTheme,
-                            onUpdateNotificationText = viewModel::updateNotificationText,
-                            onUpdateApiKey = viewModel::updateApiKey,
-                            onUpdateFtpAutoStart = viewModel::updateFtpAutoStart,
-                            onUpdateWebServerPort = viewModel::updateWebServerPort,
-                        )
-                    }
-                    state.showNotes -> {
-                        NotesScreen(
-                            state = state,
-                            onBack = viewModel::hideNotes,
-                            onGetThumbnail = viewModel::getCachedThumbnail,
-                            onSelectSlide = { 
-                                if (activePres?.inSlideshow == true) {
-                                    viewModel.jumpToSlide(it)
-                                } else {
-                                    previewSlideIndex = it
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when {
+                        state.showOnboarding -> {
+                            OnboardingScreen(onComplete = viewModel::completeOnboarding)
+                        }
+                        state.showSettings -> {
+                            SettingsScreen(
+                                state = state,
+                                onBack = viewModel::hideSettings,
+                                onUpdateBridgePort = viewModel::updateBridgePort,
+                                onUpdatePollingInterval = viewModel::updatePollingInterval,
+                                onUpdateTheme = viewModel::updateTheme,
+                                onUpdateNotificationText = viewModel::updateNotificationText,
+                                onUpdateApiKey = viewModel::updateApiKey,
+                                onUpdateFtpAutoStart = viewModel::updateFtpAutoStart,
+                                onUpdateWebServerPort = viewModel::updateWebServerPort,
+                            )
+                        }
+                        state.showNotes -> {
+                            NotesScreen(
+                                state = state,
+                                onBack = viewModel::hideNotes,
+                                onGetThumbnail = viewModel::getCachedThumbnail,
+                                onSelectSlide = { 
+                                    if (activePres?.inSlideshow == true) {
+                                        viewModel.jumpToSlide(it)
+                                    } else {
+                                        previewSlideIndex = it
+                                    }
+                                    viewModel.hideNotes()
                                 }
-                                viewModel.hideNotes()
+                            )
+                        }
+                        else -> {
+                            if (state.showFiles) {
+                                FilesScreen(
+                                    state = state,
+                                    onClose = viewModel::hideFiles,
+                                    onSelectFilesRoot = viewModel::selectFilesRoot,
+                                    onNavigateFilesTo = viewModel::navigateToFilesFolder,
+                                    onNavigateFilesUp = viewModel::navigateUpFilesFolder,
+                                    onRefreshFiles = viewModel::refreshFiles,
+                                    onOpenCurrentFilesFolderOnPc = viewModel::openCurrentFilesFolderOnPc,
+                                    onRequestStorageAccess = { requestStorageAccess() },
+                                    onRequestRestrictedFolderAccess = { requestRestrictedFolderAccess(it) },
+                                    onOpenFile = { path -> openFile(path) },
+                                    onFilesSearchQueryChange = viewModel::updateFilesSearchQuery,
+                                    onJumpToFileLocation = viewModel::jumpToFileLocation,
+                                    onFilesSortChange = viewModel::setFilesSort,
+                                    onLaunchSystemFilesApp = { launchSystemFilesApp() },
+                                    onToggleWebServer = viewModel::toggleWebServer,
+                                    onUpdateWebServerPin = viewModel::updateWebServerPin,
+                                    onSelectSharedFolder = { selectWebServerFolderLauncher.launch(null) },
+                                    onResetSharedFolder = { viewModel.setWebServerSharedFolder(null) },
+                                    onRefreshWebServerUrl = viewModel::refreshWebServerUrl
+                                )
+                            } else {
+                                RemoteScreen(
+                                    state = state,
+                                    previewSlideIndex = previewSlideIndex,
+                                    onPreviewSlideIndexChange = { previewSlideIndex = it },
+                                    onPresentationSelect = viewModel::selectPresentation,
+                                    onStartSlideshow = { viewModel.startSelectedSlideshow(it) },
+                                    onStopSlideshow = viewModel::stopSelectedSlideshow,
+                                    onNext = viewModel::nextSlide,
+                                    onPrevious = viewModel::previousSlide,
+                                    onRefresh = viewModel::refreshPresentations,
+                                    onShowSettings = viewModel::showSettings,
+                                    onShowNotes = viewModel::showNotes,
+                                    onSelectBridge = viewModel::selectBridge,
+                                    onShowFiles = viewModel::showFiles,
+                                    onGetThumbnail = viewModel::getCachedThumbnail
+                                )
                             }
-                        )
+                        }
                     }
-                    else -> {
-                        if (state.showFiles) {
-                            FilesScreen(
-                                state = state,
-                                onClose = viewModel::hideFiles,
-                                onSelectFilesRoot = viewModel::selectFilesRoot,
-                                onNavigateFilesTo = viewModel::navigateToFilesFolder,
-                                onNavigateFilesUp = viewModel::navigateUpFilesFolder,
-                                onRefreshFiles = viewModel::refreshFiles,
-                                onOpenCurrentFilesFolderOnPc = viewModel::openCurrentFilesFolderOnPc,
-                                onRequestStorageAccess = { requestStorageAccess() },
-                                onRequestRestrictedFolderAccess = { requestRestrictedFolderAccess(it) },
-                                onOpenFile = { path -> openFile(path) },
-                                onFilesSearchQueryChange = viewModel::updateFilesSearchQuery,
-                                onJumpToFileLocation = viewModel::jumpToFileLocation,
-                                onFilesSortChange = viewModel::setFilesSort,
-                                onLaunchSystemFilesApp = { launchSystemFilesApp() },
-                                onToggleWebServer = viewModel::toggleWebServer,
-                                onUpdateWebServerPin = viewModel::updateWebServerPin,
-                                onSelectSharedFolder = { selectWebServerFolderLauncher.launch(null) },
-                                onResetSharedFolder = { viewModel.setWebServerSharedFolder(null) },
-                                onRefreshWebServerUrl = viewModel::refreshWebServerUrl
-                            )
-                        } else {
-                            RemoteScreen(
-                                state = state,
-                                previewSlideIndex = previewSlideIndex,
-                                onPreviewSlideIndexChange = { previewSlideIndex = it },
-                                onPresentationSelect = viewModel::selectPresentation,
-                                onStartSlideshow = { viewModel.startSelectedSlideshow(it) },
-                                onStopSlideshow = viewModel::stopSelectedSlideshow,
-                                onNext = viewModel::nextSlide,
-                                onPrevious = viewModel::previousSlide,
-                                onRefresh = viewModel::refreshPresentations,
-                                onShowSettings = viewModel::showSettings,
-                                onShowNotes = viewModel::showNotes,
-                                onSelectBridge = viewModel::selectBridge,
-                                onShowFiles = viewModel::showFiles,
-                                onGetThumbnail = viewModel::getCachedThumbnail
-                            )
+
+                    // Global Upload Progress Card
+                    state.activeUploadName?.let { uploadName ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f))
+                                .pointerInput(Unit) {},
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Card(
+                                shape = iOSSquircleSmall,
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                                modifier = Modifier
+                                    .width(320.dp)
+                                    .padding(16.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(20.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowUpward,
+                                        contentDescription = "Uploading",
+                                        tint = iOSAccent,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = "Uploading File",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp,
+                                        color = MaterialTheme.colorScheme.textPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = uploadName,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.textSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    
+                                    LinearProgressIndicator(
+                                        progress = state.activeUploadProgress,
+                                        color = iOSAccent,
+                                        trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(6.dp)
+                                            .clip(CircleShape)
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    val percent = (state.activeUploadProgress * 100).toInt()
+                                    val totalMb = state.activeUploadTotal.toFloat() / (1024 * 1024)
+                                    val currentMb = state.activeUploadBytes.toFloat() / (1024 * 1024)
+                                    Text(
+                                        text = "$percent% (${String.format("%.1f", currentMb)} / ${String.format("%.1f", totalMb)} MB)",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.textSecondary
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                    
+                                    Button(
+                                        onClick = { viewModel.cancelUpload() },
+                                        colors = ButtonDefaults.buttonColors(containerColor = iOSRed, contentColor = Color.White),
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Cancel", modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(text = "Cancel Transfer", fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
