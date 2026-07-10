@@ -1062,7 +1062,7 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
 .bar-clear{background:transparent;color:#8b949e;border:1px solid rgba(255,255,255,0.1)}
 .bar-clear:hover{color:#e6edf3;border-color:rgba(255,255,255,0.3)}
 /* Upload area */
-.upload-area{margin-top:1.5rem;background:rgba(22,27,34,0.35);border:2px dashed rgba(88,166,255,0.25);border-radius:12px;padding:1.75rem;text-align:center;transition:all 0.3s ease}
+.upload-area{margin-top:1.5rem;margin-bottom:1.5rem;background:rgba(22,27,34,0.35);border:2px dashed rgba(88,166,255,0.25);border-radius:12px;padding:1.75rem;text-align:center;transition:all 0.3s ease}
 .upload-area.dragover{border-color:#58a6ff;background:rgba(88,166,255,0.06)}
 .upload-area h3{color:#e6edf3;margin-bottom:0.85rem;font-size:1rem;font-weight:600}
 .upload-row{display:flex;justify-content:center;align-items:center;gap:.75rem;flex-wrap:wrap;max-width:600px;margin:0 auto}
@@ -1197,6 +1197,21 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
     <input type="text" id="searchInput" placeholder="Search files and folders..." oninput="filterItems()">
   </div>
   $drivesHtml
+  <!-- Upload area -->
+  <div class="upload-area" id="dropZone">
+    <h3>Upload Files to this Folder</h3>
+    <div class="upload-row">
+      <div class="file-input-wrapper">
+        <button class="file-input-btn">&#x1F4C2; Choose Files</button>
+        <input type="file" id="fileInput" multiple onchange="updateSelectedFilesText()">
+      </div>
+      <button class="upload-btn" onclick="uploadFiles()">&#x2B06; Upload</button>
+    </div>
+    <div class="progress" id="prog">Drag &amp; drop files here or click Choose Files</div>
+    <div id="progContainer" style="display:none;margin:1rem auto 0;background:rgba(255,255,255,0.06);border-radius:6px;height:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);max-width:500px;">
+      <div id="progBar" style="width:0%;height:100%;background:linear-gradient(90deg, #1f6feb, #388bfd);transition:width 0.1s ease"></div>
+    </div>
+  </div>
   <!-- List view -->
   <div id="listView">
     <div class="table-container">
@@ -1215,21 +1230,6 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   <!-- Grid view -->
   <div id="gridView" style="display:none">
     <div class="grid-container" id="gridContainer">$gridItems</div>
-  </div>
-  <!-- Upload area -->
-  <div class="upload-area" id="dropZone">
-    <h3>Upload Files to this Folder</h3>
-    <div class="upload-row">
-      <div class="file-input-wrapper">
-        <button class="file-input-btn">&#x1F4C2; Choose Files</button>
-        <input type="file" id="fileInput" multiple onchange="updateSelectedFilesText()">
-      </div>
-      <button class="upload-btn" onclick="uploadFiles()">&#x2B06; Upload</button>
-    </div>
-    <div class="progress" id="prog">Drag &amp; drop files here or click Choose Files</div>
-    <div id="progContainer" style="display:none;margin:1rem auto 0;background:rgba(255,255,255,0.06);border-radius:6px;height:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);max-width:500px;">
-      <div id="progBar" style="width:0%;height:100%;background:linear-gradient(90deg, #1f6feb, #388bfd);transition:width 0.1s ease"></div>
-    </div>
   </div>
 </main>
 <!-- Floating action bar -->
