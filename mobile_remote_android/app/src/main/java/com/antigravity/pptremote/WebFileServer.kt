@@ -46,6 +46,10 @@ class WebFileServer(
 
     private val executor = Executors.newFixedThreadPool(4)
 
+    private class ApprovedDownload(val clientIp: String, val fileName: String, val timestamp: Long)
+    private val recentApprovals = mutableListOf<ApprovedDownload>()
+    private val approvalsLock = Any()
+
     // ------------------------------------------------------------------
     // Lifecycle
     // ------------------------------------------------------------------
@@ -635,6 +639,14 @@ class WebFileServer(
     }
 
     private fun requestDownloadPermission(clientIp: String, fileName: String): Boolean {
+        val now = System.currentTimeMillis()
+        synchronized(approvalsLock) {
+            recentApprovals.removeAll { now - it.timestamp > 30000 }
+            if (recentApprovals.any { it.clientIp == clientIp && it.fileName == fileName }) {
+                return true
+            }
+        }
+
         val listener = RemoteControlService.securityListener
         if (listener == null) {
             try {
@@ -657,7 +669,13 @@ class WebFileServer(
         activeListener.onRequestDownload(clientIp, fileName) { approved ->
             decision.setDecision(approved)
         }
-        return decision.getDecision()
+        val result = decision.getDecision()
+        if (result) {
+            synchronized(approvalsLock) {
+                recentApprovals.add(ApprovedDownload(clientIp, fileName, System.currentTimeMillis()))
+            }
+        }
+        return result
     }
 
     private fun handleDelete(exchange: HttpCtx) {
