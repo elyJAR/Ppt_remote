@@ -1334,6 +1334,14 @@ private fun WebServerCard(
                         )
                     }
                 }
+                if (state.isHttpsEnabled) {
+                    Text(
+                        "⚠️ Self-signed certificate active. You may need to click 'Advanced' -> 'Proceed' in your browser.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFD32F2F),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
                 Text(
                     "Tap the URL to copy it, then open it in any browser on the same WiFi.",
                     style = MaterialTheme.typography.labelSmall,
