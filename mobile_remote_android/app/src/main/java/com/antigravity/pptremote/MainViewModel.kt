@@ -1166,7 +1166,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             _state.value = _state.value.copy(
-                statusMessage = lastException?.message ?: "Bridge call failed",
+                statusMessage = when (lastException) {
+                    is BridgeHttpException -> when (lastException.statusCode) {
+                        423 -> "PowerPoint is busy (a dialog may be open on your PC)"
+                        503 -> "PowerPoint is not running. Please open it on your PC."
+                        else -> lastException.message ?: "Action failed"
+                    }
+                    else -> lastException?.message ?: "Bridge call failed"
+                },
                 isBusy = false
             )
         }
@@ -1379,7 +1386,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val friendlyMsg = when (ex.statusCode) {
                     400 -> "Bridge reached — no PowerPoint open or controller error"
                     401 -> "Bridge reached — check your API key in Settings"
+                    423 -> "PowerPoint is busy (a dialog may be open on your PC)"
                     429 -> "Bridge reached — too many requests, slowing down"
+                    503 -> "PowerPoint is not running. Please open it on your PC."
                     else -> ex.message ?: "Bridge HTTP error ${ex.statusCode}"
                 }
                 _state.value = nowState.copy(

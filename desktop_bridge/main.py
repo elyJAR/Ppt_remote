@@ -389,6 +389,29 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="PowerPoint Bridge API", version="2.0.0", lifespan=lifespan)
 controller = PowerPointController()
 
+from fastapi.responses import JSONResponse
+from powerpoint_controller import (
+    PowerPointBusyError,
+    PowerPointNotRunningError,
+)
+
+@app.exception_handler(PowerPointControllerError)
+def ppt_controller_exception_handler(request: Request, exc: PowerPointControllerError):
+    if isinstance(exc, PowerPointBusyError):
+        return JSONResponse(
+            status_code=423,
+            content={"detail": str(exc), "code": "POWERPOINT_BUSY"}
+        )
+    if isinstance(exc, PowerPointNotRunningError):
+        return JSONResponse(
+            status_code=503,
+            content={"detail": str(exc), "code": "POWERPOINT_UNAVAILABLE"}
+        )
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc), "code": "POWERPOINT_ERROR"}
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_CORS_ORIGINS,
@@ -520,13 +543,8 @@ def network_status() -> NetworkStatusDto:
     dependencies=[Depends(verify_api_key)],
 )
 def list_presentations() -> list[PresentationDto]:
-    try:
-        items = controller.list_presentations()
-        return [PresentationDto(**item.__dict__) for item in items]
-    except PowerPointControllerError as exc:
-        # Surface controller errors to the client as HTTP 400 so callers
-        # can distinguish COM/controller failures from empty result sets.
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    items = controller.list_presentations()
+    return [PresentationDto(**item.__dict__) for item in items]
 
 
 @app.post(
@@ -535,11 +553,8 @@ def list_presentations() -> list[PresentationDto]:
 )
 @_limiter.limit("30/minute")
 def start_slideshow(request: Request, presentation_id: str, slide_index: int | None = None):
-    try:
-        controller.start_slideshow(_resolve_id(presentation_id), slide_index)
-        return {"ok": True}
-    except PowerPointControllerError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    controller.start_slideshow(_resolve_id(presentation_id), slide_index)
+    return {"ok": True}
 
 
 @app.post(
@@ -548,11 +563,8 @@ def start_slideshow(request: Request, presentation_id: str, slide_index: int | N
 )
 @_limiter.limit("30/minute")
 def stop_slideshow(request: Request, presentation_id: str):
-    try:
-        controller.stop_slideshow(_resolve_id(presentation_id))
-        return {"ok": True}
-    except PowerPointControllerError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    controller.stop_slideshow(_resolve_id(presentation_id))
+    return {"ok": True}
 
 
 @app.post(
@@ -561,11 +573,8 @@ def stop_slideshow(request: Request, presentation_id: str):
 )
 @_limiter.limit("30/minute")
 def next_slide(request: Request, presentation_id: str):
-    try:
-        controller.next_slide(_resolve_id(presentation_id))
-        return {"ok": True}
-    except PowerPointControllerError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    controller.next_slide(_resolve_id(presentation_id))
+    return {"ok": True}
 
 
 @app.post(
@@ -574,11 +583,8 @@ def next_slide(request: Request, presentation_id: str):
 )
 @_limiter.limit("30/minute")
 def previous_slide(request: Request, presentation_id: str):
-    try:
-        controller.previous_slide(_resolve_id(presentation_id))
-        return {"ok": True}
-    except PowerPointControllerError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    controller.previous_slide(_resolve_id(presentation_id))
+    return {"ok": True}
 
 
 @app.post(
@@ -587,11 +593,8 @@ def previous_slide(request: Request, presentation_id: str):
 )
 @_limiter.limit("30/minute")
 def goto_slide(request: Request, presentation_id: str, slide_index: int):
-    try:
-        controller.goto_slide(_resolve_id(presentation_id), slide_index)
-        return {"ok": True}
-    except PowerPointControllerError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    controller.goto_slide(_resolve_id(presentation_id), slide_index)
+    return {"ok": True}
 
 
 @app.get(
@@ -601,11 +604,8 @@ def goto_slide(request: Request, presentation_id: str, slide_index: int):
     dependencies=[Depends(verify_api_key)],
 )
 def get_all_speaker_notes(presentation_id: str) -> list[SlideNotesDto]:
-    try:
-        notes = controller.get_all_speaker_notes(_resolve_id(presentation_id))
-        return [SlideNotesDto(slide_index=i + 1, notes=n) for i, n in enumerate(notes)]
-    except PowerPointControllerError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    notes = controller.get_all_speaker_notes(_resolve_id(presentation_id))
+    return [SlideNotesDto(slide_index=i + 1, notes=n) for i, n in enumerate(notes)]
 
 
 @app.get(
@@ -615,13 +615,10 @@ def get_all_speaker_notes(presentation_id: str) -> list[SlideNotesDto]:
     dependencies=[Depends(verify_api_key)],
 )
 def get_current_slide_notes(presentation_id: str) -> SlideNotesDto:
-    try:
-        slide_index, notes = controller.get_current_slide_notes(
-            _resolve_id(presentation_id)
-        )
-        return SlideNotesDto(slide_index=slide_index, notes=notes)
-    except PowerPointControllerError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    slide_index, notes = controller.get_current_slide_notes(
+        _resolve_id(presentation_id)
+    )
+    return SlideNotesDto(slide_index=slide_index, notes=notes)
 
 
 @app.get(
@@ -637,13 +634,10 @@ def get_slide_thumbnail(
     width: int = 720,
 ):
     from fastapi.responses import Response  # noqa: PLC0415
-    try:
-        png = controller.get_slide_thumbnail(
-            _resolve_id(presentation_id), slide_index, width
-        )
-        return Response(content=png, media_type="image/png")
-    except PowerPointControllerError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    png = controller.get_slide_thumbnail(
+        _resolve_id(presentation_id), slide_index, width
+    )
+    return Response(content=png, media_type="image/png")
 
 
 @app.get(
@@ -658,13 +652,10 @@ def get_current_slide_thumbnail(
     width: int = 720,
 ):
     from fastapi.responses import Response  # noqa: PLC0415
-    try:
-        _slide_index, png = controller.get_current_slide_thumbnail(
-            _resolve_id(presentation_id), width
-        )
-        return Response(content=png, media_type="image/png")
-    except PowerPointControllerError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    _slide_index, png = controller.get_current_slide_thumbnail(
+        _resolve_id(presentation_id), width
+    )
+    return Response(content=png, media_type="image/png")
 
 
 def _normalize_ftp_path(ftp_path: str | None) -> str:

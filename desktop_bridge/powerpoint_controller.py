@@ -21,6 +21,14 @@ class PowerPointControllerError(Exception):
     """Raised when PowerPoint automation fails."""
 
 
+class PowerPointBusyError(PowerPointControllerError):
+    """Raised when PowerPoint is busy (modal dialog open)."""
+
+
+class PowerPointNotRunningError(PowerPointControllerError):
+    """Raised when PowerPoint is closed or not running."""
+
+
 def _com_retry(fn):
     """Decorator: retry once on COMError in case PowerPoint briefly hiccupped."""
     @wraps(fn)
@@ -110,27 +118,56 @@ _com_worker = _ComWorker()
 def _on_com_thread(fn):
     """Decorator: run the wrapped method on the COM STA worker thread.
 
-    Combines dispatch-to-STA-thread with one automatic retry so each public
-    controller method is both thread-safe and resilient to transient COM hiccups.
+    Combines dispatch-to-STA-thread with exponential backoff retries on transient COM errors,
+    mapping specific failure states to clean exceptions.
     """
     @wraps(fn)
     def wrapper(*args, **kwargs):
+        import pywintypes
+        import time
+
         def _execute():
-            try:
-                return fn(*args, **kwargs)
-            except PowerPointControllerError:
-                raise  # our own errors — don't retry
-            except Exception as exc:
-                _logger.warning("COM call failed (%s), retrying once: %s", fn.__name__, exc)
+            max_retries = 5
+            for attempt in range(1, max_retries + 1):
                 try:
                     return fn(*args, **kwargs)
                 except PowerPointControllerError:
-                    raise
-                except Exception as exc2:
-                    raise PowerPointControllerError(
-                        f"PowerPoint COM error in {fn.__name__}: {exc2}. "
-                        "PowerPoint may have crashed — please reopen it."
-                    ) from exc2
+                    raise  # our own errors — don't retry
+                except pywintypes.com_error as exc:
+                    hresult = exc.hresult
+                    # 0x80010001 (RPC_E_CALL_REJECTED) or 0x8001010A (RPC_E_SERVERCALL_RETRYLATER)
+                    is_busy = hresult in (0x80010001, -2147418111, 0x8001010A, -2147417846)
+                    # 0x800706BA (RPC_S_SERVER_UNAVAILABLE) or 0x800A01A8 (Object required / disconnected)
+                    is_unavailable = hresult in (0x800706BA, -2147023174, 0x800A01A8, -2146827864)
+
+                    if is_busy:
+                        if attempt < max_retries:
+                            backoff = 0.1 * (2 ** (attempt - 1))
+                            _logger.warning("PowerPoint is busy (attempt %d/%d), retrying in %.2fs: %s", attempt, max_retries, backoff, exc)
+                            time.sleep(backoff)
+                            continue
+                        else:
+                            raise PowerPointBusyError(
+                                "PowerPoint is busy. A modal dialog (like Save As or Options) might be open."
+                            ) from exc
+
+                    if is_unavailable:
+                        raise PowerPointNotRunningError(
+                            "PowerPoint has closed or become unresponsive. Please reopen PowerPoint."
+                        ) from exc
+
+                    # For any other COM error, retry once immediately on first attempt, then fail
+                    if attempt == 1:
+                        _logger.warning("Transient COM call failed (%s), retrying once: %s", fn.__name__, exc)
+                        continue
+                    raise PowerPointControllerError(f"PowerPoint COM error in {fn.__name__}: {exc}") from exc
+                except Exception as exc:
+                    # Generic exceptions: retry once on first attempt, then fail
+                    if attempt == 1:
+                        _logger.warning("Transient generic call failed (%s), retrying once: %s", fn.__name__, exc)
+                        continue
+                    raise PowerPointControllerError(f"PowerPoint error in {fn.__name__}: {exc}") from exc
+
         return _com_worker.call(_execute)
     return wrapper
 
@@ -190,14 +227,21 @@ class PowerPointController:
 
     def _get_app(self) -> Any:
         """Get the running PowerPoint COM object, reconnecting if it crashed."""
+        import pywintypes
         try:
             app = win32com.client.GetActiveObject("PowerPoint.Application")
             # Probe the app to confirm it's still responsive
             _ = app.Presentations.Count
             return app
         except Exception as exc:
-            raise PowerPointControllerError(
-                "PowerPoint is not running. Open at least one presentation first."
+            if isinstance(exc, pywintypes.com_error):
+                hresult = exc.hresult
+                if hresult in (0x80010001, -2147418111, 0x8001010A, -2147417846):
+                    raise PowerPointBusyError(
+                        "PowerPoint is busy. A modal dialog might be open."
+                    ) from exc
+            raise PowerPointNotRunningError(
+                "PowerPoint is not running. Please open PowerPoint and at least one presentation."
             ) from exc
 
     def _slideshow_map(self, app: Any) -> dict[str, Any]:
