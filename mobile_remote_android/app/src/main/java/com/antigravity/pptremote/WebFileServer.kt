@@ -48,6 +48,8 @@ class WebFileServer(
 
     private class ApprovedDownload(val clientIp: String, val fileName: String, val timestamp: Long)
     private val recentApprovals = mutableListOf<ApprovedDownload>()
+    private class ApprovedUpload(val clientIp: String, var timestamp: Long)
+    private val recentUploadApprovals = mutableListOf<ApprovedUpload>()
     private val approvalsLock = Any()
 
     // ------------------------------------------------------------------
@@ -639,6 +641,16 @@ class WebFileServer(
     }
 
     private fun requestUploadPermission(clientIp: String, fileName: String): Boolean {
+        val now = System.currentTimeMillis()
+        synchronized(approvalsLock) {
+            recentUploadApprovals.removeAll { now - it.timestamp > 30000 }
+            val existing = recentUploadApprovals.firstOrNull { it.clientIp == clientIp }
+            if (existing != null) {
+                existing.timestamp = now
+                return true
+            }
+        }
+
         val listener = RemoteControlService.securityListener
         if (listener == null) {
             try {
@@ -661,7 +673,13 @@ class WebFileServer(
         activeListener.onRequestUpload(clientIp, fileName) { approved ->
             decision.setDecision(approved)
         }
-        return decision.getDecision()
+        val result = decision.getDecision()
+        if (result) {
+            synchronized(approvalsLock) {
+                recentUploadApprovals.add(ApprovedUpload(clientIp, System.currentTimeMillis()))
+            }
+        }
+        return result
     }
 
     private fun requestDownloadPermission(clientIp: String, fileName: String): Boolean {
