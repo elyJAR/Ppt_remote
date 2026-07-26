@@ -212,11 +212,31 @@ class TestListPresentations:
 
     def test_controller_error_returns_400(self, client, mock_controller):
         mock_controller.list_presentations.side_effect = PowerPointControllerError(
-            "PowerPoint is not running."
+            "Some controller error."
         )
         r = client.get("/api/presentations")
         assert r.status_code == 400
+        assert "Some controller error." in r.json()["detail"]
+
+    def test_controller_busy_returns_423(self, client, mock_controller):
+        from powerpoint_controller import PowerPointBusyError
+        mock_controller.list_presentations.side_effect = PowerPointBusyError(
+            "PowerPoint is busy."
+        )
+        r = client.get("/api/presentations")
+        assert r.status_code == 423
+        assert "PowerPoint is busy." in r.json()["detail"]
+        assert r.json()["code"] == "POWERPOINT_BUSY"
+
+    def test_controller_not_running_returns_503(self, client, mock_controller):
+        from powerpoint_controller import PowerPointNotRunningError
+        mock_controller.list_presentations.side_effect = PowerPointNotRunningError(
+            "PowerPoint is not running."
+        )
+        r = client.get("/api/presentations")
+        assert r.status_code == 503
         assert "PowerPoint is not running." in r.json()["detail"]
+        assert r.json()["code"] == "POWERPOINT_UNAVAILABLE"
 
 
 # ===========================================================================
