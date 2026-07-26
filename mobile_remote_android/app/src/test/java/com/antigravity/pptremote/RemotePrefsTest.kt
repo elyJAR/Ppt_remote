@@ -80,4 +80,49 @@ class RemotePrefsTest {
         verify { editor.putString("selected_presentation_id", null) }
         verify { editor.apply() }
     }
+
+    @Test
+    fun `isHttpsEnabled returns default false when nothing stored`() {
+        every { sharedPrefs.getBoolean("https_enabled", false) } returns false
+        val result = RemotePrefs.isHttpsEnabled(context)
+        assertEquals(false, result)
+    }
+
+    @Test
+    fun `setHttpsEnabled writes to shared prefs`() {
+        every { editor.putBoolean(any(), any()) } returns editor
+        RemotePrefs.setHttpsEnabled(context, true)
+        verify { editor.putBoolean("https_enabled", true) }
+        verify { editor.apply() }
+    }
+
+    @Test
+    fun `getFtpUsername returns default admin when nothing stored`() {
+        every { sharedPrefs.getString("ftp_username", "admin") } returns "admin"
+        val result = RemotePrefs.getFtpUsername(context)
+        assertEquals("admin", result)
+    }
+
+    @Test
+    fun `setFtpUsername writes to shared prefs`() {
+        every { editor.putString(any(), any()) } returns editor
+        RemotePrefs.setFtpUsername(context, "custom_user")
+        verify { editor.putString("ftp_username", "custom_user") }
+        verify { editor.apply() }
+    }
+
+    @Test
+    fun `getFtpPassword returns empty when nothing stored`() {
+        every { sharedPrefs.getString("ftp_password", "") } returns ""
+        val result = RemotePrefs.getFtpPassword(context)
+        assertEquals("", result)
+    }
+
+    @Test
+    fun `setFtpPassword writes to shared prefs`() {
+        every { editor.putString(any(), any()) } returns editor
+        RemotePrefs.setFtpPassword(context, "secure_pass")
+        verify { editor.putString("ftp_password", "secure_pass") }
+        verify { editor.apply() }
+    }
 }
