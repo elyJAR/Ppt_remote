@@ -80,17 +80,26 @@ _logger = logging.getLogger(__name__)
 def _run_server_with_restart(app, host: str, port: int) -> None:
     """Run uvicorn in a loop so it restarts automatically on unexpected exit."""
     import uvicorn
+    import main
 
     while True:
         try:
             _logger.info("Starting uvicorn on %s:%d", host, port)
+            kwargs = {
+                "log_level": "warning",
+                "access_log": False,
+                "use_colors": False,
+            }
+            if getattr(main, "USE_HTTPS", False) and getattr(main, "SSL_KEYFILE", None) and getattr(main, "SSL_CERTFILE", None):
+                kwargs["ssl_keyfile"] = main.SSL_KEYFILE
+                kwargs["ssl_certfile"] = main.SSL_CERTFILE
+                _logger.info("HTTPS/SSL enabled for Uvicorn HTTP server")
+
             uvicorn.run(
                 app,
                 host=host,
                 port=port,
-                log_level="warning",
-                access_log=False,
-                use_colors=False,
+                **kwargs
             )
             # Clean exit from uvicorn — do not restart
             _logger.info("Uvicorn exited cleanly")

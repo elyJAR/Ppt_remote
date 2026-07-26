@@ -60,9 +60,15 @@ class WebFileServer(
         if (serverSocket != null) return true
         var boundPort = port
         var ss: ServerSocket? = null
+        val useHttps = RemotePrefs.isHttpsEnabled(context)
         for (attempt in 0..2) {
             try {
-                ss = ServerSocket()
+                if (useHttps) {
+                    val sslContext = SslHelper.getSSLContext(context)
+                    ss = sslContext.serverSocketFactory.createServerSocket()
+                } else {
+                    ss = ServerSocket()
+                }
                 ss.reuseAddress = true
                 ss.bind(InetSocketAddress(boundPort + attempt))
                 boundPort += attempt
@@ -74,7 +80,7 @@ class WebFileServer(
         if (ss == null) return false
         port = boundPort
         serverSocket = ss
-        Log.i("WebFileServer", "Started on port $port, root=$rootPath")
+        Log.i("WebFileServer", "Started ${if (useHttps) "HTTPS" else "HTTP"} on port $port, root=$rootPath")
 
         // Accept loop
         executor.submit {

@@ -148,6 +148,9 @@ data class RemoteState(
     val activeUploadBytes: Long = 0L,
     val activeUploadTotal: Long = 0L,
     val isUploadCancelled: Boolean = false,
+    val ftpUsername: String = "admin",
+    val ftpPassword: String = "",
+    val isHttpsEnabled: Boolean = false,
 )
 
 /** Represents a detected storage volume (Internal or SD Card). */

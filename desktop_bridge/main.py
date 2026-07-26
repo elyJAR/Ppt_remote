@@ -50,6 +50,89 @@ def _setup_logging() -> None:
 _setup_logging()
 _logger = logging.getLogger(__name__)
 
+def generate_self_signed_cert(cert_path: str, key_path: str) -> None:
+    """Generate a self-signed certificate for localhost and local IP interfaces."""
+    try:
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives import serialization
+        import datetime
+        import ipaddress
+
+        _logger.info("Generating self-signed SSL/TLS certificate...")
+
+        key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+        )
+
+        sans = [
+            x509.DNSName("localhost"),
+            x509.IPAddress(ipaddress.IPv4Address("127.0.0.1"))
+        ]
+        try:
+            hostname = socket.gethostname()
+            sans.append(x509.DNSName(hostname))
+            local_ips = socket.gethostbyname_ex(hostname)[2]
+            for ip in local_ips:
+                try:
+                    sans.append(x509.IPAddress(ipaddress.IPv4Address(ip)))
+                except ValueError:
+                    pass
+        except Exception:
+            pass
+
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, "PPT Remote Bridge"),
+        ])
+        
+        cert = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            issuer
+        ).public_key(
+            key.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.datetime.utcnow() - datetime.timedelta(days=1)
+        ).not_valid_after(
+            datetime.datetime.utcnow() + datetime.timedelta(days=3650)
+        ).add_extension(
+            x509.SubjectAlternativeName(sans),
+            critical=False,
+        ).sign(key, hashes.SHA256())
+
+        with open(key_path, "wb") as f:
+            f.write(key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            ))
+
+        with open(cert_path, "wb") as f:
+            f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+        _logger.info("Self-signed SSL/TLS certificate generated successfully.")
+    except Exception as e:
+        _logger.error("Failed to generate self-signed certificate: %s", e)
+
+# Generate certificates if HTTPS is requested
+USE_HTTPS = os.getenv("PPT_USE_HTTPS", "0") == "1"
+SSL_KEYFILE = None
+SSL_CERTFILE = None
+
+if USE_HTTPS:
+    app_data = pathlib.Path(os.getenv("APPDATA", "")) / "PptRemoteBridge"
+    app_data.mkdir(parents=True, exist_ok=True)
+    SSL_KEYFILE = str(app_data / "key.pem")
+    SSL_CERTFILE = str(app_data / "cert.pem")
+    if not os.path.exists(SSL_KEYFILE) or not os.path.exists(SSL_CERTFILE):
+        generate_self_signed_cert(SSL_CERTFILE, SSL_KEYFILE)
+
+
 # Shared state for the bridge (tracked across requests)
 STATE = {
     "last_client_ip": None

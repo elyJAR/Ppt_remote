@@ -58,7 +58,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             filesSortOrder = try { SortOrder.valueOf(RemotePrefs.getFilesSortOrder(appContext)) } catch (_: Exception) { SortOrder.ASCENDING },
             webServerPin = RemotePrefs.getWebServerPin(appContext),
             webServerPort = RemotePrefs.getWebServerPort(appContext),
-            webServerSharedFolder = RemotePrefs.getWebServerSharedFolder(appContext)
+            webServerSharedFolder = RemotePrefs.getWebServerSharedFolder(appContext),
+            ftpUsername = RemotePrefs.getFtpUsername(appContext),
+            ftpPassword = RemotePrefs.getFtpPassword(appContext),
+            isHttpsEnabled = RemotePrefs.isHttpsEnabled(appContext)
         )
     )
     val state: StateFlow<RemoteState> = _state.asStateFlow()
@@ -623,6 +626,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         RemotePrefs.setApiKey(appContext, key)
         client.apiKey = key
         _state.value = _state.value.copy(apiKey = key)
+    }
+
+    fun updateFtpUsername(username: String) {
+        RemotePrefs.setFtpUsername(appContext, username)
+        _state.value = _state.value.copy(ftpUsername = username)
+        if (_state.value.isFtpEnabled) {
+            val path = _state.value.activeFtpPath
+            toggleFtp(path)
+            viewModelScope.launch {
+                delay(600)
+                toggleFtp(path)
+            }
+        }
+    }
+
+    fun updateFtpPassword(password: String) {
+        RemotePrefs.setFtpPassword(appContext, password)
+        _state.value = _state.value.copy(ftpPassword = password)
+        if (_state.value.isFtpEnabled) {
+            val path = _state.value.activeFtpPath
+            toggleFtp(path)
+            viewModelScope.launch {
+                delay(600)
+                toggleFtp(path)
+            }
+        }
+    }
+
+    fun updateHttpsEnabled(enabled: Boolean) {
+        RemotePrefs.setHttpsEnabled(appContext, enabled)
+        _state.value = _state.value.copy(isHttpsEnabled = enabled)
+        if (_state.value.isWebServerRunning) {
+            toggleWebServer()
+            viewModelScope.launch {
+                delay(600)
+                toggleWebServer()
+            }
+        }
     }
 
 

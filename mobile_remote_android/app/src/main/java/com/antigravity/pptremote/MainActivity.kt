@@ -390,6 +390,9 @@ class MainActivity : ComponentActivity() {
                                 onUpdateApiKey = viewModel::updateApiKey,
                                 onUpdateFtpAutoStart = viewModel::updateFtpAutoStart,
                                 onUpdateWebServerPort = viewModel::updateWebServerPort,
+                                onUpdateFtpUsername = viewModel::updateFtpUsername,
+                                onUpdateFtpPassword = viewModel::updateFtpPassword,
+                                onUpdateHttpsEnabled = viewModel::updateHttpsEnabled,
                             )
                         }
                         state.showNotes -> {
@@ -2551,6 +2554,9 @@ private fun SettingsScreen(
     onUpdateApiKey: (String) -> Unit,
     onUpdateFtpAutoStart: (Boolean) -> Unit,
     onUpdateWebServerPort: (Int) -> Unit,
+    onUpdateFtpUsername: (String) -> Unit,
+    onUpdateFtpPassword: (String) -> Unit,
+    onUpdateHttpsEnabled: (Boolean) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     Scaffold(
@@ -2615,10 +2621,29 @@ private fun SettingsScreen(
                     onCheckedChange = onUpdateFtpAutoStart
                 )
                 SettingsInputRow(
+                    title = "FTP Username",
+                    subtitle = "Default username for FTP login",
+                    value = state.ftpUsername,
+                    onValueChange = onUpdateFtpUsername
+                )
+                SettingsInputRow(
+                    title = "FTP Password",
+                    subtitle = "Leave blank for anonymous FTP access",
+                    value = state.ftpPassword,
+                    onValueChange = onUpdateFtpPassword,
+                    isPassword = true
+                )
+                SettingsInputRow(
                     title = "Web Server Port",
                     subtitle = "Port for browser file transfer (default is 8686)",
                     value = state.webServerPort.toString(),
                     onValueChange = { val p = it.toIntOrNull(); if (p != null) onUpdateWebServerPort(p) }
+                )
+                SettingsSwitchRow(
+                    title = "HTTPS / SSL",
+                    subtitle = "Secure file transfer using local self-signed certificate",
+                    checked = state.isHttpsEnabled,
+                    onCheckedChange = onUpdateHttpsEnabled
                 )
             }
 

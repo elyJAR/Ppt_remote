@@ -304,4 +304,35 @@ object RemotePrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString(KEY_WEB_SERVER_SHARED_FOLDER, folder).apply()
     }
+
+    private const val KEY_FTP_USERNAME = "ftp_username"
+    private const val KEY_FTP_PASSWORD = "ftp_password"
+    private const val KEY_HTTPS_ENABLED = "https_enabled"
+
+    fun getFtpUsername(context: Context): String =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_FTP_USERNAME, "admin") ?: "admin"
+
+    fun setFtpUsername(context: Context, username: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_FTP_USERNAME, username).apply()
+    }
+
+    fun getFtpPassword(context: Context): String =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_FTP_PASSWORD, "").orEmpty()
+
+    fun setFtpPassword(context: Context, password: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_FTP_PASSWORD, password).apply()
+    }
+
+    fun isHttpsEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_HTTPS_ENABLED, false)
+
+    fun setHttpsEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_HTTPS_ENABLED, enabled).apply()
+    }
 }

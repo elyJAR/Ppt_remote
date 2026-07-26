@@ -35,9 +35,16 @@ class FtpServerManager {
 
             serverFactory.addListener("default", listenerFactory.createListener())
 
-            // Anonymous user with write access
             val user = BaseUser()
-            user.name = "anonymous"
+            val ftpPassword = RemotePrefs.getFtpPassword(context)
+            if (ftpPassword.isNotBlank()) {
+                user.name = RemotePrefs.getFtpUsername(context)
+                user.password = ftpPassword
+                Log.i("FtpServerManager", "FTP Server configured with password auth (user: ${user.name})")
+            } else {
+                user.name = "anonymous"
+                Log.i("FtpServerManager", "FTP Server configured for anonymous access")
+            }
             
             val internalStorage = Environment.getExternalStorageDirectory().absolutePath
             

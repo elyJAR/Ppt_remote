@@ -145,17 +145,19 @@ class RemoteControlService : Service() {
         fun getWebServerUrl(context: Context): String? {
             val server = webFileServer ?: return null
             if (!server.isRunning()) return null
+            val useHttps = RemotePrefs.isHttpsEnabled(context)
+            val scheme = if (useHttps) "https" else "http"
             return try {
                 val ipStr = getLocalIpAddress()
                 if (!ipStr.isNullOrBlank() && ipStr != "0.0.0.0") {
-                    "http://$ipStr:${server.port}"
+                    "$scheme://$ipStr:${server.port}"
                 } else {
                     @Suppress("DEPRECATION")
                     val wifiManager = context.applicationContext
                         .getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
                     val ip = wifiManager.connectionInfo.ipAddress
                     val ipStrLegacy = android.text.format.Formatter.formatIpAddress(ip)
-                    "http://$ipStrLegacy:${server.port}"
+                    "$scheme://$ipStrLegacy:${server.port}"
                 }
             } catch (_: Exception) { null }
         }

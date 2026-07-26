@@ -158,18 +158,27 @@ def _setup_logging() -> None:
 
 def _run_server_with_restart(app, host: str, port: int) -> None:
     import uvicorn
+    import main
 
     logger = logging.getLogger(__name__)
     while True:
         try:
             logger.info("Starting uvicorn on %s:%d", host, port)
+            kwargs = {
+                "log_level": "warning",
+                "access_log": False,
+                "use_colors": False,
+            }
+            if getattr(main, "USE_HTTPS", False) and getattr(main, "SSL_KEYFILE", None) and getattr(main, "SSL_CERTFILE", None):
+                kwargs["ssl_keyfile"] = main.SSL_KEYFILE
+                kwargs["ssl_certfile"] = main.SSL_CERTFILE
+                logger.info("HTTPS/SSL enabled for Uvicorn HTTP server")
+
             uvicorn.run(
                 app,
                 host=host,
                 port=port,
-                log_level="warning",
-                access_log=False,
-                use_colors=False,
+                **kwargs
             )
             logger.info("Uvicorn exited cleanly")
             break
