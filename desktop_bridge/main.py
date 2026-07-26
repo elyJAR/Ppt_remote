@@ -358,10 +358,11 @@ class DiscoveryResponder:
                     continue
 
                 local_ip = _local_ip_for_peer(addr[0])
+                scheme = "https" if USE_HTTPS else "http"
                 payload = json.dumps({
                     "bridge_id": get_bridge_id(),
                     "bridge_name": get_bridge_name(),
-                    "bridge_url": f"http://{local_ip}:{self._bridge_port}",
+                    "bridge_url": f"{scheme}://{local_ip}:{self._bridge_port}",
                     "version": "2.0.0"
                 })
                 sock.sendto(payload.encode("utf-8"), addr)
