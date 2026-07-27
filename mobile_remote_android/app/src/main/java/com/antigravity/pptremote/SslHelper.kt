@@ -13,7 +13,7 @@ import javax.net.ssl.SSLContext
 import javax.security.auth.x500.X500Principal
 
 object SslHelper {
-    private const val ALIAS = "ppt_remote_web_server"
+    private const val ALIAS = "ppt_remote_web_server_v2"
     private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
 
     fun getSSLContext(context: Context): SSLContext {
@@ -32,7 +32,7 @@ object SslHelper {
                 kpg.initialize(
                     KeyGenParameterSpec.Builder(
                         ALIAS,
-                        KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+                        KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_DECRYPT
                     )
                     .setCertificateSubject(X500Principal("CN=PPT Remote Web Server"))
                     .setCertificateSerialNumber(BigInteger.ONE)
@@ -41,6 +41,7 @@ object SslHelper {
                     .setKeySize(2048)
                     .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
                     .setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1)
                     .build()
                 )
                 kpg.generateKeyPair()

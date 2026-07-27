@@ -633,10 +633,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(ftpUsername = username)
         if (_state.value.isFtpEnabled) {
             val path = _state.value.activeFtpPath
-            toggleFtp(path)
+            toggleFtp(null) // Stop server
             viewModelScope.launch {
                 delay(600)
-                toggleFtp(path)
+                toggleFtp(path) // Start server with new username
             }
         }
     }
@@ -646,10 +646,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(ftpPassword = password)
         if (_state.value.isFtpEnabled) {
             val path = _state.value.activeFtpPath
-            toggleFtp(path)
+            toggleFtp(null) // Stop server
             viewModelScope.launch {
                 delay(600)
-                toggleFtp(path)
+                toggleFtp(path) // Start server with new password
             }
         }
     }
