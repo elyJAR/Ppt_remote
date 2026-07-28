@@ -46,7 +46,7 @@ class WebFileServer(
 
     private val executor = Executors.newFixedThreadPool(4)
 
-    private class ApprovedDownload(val clientIp: String, val fileName: String, val timestamp: Long)
+    private class ApprovedDownload(val clientIp: String, val fileName: String, var timestamp: Long)
     private val recentApprovals = mutableListOf<ApprovedDownload>()
     private class ApprovedUpload(val clientIp: String, var timestamp: Long)
     private val recentUploadApprovals = mutableListOf<ApprovedUpload>()

@@ -335,4 +335,21 @@ object RemotePrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putBoolean(KEY_HTTPS_ENABLED, enabled).apply()
     }
+
+    private const val KEY_RECENT_MEDIA_SERVERS = "recent_media_servers"
+
+    fun getRecentMediaServers(context: Context): List<String> {
+        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_RECENT_MEDIA_SERVERS, "") ?: ""
+        return raw.split(";").map { it.trim() }.filter { it.isNotBlank() }
+    }
+
+    fun addRecentMediaServer(context: Context, serverUrl: String) {
+        val current = getRecentMediaServers(context).toMutableList()
+        current.remove(serverUrl)
+        current.add(0, serverUrl)
+        val updated = current.take(5).joinToString(";")
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_RECENT_MEDIA_SERVERS, updated).apply()
+    }
 }

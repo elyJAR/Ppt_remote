@@ -26,6 +26,12 @@ import android.util.Size
 import android.view.KeyEvent
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -766,6 +772,7 @@ private fun RemoteScreen(
     val connected = state.bridgeReachable
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    var showPairingDialog by remember { mutableStateOf(false) }
     
     val isTablet = configuration.screenWidthDp >= 600
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
@@ -997,7 +1004,7 @@ private fun RemoteScreen(
                                 selected = false,
                                 onClick = { 
                                     scope.launch { drawerState.close() }
-                                    MediaStreamActivity.launch(context, (state.webServerUrl ?: "").ifBlank { "http://127.0.0.1:8686" })
+                                    showPairingDialog = true
                                 },
                                 icon = { Icon(Icons.Default.PlayCircle, contentDescription = "Stream Media", tint = iOSAccent) },
                                 colors = NavigationDrawerItemDefaults.colors(
@@ -1052,8 +1059,7 @@ private fun RemoteScreen(
                         }
                     },
                     actions = {
-                        val context = LocalContext.current
-                        IconButton(onClick = { MediaStreamActivity.launch(context, (state.webServerUrl ?: "").ifBlank { "http://127.0.0.1:8686" }) }) {
+                        IconButton(onClick = { showPairingDialog = true }) {
                             Icon(Icons.Default.PlayCircle, contentDescription = "Stream Server Media", tint = iOSAccent)
                         }
                         IconButton(onClick = onRefresh) {
@@ -1242,6 +1248,154 @@ private fun RemoteScreen(
             }
         }
     }
+
+    MediaServerPairingDialog(
+        showDialog = showPairingDialog,
+        defaultUrl = (state.webServerUrl ?: ""),
+        onDismiss = { showPairingDialog = false },
+        onConnect = { targetUrl -> MediaStreamActivity.launch(context, targetUrl) }
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MediaServerPairingDialog(
+    showDialog: Boolean,
+    defaultUrl: String,
+    onDismiss: () -> Unit,
+    onConnect: (String) -> Unit
+) {
+    if (!showDialog) return
+    val context = LocalContext.current
+    val colorScheme = MaterialTheme.colorScheme
+    val scope = rememberCoroutineScope()
+
+    var serverUrlInput by remember { mutableStateOf(defaultUrl.ifBlank { "http://192.168.1.50:8686" }) }
+    var testStatus by remember { mutableStateOf("NOT_TESTED") }
+    var statusMessage by remember { mutableStateOf("") }
+    var recentServers by remember { mutableStateOf(RemotePrefs.getRecentMediaServers(context)) }
+
+    fun runConnectionTest() {
+        testStatus = "TESTING"
+        statusMessage = "Testing server reachability..."
+        scope.launch(Dispatchers.IO) {
+            try {
+                var formatted = serverUrlInput.trim()
+                if (!formatted.startsWith("http://") && !formatted.startsWith("https://")) {
+                    formatted = "http://$formatted"
+                }
+                val url = URL(formatted)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.connectTimeout = 3000
+                conn.readTimeout = 3000
+                conn.requestMethod = "HEAD"
+                val responseCode = conn.responseCode
+                conn.disconnect()
+                withContext(Dispatchers.Main) {
+                    if (responseCode in 200..399 || responseCode == 401) {
+                        testStatus = "ONLINE"
+                        statusMessage = "🟢 Server Online & Reachable!"
+                    } else {
+                        testStatus = "FAILED"
+                        statusMessage = "🔴 Server test failed (HTTP $responseCode)"
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    testStatus = "FAILED"
+                    statusMessage = "🔴 Cannot reach server (${e.message ?: "timeout"})"
+                }
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Wifi, contentDescription = null, tint = iOSAccent)
+                Text("Media Server Pairing", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Pair with another Android device or PC connected on the same WiFi to browse and stream media files in-app.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colorScheme.textSecondary
+                )
+
+                OutlinedTextField(
+                    value = serverUrlInput,
+                    onValueChange = { serverUrlInput = it; testStatus = "NOT_TESTED" },
+                    label = { Text("Server Address (e.g. http://192.168.1.50:8686)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = iOSSquircleSmall,
+                    trailingIcon = {
+                        IconButton(onClick = { runConnectionTest() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Test connection", tint = iOSAccent)
+                        }
+                    }
+                )
+
+                if (statusMessage.isNotBlank()) {
+                    Text(
+                        statusMessage,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                if (recentServers.isNotEmpty()) {
+                    Text("Recent Media Servers:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = iOSAccent)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        recentServers.forEach { server ->
+                            AssistChip(
+                                onClick = {
+                                    serverUrlInput = server
+                                    runConnectionTest()
+                                },
+                                label = { Text(server, style = MaterialTheme.typography.labelSmall) },
+                                leadingIcon = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    var formatted = serverUrlInput.trim()
+                    if (!formatted.startsWith("http://") && !formatted.startsWith("https://")) {
+                        formatted = "http://$formatted"
+                    }
+                    RemotePrefs.addRecentMediaServer(context, formatted)
+                    onDismiss()
+                    onConnect(formatted)
+                },
+                shape = iOSSquircleSmall
+            ) {
+                Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Connect & Stream", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+        containerColor = colorScheme.surface,
+        titleContentColor = colorScheme.textPrimary
+    )
 }
 
 private enum class FileViewMode {
@@ -1369,16 +1523,23 @@ private fun WebServerCard(
                     color = colorScheme.textSecondary
                 )
                 val context = LocalContext.current
+                var showPairingDialog by remember { mutableStateOf(false) }
                 Button(
-                    onClick = { MediaStreamActivity.launch(context, (state.webServerUrl ?: "").ifBlank { "http://127.0.0.1:8686" }) },
+                    onClick = { showPairingDialog = true },
                     shape = iOSSquircleSmall,
                     colors = ButtonDefaults.buttonColors(containerColor = iOSAccent),
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                 ) {
-                    Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Stream Server Media (In-App)", fontWeight = FontWeight.Bold)
+                    Text("Connect & Pair Device (In-App Stream)", fontWeight = FontWeight.Bold)
                 }
+                MediaServerPairingDialog(
+                    showDialog = showPairingDialog,
+                    defaultUrl = (state.webServerUrl ?: ""),
+                    onDismiss = { showPairingDialog = false },
+                    onConnect = { targetUrl -> MediaStreamActivity.launch(context, targetUrl) }
+                )
             }
 
             Row(
