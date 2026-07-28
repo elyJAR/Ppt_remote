@@ -1706,6 +1706,7 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
         </select>
       </label>
       <button class="btn-sm" style="background:rgba(88,166,255,0.15);color:#58a6ff;border:1px solid rgba(88,166,255,0.3);padding:3px 10px;" onclick="document.getElementById('subFileInput').click()">📁 Load Local Subtitle</button>
+      <button class="btn-sm" style="background:rgba(46,160,67,0.15);color:#3fb950;border:1px solid rgba(46,160,67,0.3);padding:3px 10px;" onclick="browseServerSubtitles()">🌐 Browse Server Subtitle</button>
       <input type="file" id="subFileInput" accept=".srt,.vtt" style="display:none" onchange="handleLocalSubtitle(event)">
     </div>
   </div>
@@ -1719,6 +1720,17 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   </div>
   <audio id="mediaAudioPlayer" controls autoplay></audio>
   <button onclick="closeAudioPlayer()" class="audio-close-btn" title="Close player">&#x2715;</button>
+</div>
+
+<!-- Server Subtitle File Picker Modal -->
+<div id="serverSubModal" class="overlay" style="display:none;z-index:1100;">
+  <div class="media-modal-card" style="max-width:480px;">
+    <div class="media-modal-header">
+      <h3>🌐 Server Subtitles</h3>
+      <button class="overlay-close-btn" onclick="closeServerSubModal()">&#x2715; Close</button>
+    </div>
+    <div style="margin-top:1rem;" id="serverSubList"></div>
+  </div>
 </div>
 
 <div id="approvalOverlay" class="overlay" style="display:none;">
@@ -2393,9 +2405,83 @@ function initGestureOverlay() {
   };
 }
 
+function browseServerSubtitles() {
+  var serverSubModal = document.getElementById('serverSubModal');
+  if (!serverSubModal) return;
+  serverSubModal.style.display = 'flex';
+  var listEl = document.getElementById('serverSubList');
+  listEl.innerHTML = '<div style="color:#8b949e;padding:1rem;">Scanning folder for subtitle files...</div>';
+
+  fetch('/api/files?path=' + encodeURIComponent(currentPath))
+    .then(function(r){ return r.json(); })
+    .then(function(items){
+      if (!items || !items.length) {
+        listEl.innerHTML = '<div style="color:#8b949e;padding:1rem;">No items found in this directory.</div>';
+        return;
+      }
+      var subExts = ['srt', 'vtt', 'ass', 'sub'];
+      var subFiles = items.filter(function(it){
+        if (it.isDir) return false;
+        var ext = (it.name.substring(it.name.lastIndexOf('.') + 1) || '').toLowerCase();
+        return subExts.indexOf(ext) !== -1;
+      });
+
+      if (!subFiles.length) {
+        listEl.innerHTML = '<div style="color:#8b949e;padding:1rem;">No subtitle files (.srt, .vtt, .ass) found in current server folder.</div>';
+        return;
+      }
+
+      var html = '<div style="display:flex;flex-direction:column;gap:0.5rem;max-height:250px;overflow-y:auto;">';
+      subFiles.forEach(function(f){
+        html += '<button class="btn-sm" style="background:rgba(255,255,255,0.05);color:#e6edf3;border:1px solid rgba(255,255,255,0.1);padding:8px 12px;text-align:left;width:100%;display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="selectServerSubtitleFile(\'' + encodeURIComponent(f.path) + '\', \'' + f.name.replace(/'/g, "\\'") + '\')">';
+        html += '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px;">📄 ' + f.name + '</span>';
+        html += '<span style="color:#3fb950;font-size:0.75rem;flex-shrink:0;">Select</span>';
+        html += '</button>';
+      });
+      html += '</div>';
+      listEl.innerHTML = html;
+    })
+    .catch(function(){
+      listEl.innerHTML = '<div style="color:#f85149;padding:1rem;">Failed to read server directory.</div>';
+    });
+}
+
+function closeServerSubModal() {
+  document.getElementById('serverSubModal').style.display = 'none';
+}
+
+function selectServerSubtitleFile(encPath, name) {
+  closeServerSubModal();
+  var subUrl = '/subtitle?path=' + encPath;
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  
+  var track = document.createElement('track');
+  track.kind = 'subtitles';
+  track.label = 'Server: ' + name;
+  track.src = subUrl;
+  track.default = true;
+  vPlayer.appendChild(track);
+
+  var subSel = document.getElementById('subSelect');
+  var opt = document.createElement('option');
+  opt.value = subUrl;
+  opt.textContent = 'Server: ' + name;
+  opt.selected = true;
+  subSel.appendChild(opt);
+
+  for (var i = 0; i < vPlayer.textTracks.length; i++) {
+    vPlayer.textTracks[i].mode = 'disabled';
+  }
+  if (vPlayer.textTracks.length > 0) {
+    vPlayer.textTracks[vPlayer.textTracks.length - 1].mode = 'showing';
+  }
+  toast('Loaded server subtitle: ' + name, true);
+}
+
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
     closeMediaModal();
+    closeServerSubModal();
   }
 });
 </script>
