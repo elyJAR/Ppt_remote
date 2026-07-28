@@ -46,6 +46,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             showOnboarding = !RemotePrefs.isOnboardingCompleted(appContext),
             bridgePort = RemotePrefs.getBridgePort(appContext),
             pollingIntervalSeconds = RemotePrefs.getPollingInterval(appContext),
+            themeMode = try { ThemeMode.valueOf(RemotePrefs.getThemeMode(appContext).uppercase()) } catch (_: Exception) { ThemeMode.SYSTEM },
             isDarkTheme = RemotePrefs.isDarkTheme(appContext),
             connectionHistory = RemotePrefs.getConnectionHistory(appContext),
             notificationText = RemotePrefs.getNotificationText(appContext),
@@ -273,6 +274,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun showNotes() { _state.value = _state.value.copy(showNotes = true) }
     fun hideNotes() { _state.value = _state.value.copy(showNotes = false) }
+
+    fun setThemeMode(mode: ThemeMode) {
+        RemotePrefs.setThemeMode(appContext, mode.name.lowercase())
+        _state.value = _state.value.copy(themeMode = mode)
+    }
+
+    fun updateTheme(isDark: Boolean) {
+        val mode = if (isDark) ThemeMode.DARK else ThemeMode.LIGHT
+        setThemeMode(mode)
+    }
     fun toggleService() {
         if (_state.value.isServiceRunning) {
             RemoteControlService.stop(appContext)

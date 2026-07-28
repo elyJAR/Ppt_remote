@@ -555,6 +555,19 @@ class WebFileServer(
         sb.append("WEBVTT\n\n")
         val lines = srt.replace("\r\n", "\n").replace('\r', '\n').split('\n')
         for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.startsWith("Dialogue:")) {
+                val parts = trimmed.substringAfter("Dialogue:").split(",", limit = 10)
+                if (parts.size >= 10) {
+                    val start = parts[1].trim()
+                    val end = parts[2].trim()
+                    val text = parts[9].replace(Regex("\\{.*?\\}"), "").trim()
+                    val vttStart = if (start.length == 9) "0$start" else start
+                    val vttEnd = if (end.length == 9) "0$end" else end
+                    sb.append("${vttStart.replace('.', ':')} --> ${vttEnd.replace('.', ':')}\n$text\n\n")
+                    continue
+                }
+            }
             val converted = line.replace(Regex("(\\d{2}:\\d{2}:\\d{2}),(\\d{3})"), "$1.$2")
             sb.append(converted).append("\n")
         }
@@ -840,53 +853,35 @@ class WebFileServer(
     }
 
     private fun requestConnectionPermission(clientIp: String): Boolean {
-        val listener = RemoteControlService.securityListener
-        if (listener == null) {
-            try {
-                val intent = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    putExtra("LAUNCHED_FOR_AUTH", true)
-                }
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                Log.w("WebFileServer", "Could not start MainActivity for auth", e)
-            }
-            for (i in 0..15) {
-                if (RemoteControlService.securityListener != null) break
-                Thread.sleep(200)
-            }
-        }
-
-        val activeListener = RemoteControlService.securityListener ?: return false
         val decision = RemoteControlService.SecurityDecision()
-        activeListener.onRequestConnection(clientIp) { approved ->
-            decision.setDecision(approved)
+        val requestId = java.util.UUID.randomUUID().toString()
+
+        RemoteControlService.showPermissionRequestNotification(
+            context, clientIp, "Connection Request", requestId, "Pairing Connection"
+        ) { approved -> decision.setDecision(approved) }
+
+        val activeListener = RemoteControlService.securityListener
+        if (activeListener != null) {
+            activeListener.onRequestConnection(clientIp) { approved ->
+                RemoteControlService.resolveRequest(requestId, approved)
+            }
         }
         return decision.getDecision()
     }
 
     private fun requestDeletePermission(clientIp: String, fileName: String): Boolean {
-        val listener = RemoteControlService.securityListener
-        if (listener == null) {
-            try {
-                val intent = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    putExtra("LAUNCHED_FOR_AUTH", true)
-                }
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                Log.w("WebFileServer", "Could not start MainActivity for delete permission", e)
-            }
-            for (i in 0..15) {
-                if (RemoteControlService.securityListener != null) break
-                Thread.sleep(200)
-            }
-        }
-
-        val activeListener = RemoteControlService.securityListener ?: return false
         val decision = RemoteControlService.SecurityDecision()
-        activeListener.onRequestDelete(clientIp, fileName) { approved ->
-            decision.setDecision(approved)
+        val requestId = java.util.UUID.randomUUID().toString()
+
+        RemoteControlService.showPermissionRequestNotification(
+            context, clientIp, fileName, requestId, "Delete"
+        ) { approved -> decision.setDecision(approved) }
+
+        val activeListener = RemoteControlService.securityListener
+        if (activeListener != null) {
+            activeListener.onRequestDelete(clientIp, fileName) { approved ->
+                RemoteControlService.resolveRequest(requestId, approved)
+            }
         }
         return decision.getDecision()
     }
@@ -905,9 +900,9 @@ class WebFileServer(
         val decision = RemoteControlService.SecurityDecision()
         val requestId = java.util.UUID.randomUUID().toString()
 
-        RemoteControlService.showUploadRequestNotification(context, clientIp, fileName, requestId) { approved ->
-            decision.setDecision(approved)
-        }
+        RemoteControlService.showPermissionRequestNotification(
+            context, clientIp, fileName, requestId, "Upload"
+        ) { approved -> decision.setDecision(approved) }
 
         val activeListener = RemoteControlService.securityListener
         if (activeListener != null) {
@@ -928,37 +923,28 @@ class WebFileServer(
     private fun requestDownloadPermission(clientIp: String, fileName: String): Boolean {
         val now = System.currentTimeMillis()
         synchronized(approvalsLock) {
-            // Keep stream/download approvals active for 2 hours and refresh timestamp on each byte range request
             recentApprovals.removeAll { now - it.timestamp > 7200000L }
-            val existing = recentApprovals.firstOrNull { it.clientIp == clientIp && it.fileName == fileName }
+            val existing = recentApprovals.firstOrNull { it.clientIp == clientIp }
             if (existing != null) {
                 existing.timestamp = now
                 return true
             }
         }
 
-        val listener = RemoteControlService.securityListener
-        if (listener == null) {
-            try {
-                val intent = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    putExtra("LAUNCHED_FOR_AUTH", true)
-                }
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                Log.w("WebFileServer", "Could not start MainActivity for download permission", e)
-            }
-            for (i in 0..15) {
-                if (RemoteControlService.securityListener != null) break
-                Thread.sleep(200)
+        val decision = RemoteControlService.SecurityDecision()
+        val requestId = java.util.UUID.randomUUID().toString()
+
+        RemoteControlService.showPermissionRequestNotification(
+            context, clientIp, fileName, requestId, "Stream/Download"
+        ) { approved -> decision.setDecision(approved) }
+
+        val activeListener = RemoteControlService.securityListener
+        if (activeListener != null) {
+            activeListener.onRequestDownload(clientIp, fileName) { approved ->
+                RemoteControlService.resolveRequest(requestId, approved)
             }
         }
 
-        val activeListener = RemoteControlService.securityListener ?: return false
-        val decision = RemoteControlService.SecurityDecision()
-        activeListener.onRequestDownload(clientIp, fileName) { approved ->
-            decision.setDecision(approved)
-        }
         val result = decision.getDecision()
         if (result) {
             synchronized(approvalsLock) {
@@ -2294,6 +2280,7 @@ function openMediaPlayer(enc, name, ext) {
       var customCtrl = document.getElementById('videoCustomControls');
       if (customCtrl) customCtrl.style.display = 'flex';
       document.getElementById('speedSelect').value = '1.0';
+      vPlayer.crossOrigin = 'anonymous';
       vPlayer.src = streamUrl;
       clearSubtitleTracks();
       fetchServerSubtitles(enc);
@@ -2329,6 +2316,7 @@ function fetchServerSubtitles(enc) {
     .then(function(r){ return r.json(); })
     .then(function(items){
       var subSel = document.getElementById('subSelect');
+      var vPlayer = document.getElementById('mediaVideoPlayer');
       if (items && items.length > 0) {
         items.forEach(function(item, idx){
           var opt = document.createElement('option');
@@ -2344,9 +2332,18 @@ function fetchServerSubtitles(enc) {
             track.default = true;
             opt.selected = true;
           }
-          document.getElementById('mediaVideoPlayer').appendChild(track);
+          vPlayer.appendChild(track);
         });
-        toast('Found ' + items.length + ' subtitle track(s)', true);
+
+        setTimeout(function() {
+          if (vPlayer.textTracks && vPlayer.textTracks.length > 0) {
+            for (var i = 0; i < vPlayer.textTracks.length; i++) {
+              vPlayer.textTracks[i].mode = (i === 0) ? 'showing' : 'disabled';
+            }
+          }
+        }, 500);
+
+        toast('Found ' + items.length + ' subtitle track(s) — Auto-enabled', true);
       }
     })
     .catch(function(_){});

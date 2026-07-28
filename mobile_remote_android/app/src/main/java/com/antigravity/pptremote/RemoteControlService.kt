@@ -110,6 +110,17 @@ class RemoteControlService : Service() {
             requestId: String,
             onResponse: (Boolean) -> Unit
         ) {
+            showPermissionRequestNotification(context, clientIp, fileName, requestId, "Upload", onResponse)
+        }
+
+        fun showPermissionRequestNotification(
+            context: Context,
+            clientIp: String,
+            fileName: String,
+            requestId: String,
+            actionType: String = "Stream",
+            onResponse: (Boolean) -> Unit
+        ) {
             val notificationId = notificationIdCounter++
             pendingRequests[requestId] = Pair(notificationId, onResponse)
 
@@ -127,10 +138,10 @@ class RemoteControlService : Service() {
 
                 val channel = NotificationChannel(
                     CHANNEL_ID_ALERTS,
-                    "Security & Upload Approval Alerts",
+                    "Security & Stream Approval Alerts",
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "High priority notification alerts for file upload and download approvals"
+                    description = "High priority notification alerts for file stream, upload, and download approvals"
                     enableVibration(true)
                     vibrationPattern = longArrayOf(0, 400, 200, 400)
                     setSound(ringtoneUri, audioAttributes)
@@ -168,9 +179,9 @@ class RemoteControlService : Service() {
             )
 
             val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
-                .setContentTitle("⚠️ Upload Requested by $clientIp")
-                .setContentText("Allow upload of \"$fileName\"?")
-                .setStyle(NotificationCompat.BigTextStyle().bigText("Client at $clientIp wants to upload file:\n\"$fileName\"\n\nTap APPROVE or DENY."))
+                .setContentTitle("⚠️ $actionType Requested by $clientIp")
+                .setContentText("Allow $actionType of \"$fileName\"?")
+                .setStyle(NotificationCompat.BigTextStyle().bigText("Client at $clientIp wants to $actionType file:\n\"$fileName\"\n\nTap APPROVE or DENY."))
                 .setSmallIcon(R.drawable.ic_notification)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)

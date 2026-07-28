@@ -76,6 +76,10 @@ enum class SortOrder {
     ASCENDING, DESCENDING
 }
 
+enum class ThemeMode {
+    SYSTEM, DARK, LIGHT
+}
+
 /**
  * Immutable UI state for the entire app, held in [MainViewModel] as a [kotlinx.coroutines.flow.StateFlow].
  *
@@ -98,6 +102,7 @@ data class RemoteState(
     val showNotes: Boolean = false,
     val bridgePort: Int = 8787,
     val pollingIntervalSeconds: Int = 2,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val isDarkTheme: Boolean = true,
     val connectionHistory: List<String> = emptyList(),
     val notificationText: String = "Tap ⏮ ⏭ to change slides — works with screen off",

@@ -120,6 +120,17 @@ object RemotePrefs {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getBoolean(KEY_IS_DARK_THEME, true)
 
+    fun setThemeMode(context: Context, mode: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString("theme_mode", mode)
+            .apply()
+    }
+
+    fun getThemeMode(context: Context): String =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString("theme_mode", "system") ?: "system"
+
     fun addToConnectionHistory(context: Context, url: String) {
         if (url.isBlank()) return
 
