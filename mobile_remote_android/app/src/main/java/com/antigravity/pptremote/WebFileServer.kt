@@ -1277,9 +1277,13 @@ body{background:radial-gradient(circle at top right, rgba(29,78,216,0.08), trans
 header{background:rgba(22,27,34,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,0.05);padding:0.85rem 1.5rem;display:flex;align-items:center;gap:1rem;position:sticky;top:0;z-index:100;box-shadow:0 4px 20px rgba(0,0,0,0.15);flex-wrap:wrap}
 header h1{color:#58a6ff;font-size:1.15rem;font-weight:700;letter-spacing:-0.01em;display:flex;align-items:center;gap:0.4rem;white-space:nowrap}
 .breadcrumb{color:#8b949e;font-size:.85rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;min-width:0}
-.bc-item{color:#58a6ff;text-decoration:none;transition:color 0.2s;flex-shrink:0}
-.bc-item:hover{color:#79c0ff;text-decoration:underline}
-.bc-sep{margin:0 0.4rem;color:#30363d;flex-shrink:0}
+.current-location-bar{display:flex;align-items:center;gap:0.6rem;background:rgba(22,27,34,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:0.65rem 1rem;margin-bottom:1.25rem;font-size:0.9rem;color:#e6edf3;box-shadow:0 4px 16px rgba(0,0,0,0.15);flex-wrap:wrap}
+.location-icon{font-size:1.1rem}
+.location-label{color:#8b949e;font-weight:600;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.04em}
+.location-breadcrumbs{display:flex;align-items:center;flex-wrap:wrap;gap:0.3rem}
+.bc-item{color:#58a6ff;text-decoration:none;background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.2);padding:3px 9px;border-radius:6px;font-weight:500;font-size:0.85rem;transition:all 0.2s;display:inline-flex;align-items:center}
+.bc-item:hover{background:rgba(88,166,255,0.25);border-color:#58a6ff;color:#fff;text-decoration:none}
+.bc-sep{color:#484f58;font-weight:bold;margin:0 2px}
 .root-badge{font-size:0.7rem;color:#8b949e;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:5px;padding:2px 7px;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;cursor:default}
 .view-toggle{display:flex;gap:3px;background:rgba(255,255,255,0.05);border-radius:8px;padding:3px;flex-shrink:0}
 .view-btn{background:transparent;border:none;color:#8b949e;padding:5px 9px;border-radius:5px;cursor:pointer;font-size:1rem;transition:all 0.2s;line-height:1}
@@ -1625,9 +1629,14 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   </div>
 </header>
 <main>
-  <div class="search-bar-container">
+  <div class="current-location-bar">
+    <span class="location-icon">&#x1F4C2;</span>
+    <span class="location-label">Current Location:</span>
+    <div class="location-breadcrumbs">$breadcrumbs</div>
+  </div>
+  <div class="search-bar-container" style="margin: 0 0 1.25rem 0; max-width: 100%;">
     <span class="search-icon">&#x1F50D;</span>
-    <input type="text" id="searchInput" placeholder="Search files and folders..." oninput="filterItems()">
+    <input type="text" id="searchInput" placeholder="Search files and folders in current directory..." oninput="filterItems()">
   </div>
   $drivesHtml
   <!-- Upload area -->
