@@ -1790,38 +1790,42 @@ private fun FilesScreen(
                 )
             }
         },
+        bottomBar = {
+            NavigationBar(
+                containerColor = colorScheme.surface,
+                contentColor = colorScheme.primary,
+                tonalElevation = 8.dp
+            ) {
+                NavigationBarItem(
+                    selected = selectedTabIndex == 0,
+                    onClick = { selectedTabIndex = 0 },
+                    icon = { Icon(Icons.Default.Folder, contentDescription = null) },
+                    label = { Text("Local Files", fontWeight = FontWeight.Bold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = colorScheme.primary,
+                        selectedTextColor = colorScheme.primary,
+                        unselectedIconColor = colorScheme.textSecondary,
+                        unselectedTextColor = colorScheme.textSecondary
+                    )
+                )
+                NavigationBarItem(
+                    selected = selectedTabIndex == 1,
+                    onClick = { selectedTabIndex = 1 },
+                    icon = { Icon(Icons.Default.Wifi, contentDescription = null) },
+                    label = { Text("Web Server & Stream", fontWeight = FontWeight.Bold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = colorScheme.primary,
+                        selectedTextColor = colorScheme.primary,
+                        unselectedIconColor = colorScheme.textSecondary,
+                        unselectedTextColor = colorScheme.textSecondary
+                    )
+                )
+            }
+        },
         containerColor = colorScheme.screenBg
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                TabRow(
-                    selectedTabIndex = selectedTabIndex,
-                    containerColor = Color.Transparent,
-                    contentColor = iOSAccent,
-                    divider = { HorizontalDivider(color = colorScheme.divider) }
-                ) {
-                    Tab(
-                        selected = selectedTabIndex == 0,
-                        onClick = { selectedTabIndex = 0 },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Local Files", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    )
-                    Tab(
-                        selected = selectedTabIndex == 1,
-                        onClick = { selectedTabIndex = 1 },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text("Web Server & Stream", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    )
-                }
-
                 if (selectedTabIndex == 1) {
                     Column(
                         modifier = Modifier
