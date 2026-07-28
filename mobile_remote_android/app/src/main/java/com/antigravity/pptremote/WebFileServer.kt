@@ -1767,7 +1767,10 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   <div class="media-modal-card">
     <div class="media-modal-header">
       <h3 id="mediaTitle">&#x1F3AC; Media Player</h3>
-      <button class="overlay-close-btn" onclick="closeMediaModal()">&#x2715; Close</button>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <button class="btn-sm" style="background:rgba(46,160,67,0.2);color:#3fb950;border:1px solid rgba(46,160,67,0.4);padding:4px 10px;font-weight:600;display:inline-flex;align-items:center;gap:4px;cursor:pointer;" onclick="openInVlcPlayer()" title="Open stream in external player like VLC or MX Player">🚀 Open in VLC / App</button>
+        <button class="overlay-close-btn" onclick="closeMediaModal()">&#x2715; Close</button>
+      </div>
     </div>
     <div class="media-container" id="mediaContainer">
       <video id="mediaVideoPlayer" autoplay style="display:none;width:100%;max-height:70vh;border-radius:10px;background:#000;"></video>
@@ -1787,6 +1790,11 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
         <input type="range" id="vVolumeSlider" class="v-vol-bar" min="0" max="1" value="1" step="0.05" oninput="onVolumeChange(this.value)">
         <button id="vBtnFullscreen" class="v-btn" onclick="toggleVideoFullscreen()" title="Fullscreen">⛶</button>
       </div>
+    </div>
+    <div id="videoErrorNotice" style="display:none;background:rgba(218,54,51,0.15);border:1px solid rgba(248,81,73,0.4);color:#f85149;padding:0.75rem 1rem;border-radius:8px;margin-top:0.75rem;font-size:0.88rem;text-align:center;">
+      ⚠️ Your browser cannot decode this MKV video/audio stream natively.<br>
+      <button class="btn-sm" style="background:#2ea043;color:#fff;border:none;margin-top:8px;padding:6px 14px;font-weight:600;cursor:pointer;" onclick="openInVlcPlayer()">🚀 Open Stream in VLC / External Player</button>
+      <a id="videoDownloadLink" href="#" download class="btn-sm" style="background:rgba(255,255,255,0.1);color:#fff;text-decoration:none;padding:6px 14px;display:inline-block;margin-top:8px;margin-left:6px;">📥 Download File</a>
     </div>
     <div class="media-controls-extra" id="mediaExtraControls" style="display:none;margin-top:0.75rem;align-items:center;justify-content:center;gap:1rem;flex-wrap:wrap;">
       <label style="color:#8b949e;font-size:0.85rem;display:flex;align-items:center;gap:0.4rem;">Speed: 
@@ -2342,6 +2350,22 @@ function openMediaPlayer(enc, name, ext) {
       document.getElementById('speedSelect').value = '1.0';
       vPlayer.crossOrigin = 'anonymous';
       vPlayer.src = streamUrl;
+
+      var errNotice = document.getElementById('videoErrorNotice');
+      if (errNotice) errNotice.style.display = 'none';
+
+      vPlayer.onerror = function() {
+        if (errNotice) {
+          errNotice.style.display = 'block';
+          var dlLink = document.getElementById('videoDownloadLink');
+          if (dlLink) dlLink.href = streamUrl;
+        }
+      };
+
+      if (ext === 'mkv') {
+        toast('MKV file: If browser fails, tap 🚀 Open in VLC', true);
+      }
+
       clearSubtitleTracks();
       fetchServerSubtitles(enc);
       initGestureOverlay();
@@ -2473,6 +2497,16 @@ function closeMediaModal() {
   var customCtrl = document.getElementById('videoCustomControls');
   if (customCtrl) customCtrl.style.display = 'none';
   modal.style.display = 'none';
+}
+
+function openInVlcPlayer() {
+  if (!activeVideoEnc) return;
+  var streamUrl = window.location.origin + '/stream?path=' + activeVideoEnc + '&inline=true';
+  var vlcUrl = 'vlc://' + streamUrl;
+  var win = window.open(vlcUrl, '_blank');
+  setTimeout(function() {
+    window.open(streamUrl, '_blank');
+  }, 800);
 }
 
 function closeAudioPlayer() {
