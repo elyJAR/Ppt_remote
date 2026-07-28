@@ -1415,6 +1415,12 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   z-index: 15;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
+.video-custom-controls{display:flex;align-items:center;gap:0.6rem;background:rgba(13,17,23,0.95);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:0.6rem 1rem;margin-top:0.75rem;box-shadow:0 4px 16px rgba(0,0,0,0.3);width:100%;flex-wrap:wrap}
+.v-btn{background:rgba(88,166,255,0.15);border:1px solid rgba(88,166,255,0.3);color:#58a6ff;border-radius:6px;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;font-size:1rem;cursor:pointer;transition:all 0.2s;flex-shrink:0}
+.v-btn:hover{background:rgba(88,166,255,0.3);color:#fff}
+.v-time{color:#8b949e;font-family:monospace;font-size:0.85rem;white-space:nowrap;flex-shrink:0}
+.v-seek-bar{flex:1;min-width:120px;height:6px;border-radius:3px;background:rgba(255,255,255,0.15);outline:none;cursor:pointer;accent-color:#58a6ff}
+.v-vol-bar{width:70px;height:6px;border-radius:3px;background:rgba(255,255,255,0.15);outline:none;cursor:pointer;accent-color:#58a6ff;flex-shrink:0}
 .media-modal-header {
   display: flex;
   justify-content: space-between;
@@ -1726,6 +1732,15 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
         <div id="gestureBadgeRight" class="gesture-badge gesture-right">+10s</div>
         <div id="gestureHUD" class="gesture-hud"></div>
       </div>
+    </div>
+    <!-- Custom Onscreen Video Player Bar -->
+    <div id="videoCustomControls" class="video-custom-controls" style="display:none;">
+      <button id="vBtnPlayPause" class="v-btn" onclick="togglePlayPause()" title="Play / Pause">▶</button>
+      <span id="vTimeDisplay" class="v-time">00:00 / 00:00</span>
+      <input type="range" id="vSeekSlider" class="v-seek-bar" min="0" max="100" value="0" step="0.1" oninput="onSeekInput(this.value)" onchange="onSeekChange(this.value)">
+      <button id="vBtnMute" class="v-btn" onclick="toggleMute()" title="Mute / Unmute">🔊</button>
+      <input type="range" id="vVolumeSlider" class="v-vol-bar" min="0" max="1" value="1" step="0.05" oninput="onVolumeChange(this.value)">
+      <button id="vBtnFullscreen" class="v-btn" onclick="toggleVideoFullscreen()" title="Fullscreen">⛶</button>
     </div>
     <div class="media-controls-extra" id="mediaExtraControls" style="display:none;margin-top:0.75rem;align-items:center;justify-content:center;gap:1rem;flex-wrap:wrap;">
       <label style="color:#8b949e;font-size:0.85rem;display:flex;align-items:center;gap:0.4rem;">Speed: 
@@ -2276,17 +2291,22 @@ function openMediaPlayer(enc, name, ext) {
       vPlayer.style.display = 'block';
       extraCtrl.style.display = 'flex';
       gOverlay.style.display = 'block';
+      var customCtrl = document.getElementById('videoCustomControls');
+      if (customCtrl) customCtrl.style.display = 'flex';
       document.getElementById('speedSelect').value = '1.0';
       vPlayer.src = streamUrl;
       clearSubtitleTracks();
       fetchServerSubtitles(enc);
       initGestureOverlay();
+      initVideoControls();
       vPlayer.play().catch(function(_){});
     } else {
       vPlayer.pause();
       vPlayer.style.display = 'none';
       extraCtrl.style.display = 'none';
       gOverlay.style.display = 'none';
+      var customCtrl = document.getElementById('videoCustomControls');
+      if (customCtrl) customCtrl.style.display = 'none';
       imgViewer.style.display = 'block';
       imgViewer.src = streamUrl;
     }
@@ -2390,6 +2410,8 @@ function closeMediaModal() {
   var modal = document.getElementById('mediaModal');
   var vPlayer = document.getElementById('mediaVideoPlayer');
   if (vPlayer) { vPlayer.pause(); vPlayer.src = ''; }
+  var customCtrl = document.getElementById('videoCustomControls');
+  if (customCtrl) customCtrl.style.display = 'none';
   modal.style.display = 'none';
 }
 
@@ -2403,6 +2425,102 @@ function closeAudioPlayer() {
 function changePlaybackSpeed(val) {
   var vPlayer = document.getElementById('mediaVideoPlayer');
   if (vPlayer) { vPlayer.playbackRate = parseFloat(val); }
+}
+
+// --- Onscreen Video Player Controls -----------------------------
+var isSeeking = false;
+
+function initVideoControls() {
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  var playBtn = document.getElementById('vBtnPlayPause');
+  var timeDisp = document.getElementById('vTimeDisplay');
+  var seekBar = document.getElementById('vSeekSlider');
+  var muteBtn = document.getElementById('vBtnMute');
+  var volBar = document.getElementById('vVolumeSlider');
+
+  if (!vPlayer) return;
+
+  vPlayer.ontimeupdate = function() {
+    if (isSeeking) return;
+    if (vPlayer.duration) {
+      var pct = (vPlayer.currentTime / vPlayer.duration) * 100;
+      if (seekBar) seekBar.value = pct;
+      if (timeDisp) timeDisp.textContent = formatTimeSec(vPlayer.currentTime) + ' / ' + formatTimeSec(vPlayer.duration);
+    }
+  };
+
+  vPlayer.onplay = function() {
+    if (playBtn) playBtn.textContent = '⏸';
+  };
+
+  vPlayer.onpause = function() {
+    if (playBtn) playBtn.textContent = '▶';
+  };
+
+  vPlayer.onvolumechange = function() {
+    if (!vPlayer) return;
+    if (vPlayer.muted || vPlayer.volume === 0) {
+      if (muteBtn) muteBtn.textContent = '🔇';
+      if (volBar) volBar.value = 0;
+    } else {
+      if (muteBtn) muteBtn.textContent = '🔊';
+      if (volBar) volBar.value = vPlayer.volume;
+    }
+  };
+}
+
+function formatTimeSec(sec) {
+  if (isNaN(sec)) return '00:00';
+  var m = Math.floor(sec / 60);
+  var s = Math.floor(sec % 60);
+  if (m < 10) m = '0' + m;
+  if (s < 10) s = '0' + s;
+  return m + ':' + s;
+}
+
+function togglePlayPause() {
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  if (!vPlayer) return;
+  if (vPlayer.paused) {
+    vPlayer.play().catch(function(_){});
+  } else {
+    vPlayer.pause();
+  }
+}
+
+function onSeekInput(val) {
+  isSeeking = true;
+}
+
+function onSeekChange(val) {
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  if (vPlayer && vPlayer.duration) {
+    vPlayer.currentTime = (val / 100) * vPlayer.duration;
+  }
+  isSeeking = false;
+}
+
+function toggleMute() {
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  if (vPlayer) vPlayer.muted = !vPlayer.muted;
+}
+
+function onVolumeChange(val) {
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  if (!vPlayer) return;
+  vPlayer.volume = parseFloat(val);
+  vPlayer.muted = (parseFloat(val) === 0);
+}
+
+function toggleVideoFullscreen() {
+  var container = document.getElementById('mediaContainer');
+  if (!container) return;
+  if (!document.fullscreenElement) {
+    if (container.requestFullscreen) container.requestFullscreen();
+    else if (container.webkitRequestFullscreen) container.webkitRequestFullscreen();
+  } else {
+    if (document.exitFullscreen) document.exitFullscreen();
+  }
 }
 
 // --- Gesture Controls -----------------------------------------
