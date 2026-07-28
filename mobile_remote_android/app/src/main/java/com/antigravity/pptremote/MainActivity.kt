@@ -991,6 +991,23 @@ private fun RemoteScreen(
                         // Fixed Bottom Part (FTP + Settings)
                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             HorizontalDivider(color = MaterialTheme.colorScheme.divider)
+                            val context = LocalContext.current
+                            NavigationDrawerItem(
+                                label = { Text("Stream Server Media", fontWeight = FontWeight.Bold) },
+                                selected = false,
+                                onClick = { 
+                                    scope.launch { drawerState.close() }
+                                    MediaStreamActivity.launch(context, state.webServerUrl.ifBlank { "http://127.0.0.1:8686" })
+                                },
+                                icon = { Icon(Icons.Default.PlayCircle, contentDescription = "Stream Media", tint = iOSAccent) },
+                                colors = NavigationDrawerItemDefaults.colors(
+                                    unselectedContainerColor = Color.Transparent,
+                                    unselectedTextColor = MaterialTheme.colorScheme.textPrimary,
+                                    unselectedIconColor = iOSAccent
+                                ),
+                                shape = iOSSquircleSmall,
+                                modifier = Modifier.padding(horizontal = 0.dp)
+                            )
                             
                             NavigationDrawerItem(
                                 label = { Text("App Settings", fontWeight = FontWeight.Bold) },
@@ -1035,6 +1052,10 @@ private fun RemoteScreen(
                         }
                     },
                     actions = {
+                        val context = LocalContext.current
+                        IconButton(onClick = { MediaStreamActivity.launch(context, state.webServerUrl.ifBlank { "http://127.0.0.1:8686" }) }) {
+                            Icon(Icons.Default.PlayCircle, contentDescription = "Stream Server Media", tint = iOSAccent)
+                        }
                         IconButton(onClick = onRefresh) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                         }
@@ -1347,6 +1368,17 @@ private fun WebServerCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = colorScheme.textSecondary
                 )
+                val context = LocalContext.current
+                Button(
+                    onClick = { MediaStreamActivity.launch(context, state.webServerUrl.ifBlank { "http://127.0.0.1:8686" }) },
+                    shape = iOSSquircleSmall,
+                    colors = ButtonDefaults.buttonColors(containerColor = iOSAccent),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                ) {
+                    Icon(Icons.Default.PlayCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Stream Server Media (In-App)", fontWeight = FontWeight.Bold)
+                }
             }
 
             Row(
