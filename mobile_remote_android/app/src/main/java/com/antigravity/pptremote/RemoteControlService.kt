@@ -18,6 +18,7 @@ import android.view.KeyEvent
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.media.session.MediaButtonReceiver
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -93,6 +94,93 @@ class RemoteControlService : Service() {
         private var webFileServer: WebFileServer? = null
 
         var securityListener: WebServerSecurityListener? = null
+
+        const val CHANNEL_ID_ALERTS         = "ppt_remote_alerts"
+        const val ACTION_APPROVE_REQUEST    = "com.antigravity.pptremote.action.APPROVE_REQUEST"
+        const val ACTION_DENY_REQUEST       = "com.antigravity.pptremote.action.DENY_REQUEST"
+        const val EXTRA_REQUEST_ID          = "com.antigravity.pptremote.extra.REQUEST_ID"
+
+        private val pendingRequests = ConcurrentHashMap<String, Pair<Int, (Boolean) -> Unit>>()
+        private var notificationIdCounter = 2000
+
+        fun showUploadRequestNotification(
+            context: Context,
+            clientIp: String,
+            fileName: String,
+            requestId: String,
+            onResponse: (Boolean) -> Unit
+        ) {
+            val notificationId = notificationIdCounter++
+            pendingRequests[requestId] = Pair(notificationId, onResponse)
+
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    CHANNEL_ID_ALERTS,
+                    "Security & Upload Approval Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "High priority notification alerts for file upload and download approvals"
+                    enableVibration(true)
+                    setShowBadge(true)
+                }
+                nm.createNotificationChannel(channel)
+            }
+
+            val approveIntent = Intent(context, RemoteControlService::class.java).apply {
+                action = ACTION_APPROVE_REQUEST
+                putExtra(EXTRA_REQUEST_ID, requestId)
+            }
+            val approvePending = PendingIntent.getService(
+                context, requestId.hashCode() + 1, approveIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            val denyIntent = Intent(context, RemoteControlService::class.java).apply {
+                action = ACTION_DENY_REQUEST
+                putExtra(EXTRA_REQUEST_ID, requestId)
+            }
+            val denyPending = PendingIntent.getService(
+                context, requestId.hashCode() + 2, denyIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            val openApp = PendingIntent.getActivity(
+                context, requestId.hashCode() + 3,
+                Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    putExtra("LAUNCHED_FOR_AUTH", true)
+                },
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
+                .setContentTitle("Upload Requested by $clientIp")
+                .setContentText("Allow upload of \"$fileName\"?")
+                .setStyle(NotificationCompat.BigTextStyle().bigText("Device at IP $clientIp wants to upload file:\n\"$fileName\"\n\nTap APPROVE or DENY."))
+                .setSmallIcon(R.drawable.ic_notification)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setAutoCancel(true)
+                .setContentIntent(openApp)
+                .addAction(R.drawable.ic_play, "APPROVE", approvePending)
+                .addAction(R.drawable.ic_stop, "DENY", denyPending)
+
+            nm.notify(notificationId, builder.build())
+        }
+
+        fun resolveRequest(requestId: String, approved: Boolean, context: Context? = null) {
+            val entry = pendingRequests.remove(requestId)
+            if (entry != null) {
+                val (notificationId, callback) = entry
+                callback.invoke(approved)
+                if (context != null) {
+                    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    nm.cancel(notificationId)
+                }
+            }
+        }
 
         fun toggleWebServer(context: Context, rootDir: String, pin: String) {
             val intent = Intent(context, RemoteControlService::class.java).apply {
@@ -246,6 +334,18 @@ class RemoteControlService : Service() {
 
         // Handle notification button actions — fire even when screen is off
         when (intent?.action) {
+            ACTION_APPROVE_REQUEST -> {
+                val reqId = intent.getStringExtra(EXTRA_REQUEST_ID)
+                if (reqId != null) {
+                    resolveRequest(reqId, true, this)
+                }
+            }
+            ACTION_DENY_REQUEST -> {
+                val reqId = intent.getStringExtra(EXTRA_REQUEST_ID)
+                if (reqId != null) {
+                    resolveRequest(reqId, false, this)
+                }
+            }
             ACTION_NEXT          -> executeBridgeAction("next")
             ACTION_PREVIOUS      -> executeBridgeAction("previous")
             ACTION_START         -> executeBridgeAction("start")

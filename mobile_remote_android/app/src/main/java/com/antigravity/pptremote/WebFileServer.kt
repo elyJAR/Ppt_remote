@@ -857,7 +857,7 @@ class WebFileServer(
     private fun requestUploadPermission(clientIp: String, fileName: String): Boolean {
         val now = System.currentTimeMillis()
         synchronized(approvalsLock) {
-            recentUploadApprovals.removeAll { now - it.timestamp > 30000 }
+            recentUploadApprovals.removeAll { now - it.timestamp > 300000L }
             val existing = recentUploadApprovals.firstOrNull { it.clientIp == clientIp }
             if (existing != null) {
                 existing.timestamp = now
@@ -865,8 +865,19 @@ class WebFileServer(
             }
         }
 
-        val listener = RemoteControlService.securityListener
-        if (listener == null) {
+        val decision = RemoteControlService.SecurityDecision()
+        val requestId = java.util.UUID.randomUUID().toString()
+
+        RemoteControlService.showUploadRequestNotification(context, clientIp, fileName, requestId) { approved ->
+            decision.setDecision(approved)
+        }
+
+        val activeListener = RemoteControlService.securityListener
+        if (activeListener != null) {
+            activeListener.onRequestUpload(clientIp, fileName) { approved ->
+                RemoteControlService.resolveRequest(requestId, approved)
+            }
+        } else {
             try {
                 val intent = Intent(context, MainActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -876,17 +887,8 @@ class WebFileServer(
             } catch (e: Exception) {
                 Log.w("WebFileServer", "Could not start MainActivity for upload permission", e)
             }
-            for (i in 0..15) {
-                if (RemoteControlService.securityListener != null) break
-                Thread.sleep(200)
-            }
         }
 
-        val activeListener = RemoteControlService.securityListener ?: return false
-        val decision = RemoteControlService.SecurityDecision()
-        activeListener.onRequestUpload(clientIp, fileName) { approved ->
-            decision.setDecision(approved)
-        }
         val result = decision.getDecision()
         if (result) {
             synchronized(approvalsLock) {
