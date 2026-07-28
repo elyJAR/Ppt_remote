@@ -407,11 +407,11 @@ class MainActivity : ComponentActivity() {
                                 state = state,
                                 onBack = viewModel::hideNotes,
                                 onGetThumbnail = viewModel::getCachedThumbnail,
-                                onSelectSlide = { 
+                                onSelectSlide = { slideIndex -> 
                                     if (activePres?.inSlideshow == true) {
-                                        viewModel.jumpToSlide(it)
+                                        viewModel.jumpToSlide(slideIndex)
                                     } else {
-                                        previewSlideIndex = it
+                                        previewSlideIndex = slideIndex
                                     }
                                     viewModel.hideNotes()
                                 }
@@ -2198,6 +2198,7 @@ private fun FilesScreen(
             }
         }
     }
+}
 }
 
 object ThumbnailCache {
