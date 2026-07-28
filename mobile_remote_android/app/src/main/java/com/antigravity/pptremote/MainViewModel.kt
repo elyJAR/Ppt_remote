@@ -620,6 +620,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (seconds in 1..30) {
             RemotePrefs.setPollingInterval(appContext, seconds)
             _state.value = _state.value.copy(pollingIntervalSeconds = seconds)
+        }
+    }
+
     fun updateNotificationText(text: String) {
         RemotePrefs.setNotificationText(appContext, text)
         _state.value = _state.value.copy(notificationText = text)
