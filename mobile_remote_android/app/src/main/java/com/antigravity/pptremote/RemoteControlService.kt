@@ -113,8 +113,18 @@ class RemoteControlService : Service() {
             val notificationId = notificationIdCounter++
             pendingRequests[requestId] = Pair(notificationId, onResponse)
 
+            try {
+                RemoteControlService.start(context)
+            } catch (_: Exception) {}
+
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val ringtoneUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
+                val audioAttributes = android.media.AudioAttributes.Builder()
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                    .build()
+
                 val channel = NotificationChannel(
                     CHANNEL_ID_ALERTS,
                     "Security & Upload Approval Alerts",
@@ -122,6 +132,9 @@ class RemoteControlService : Service() {
                 ).apply {
                     description = "High priority notification alerts for file upload and download approvals"
                     enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 300, 150, 300)
+                    setSound(ringtoneUri, audioAttributes)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                     setShowBadge(true)
                 }
                 nm.createNotificationChannel(channel)
@@ -159,7 +172,8 @@ class RemoteControlService : Service() {
                 .setContentText("Allow upload of \"$fileName\"?")
                 .setStyle(NotificationCompat.BigTextStyle().bigText("Device at IP $clientIp wants to upload file:\n\"$fileName\"\n\nTap APPROVE or DENY."))
                 .setSmallIcon(R.drawable.ic_notification)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setAutoCancel(true)

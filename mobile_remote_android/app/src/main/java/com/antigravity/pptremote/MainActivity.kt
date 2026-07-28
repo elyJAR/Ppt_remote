@@ -350,6 +350,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            RemoteControlService.start(this)
+        } else {
+            Toast.makeText(this, "Notification permission required for upload approval alerts.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun ensureNotificationPermissionAndStartService() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                RemoteControlService.start(this)
+            }
+        } else {
+            RemoteControlService.start(this)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         SafStorageHelper.appPackageName = packageName
         // Install splash screen before calling super.onCreate()
