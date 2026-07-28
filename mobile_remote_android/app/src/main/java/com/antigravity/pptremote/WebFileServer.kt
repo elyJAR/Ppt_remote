@@ -2311,18 +2311,33 @@ function showHUD(text) {
   hudTimer = setTimeout(function(){ hud.style.display = 'none'; }, 1500);
 }
 
+var isPointerPressed = false;
+
 function initGestureOverlay() {
   var overlay = document.getElementById('gestureOverlay');
   var vPlayer = document.getElementById('mediaVideoPlayer');
   if (!overlay || !vPlayer) return;
 
   overlay.onpointerdown = function(e) {
+    isPointerPressed = true;
     touchStartX = e.clientX;
     touchStartY = e.clientY;
     isSwiping = false;
+    try { overlay.setPointerCapture(e.pointerId); } catch(_){}
+  };
+
+  overlay.onpointerup = function(e) {
+    isPointerPressed = false;
+    try { overlay.releasePointerCapture(e.pointerId); } catch(_){}
+  };
+
+  overlay.onpointercancel = function(e) {
+    isPointerPressed = false;
   };
 
   overlay.onpointermove = function(e) {
+    if (!isPointerPressed || (e.pointerType === 'mouse' && e.buttons === 0)) return;
+
     var dx = e.clientX - touchStartX;
     var dy = e.clientY - touchStartY;
 
