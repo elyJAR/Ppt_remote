@@ -914,16 +914,6 @@ class WebFileServer(
             activeListener.onRequestUpload(clientIp, fileName) { approved ->
                 RemoteControlService.resolveRequest(requestId, approved)
             }
-        } else {
-            try {
-                val intent = Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    putExtra("LAUNCHED_FOR_AUTH", true)
-                }
-                context.startActivity(intent)
-            } catch (e: Exception) {
-                Log.w("WebFileServer", "Could not start MainActivity for upload permission", e)
-            }
         }
 
         val result = decision.getDecision()

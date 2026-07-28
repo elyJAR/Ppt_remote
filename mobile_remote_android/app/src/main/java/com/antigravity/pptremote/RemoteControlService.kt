@@ -95,7 +95,7 @@ class RemoteControlService : Service() {
 
         var securityListener: WebServerSecurityListener? = null
 
-        const val CHANNEL_ID_ALERTS         = "ppt_remote_alerts"
+        const val CHANNEL_ID_ALERTS         = "ppt_remote_alerts_v2"
         const val ACTION_APPROVE_REQUEST    = "com.antigravity.pptremote.action.APPROVE_REQUEST"
         const val ACTION_DENY_REQUEST       = "com.antigravity.pptremote.action.DENY_REQUEST"
         const val EXTRA_REQUEST_ID          = "com.antigravity.pptremote.extra.REQUEST_ID"
@@ -132,7 +132,7 @@ class RemoteControlService : Service() {
                 ).apply {
                     description = "High priority notification alerts for file upload and download approvals"
                     enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 300, 150, 300)
+                    vibrationPattern = longArrayOf(0, 400, 200, 400)
                     setSound(ringtoneUri, audioAttributes)
                     lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                     setShowBadge(true)
@@ -168,20 +168,28 @@ class RemoteControlService : Service() {
             )
 
             val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
-                .setContentTitle("Upload Requested by $clientIp")
+                .setContentTitle("⚠️ Upload Requested by $clientIp")
                 .setContentText("Allow upload of \"$fileName\"?")
-                .setStyle(NotificationCompat.BigTextStyle().bigText("Device at IP $clientIp wants to upload file:\n\"$fileName\"\n\nTap APPROVE or DENY."))
+                .setStyle(NotificationCompat.BigTextStyle().bigText("Client at $clientIp wants to upload file:\n\"$fileName\"\n\nTap APPROVE or DENY."))
                 .setSmallIcon(R.drawable.ic_notification)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
-                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setAutoCancel(true)
                 .setContentIntent(openApp)
-                .addAction(R.drawable.ic_play, "APPROVE", approvePending)
-                .addAction(R.drawable.ic_stop, "DENY", denyPending)
+                .addAction(R.drawable.ic_play, "✅ APPROVE", approvePending)
+                .addAction(R.drawable.ic_stop, "❌ DENY", denyPending)
 
-            nm.notify(notificationId, builder.build())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+                    nm.notify(notificationId, builder.build())
+                } else {
+                    android.util.Log.w("RemoteControlService", "POST_NOTIFICATIONS permission missing")
+                }
+            } else {
+                nm.notify(notificationId, builder.build())
+            }
         }
 
         fun resolveRequest(requestId: String, approved: Boolean, context: Context? = null) {
