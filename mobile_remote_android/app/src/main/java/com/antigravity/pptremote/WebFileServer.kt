@@ -1366,6 +1366,29 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   overflow: hidden;
   min-height: 220px;
 }
+.media-container:fullscreen,
+.media-container:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+  background: #000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.media-container:fullscreen #mediaVideoPlayer,
+.media-container:-webkit-full-screen #mediaVideoPlayer {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  object-fit: contain !important;
+  border-radius: 0 !important;
+}
 .gesture-overlay {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -1414,7 +1437,31 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   z-index: 15;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
 }
-.video-custom-controls{display:flex;align-items:center;gap:0.6rem;background:rgba(13,17,23,0.95);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:0.6rem 1rem;margin-top:0.75rem;box-shadow:0 4px 16px rgba(0,0,0,0.3);width:100%;flex-wrap:wrap}
+.video-custom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(13,17,23,0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  width: 100%;
+  flex-wrap: wrap;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  transition: opacity 0.3s ease;
+}
+.media-container:fullscreen .video-custom-controls,
+.media-container:-webkit-full-screen .video-custom-controls {
+  border-radius: 0 !important;
+  border: none !important;
+  background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.5) 70%, transparent) !important;
+  padding: 1rem 1.5rem !important;
+}
 .v-btn{background:rgba(88,166,255,0.15);border:1px solid rgba(88,166,255,0.3);color:#58a6ff;border-radius:6px;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;font-size:1rem;cursor:pointer;transition:all 0.2s;flex-shrink:0}
 .v-btn:hover{background:rgba(88,166,255,0.3);color:#fff}
 .v-time{color:#8b949e;font-family:monospace;font-size:0.85rem;white-space:nowrap;flex-shrink:0}
@@ -1723,7 +1770,7 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
       <button class="overlay-close-btn" onclick="closeMediaModal()">&#x2715; Close</button>
     </div>
     <div class="media-container" id="mediaContainer">
-      <video id="mediaVideoPlayer" controls autoplay style="display:none;width:100%;max-height:70vh;border-radius:10px;background:#000;"></video>
+      <video id="mediaVideoPlayer" autoplay style="display:none;width:100%;max-height:70vh;border-radius:10px;background:#000;"></video>
       <img id="mediaImageViewer" style="display:none;max-width:100%;max-height:70vh;border-radius:10px;object-fit:contain;" />
       <div id="gestureOverlay" class="gesture-overlay" style="display:none;">
         <div id="gestureBadgeLeft" class="gesture-badge gesture-left">-10s</div>
@@ -1731,15 +1778,15 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
         <div id="gestureBadgeRight" class="gesture-badge gesture-right">+10s</div>
         <div id="gestureHUD" class="gesture-hud"></div>
       </div>
-    </div>
-    <!-- Custom Onscreen Video Player Bar -->
-    <div id="videoCustomControls" class="video-custom-controls" style="display:none;">
-      <button id="vBtnPlayPause" class="v-btn" onclick="togglePlayPause()" title="Play / Pause">▶</button>
-      <span id="vTimeDisplay" class="v-time">00:00 / 00:00</span>
-      <input type="range" id="vSeekSlider" class="v-seek-bar" min="0" max="100" value="0" step="0.1" oninput="onSeekInput(this.value)" onchange="onSeekChange(this.value)">
-      <button id="vBtnMute" class="v-btn" onclick="toggleMute()" title="Mute / Unmute">🔊</button>
-      <input type="range" id="vVolumeSlider" class="v-vol-bar" min="0" max="1" value="1" step="0.05" oninput="onVolumeChange(this.value)">
-      <button id="vBtnFullscreen" class="v-btn" onclick="toggleVideoFullscreen()" title="Fullscreen">⛶</button>
+      <!-- Custom Onscreen Video Player Bar inside mediaContainer -->
+      <div id="videoCustomControls" class="video-custom-controls" style="display:none;">
+        <button id="vBtnPlayPause" class="v-btn" onclick="togglePlayPause()" title="Play / Pause">▶</button>
+        <span id="vTimeDisplay" class="v-time">00:00 / 00:00</span>
+        <input type="range" id="vSeekSlider" class="v-seek-bar" min="0" max="100" value="0" step="0.1" oninput="onSeekInput(this.value)" onchange="onSeekChange(this.value)">
+        <button id="vBtnMute" class="v-btn" onclick="toggleMute()" title="Mute / Unmute">🔊</button>
+        <input type="range" id="vVolumeSlider" class="v-vol-bar" min="0" max="1" value="1" step="0.05" oninput="onVolumeChange(this.value)">
+        <button id="vBtnFullscreen" class="v-btn" onclick="toggleVideoFullscreen()" title="Fullscreen">⛶</button>
+      </div>
     </div>
     <div class="media-controls-extra" id="mediaExtraControls" style="display:none;margin-top:0.75rem;align-items:center;justify-content:center;gap:1rem;flex-wrap:wrap;">
       <label style="color:#8b949e;font-size:0.85rem;display:flex;align-items:center;gap:0.4rem;">Speed: 
@@ -2440,11 +2487,25 @@ function changePlaybackSpeed(val) {
   if (vPlayer) { vPlayer.playbackRate = parseFloat(val); }
 }
 
-// --- Onscreen Video Player Controls -----------------------------
 var isSeeking = false;
+var hideControlsTimer = null;
+
+function resetControlsTimeout() {
+  var ctrl = document.getElementById('videoCustomControls');
+  if (!ctrl) return;
+  ctrl.style.opacity = '1';
+  if (hideControlsTimer) clearTimeout(hideControlsTimer);
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  if (vPlayer && !vPlayer.paused) {
+    hideControlsTimer = setTimeout(function() {
+      if (!isSeeking) ctrl.style.opacity = '0';
+    }, 3500);
+  }
+}
 
 function initVideoControls() {
   var vPlayer = document.getElementById('mediaVideoPlayer');
+  var container = document.getElementById('mediaContainer');
   var playBtn = document.getElementById('vBtnPlayPause');
   var timeDisp = document.getElementById('vTimeDisplay');
   var seekBar = document.getElementById('vSeekSlider');
@@ -2452,6 +2513,12 @@ function initVideoControls() {
   var volBar = document.getElementById('vVolumeSlider');
 
   if (!vPlayer) return;
+
+  if (container) {
+    container.onmousemove = resetControlsTimeout;
+    container.onclick = resetControlsTimeout;
+    container.ontouchstart = resetControlsTimeout;
+  }
 
   vPlayer.ontimeupdate = function() {
     if (isSeeking) return;
@@ -2464,10 +2531,13 @@ function initVideoControls() {
 
   vPlayer.onplay = function() {
     if (playBtn) playBtn.textContent = '⏸';
+    resetControlsTimeout();
   };
 
   vPlayer.onpause = function() {
     if (playBtn) playBtn.textContent = '▶';
+    var ctrl = document.getElementById('videoCustomControls');
+    if (ctrl) ctrl.style.opacity = '1';
   };
 
   vPlayer.onvolumechange = function() {

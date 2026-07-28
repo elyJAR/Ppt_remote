@@ -368,8 +368,13 @@ class MainActivity : ComponentActivity() {
         ensureNotificationPermissionAndStartService()
         
         setContent {
-            val state by viewModel.state.collectAsState()
-            val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
+            val systemInDark = isSystemInDarkTheme()
+            val isDarkTheme = when (state.themeMode) {
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+                ThemeMode.SYSTEM -> systemInDark
+            }
+            val colorScheme = if (isDarkTheme) DarkColorScheme else LightColorScheme
 
             val activePres = remember(state.presentations, state.selectedPresentationId) {
                 state.presentations.find { it.id == state.selectedPresentationId }
@@ -383,8 +388,8 @@ class MainActivity : ComponentActivity() {
                 if (!view.isInEditMode) {
                     SideEffect {
                         val window = (view.context as ComponentActivity).window
-                        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !state.isDarkTheme
-                        WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !state.isDarkTheme
+                        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDarkTheme
+                        WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !isDarkTheme
                     }
                 }
                 
@@ -399,7 +404,7 @@ class MainActivity : ComponentActivity() {
                                 onBack = viewModel::hideSettings,
                                 onUpdateBridgePort = viewModel::updateBridgePort,
                                 onUpdatePollingInterval = viewModel::updatePollingInterval,
-                                onUpdateTheme = viewModel::updateTheme,
+                                onUpdateTheme = viewModel::setThemeMode,
                                 onUpdateNotificationText = viewModel::updateNotificationText,
                                 onUpdateApiKey = viewModel::updateApiKey,
                                 onUpdateFtpAutoStart = viewModel::updateFtpAutoStart,
@@ -2799,7 +2804,7 @@ private fun SettingsScreen(
     onBack: () -> Unit,
     onUpdateBridgePort: (Int) -> Unit,
     onUpdatePollingInterval: (Int) -> Unit,
-    onUpdateTheme: (Boolean) -> Unit,
+    onUpdateTheme: (ThemeMode) -> Unit,
     onUpdateNotificationText: (String) -> Unit,
     onUpdateApiKey: (String) -> Unit,
     onUpdateFtpAutoStart: (Boolean) -> Unit,
@@ -2836,12 +2841,61 @@ private fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             SettingsSection(title = "Appearance") {
-                SettingsSwitchRow(
-                    title = "Dark Theme",
-                    subtitle = "Use high-contrast dark mode",
-                    checked = state.isDarkTheme,
-                    onCheckedChange = onUpdateTheme
-                )
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Text(
+                        text = "Theme Mode",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.textPrimary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Choose between dark mode, light mode, or follow device default",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.textSecondary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val options = listOf(
+                            Triple(ThemeMode.SYSTEM, "📱 System", "Device Default"),
+                            Triple(ThemeMode.DARK, "🌙 Dark", "High Contrast"),
+                            Triple(ThemeMode.LIGHT, "☀️ Light", "Bright Mode")
+                        )
+                        options.forEach { (mode, label, desc) ->
+                            val isSelected = state.themeMode == mode
+                            Surface(
+                                onClick = { onUpdateTheme(mode) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = desc,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             SettingsSection(title = "Connection") {
