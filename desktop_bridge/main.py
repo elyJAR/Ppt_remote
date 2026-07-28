@@ -53,11 +53,11 @@ _logger = logging.getLogger(__name__)
 def generate_self_signed_cert(cert_path: str, key_path: str) -> None:
     """Generate a self-signed certificate for localhost and local IP interfaces."""
     try:
-        from cryptography import x509
-        from cryptography.x509.oid import NameOID
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.asymmetric import rsa
-        from cryptography.hazmat.primitives import serialization
+        from cryptography import x509  # pyright: ignore[reportMissingImports]
+        from cryptography.x509.oid import NameOID  # pyright: ignore[reportMissingImports]
+        from cryptography.hazmat.primitives import hashes  # pyright: ignore[reportMissingImports]
+        from cryptography.hazmat.primitives.asymmetric import rsa  # pyright: ignore[reportMissingImports]
+        from cryptography.hazmat.primitives import serialization  # pyright: ignore[reportMissingImports]
         import datetime
         import ipaddress
 
@@ -733,3 +733,22 @@ def rename_bridge(name: str):
         raise HTTPException(status_code=400, detail="Name cannot be empty")
     set_bridge_name(name)
     return {"ok": True, "new_name": get_bridge_name()}
+
+
+@app.post(
+    "/api/stream/open",
+    summary="Open media stream URL in default browser/player on PC",
+    dependencies=[Depends(verify_api_key)],
+)
+def open_stream_on_pc(url: str):
+    if not url.startswith("http://") and not url.startswith("https://"):
+        raise HTTPException(status_code=400, detail="Invalid stream URL scheme")
+    import webbrowser
+    _logger.info("Opening media stream URL on PC: %s", url)
+    try:
+        webbrowser.open(url)
+        return {"ok": True, "stream_url": url}
+    except Exception as exc:
+        _logger.error("Failed to open media stream: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Failed to launch browser/player: {exc}")
+

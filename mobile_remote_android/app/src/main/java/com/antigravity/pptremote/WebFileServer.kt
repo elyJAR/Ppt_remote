@@ -146,6 +146,7 @@ class WebFileServer(
                 path == "/login" -> handleLogin(exchange)
                 path == "/api/files" -> handleList(exchange)
                 path == "/download-zip" -> handleDownloadZip(exchange)
+                path.startsWith("/stream") -> handleStream(exchange)
                 path.startsWith("/download") -> handleDownload(exchange)
                 path.startsWith("/upload") -> handleUpload(exchange)
                 path.startsWith("/delete") -> handleDelete(exchange)
@@ -219,9 +220,9 @@ class WebFileServer(
         }
 
         private fun statusText(code: Int) = when (code) {
-            200 -> "OK"; 201 -> "Created"; 204 -> "No Content"
-            302 -> "Found"; 400 -> "Bad Request"; 401 -> "Unauthorized"
-            404 -> "Not Found"; 405 -> "Method Not Allowed"; 500 -> "Internal Server Error"
+            200 -> "OK"; 201 -> "Created"; 204 -> "No Content"; 206 -> "Partial Content"
+            302 -> "Found"; 400 -> "Bad Request"; 401 -> "Unauthorized"; 403 -> "Forbidden"
+            404 -> "Not Found"; 405 -> "Method Not Allowed"; 416 -> "Range Not Satisfiable"; 500 -> "Internal Server Error"
             else -> "Unknown"
         }
     }
@@ -384,6 +385,135 @@ class WebFileServer(
         exchange.addResponseHeader("Content-Type", "application/octet-stream")
         exchange.sendResponseStream(200, file.length()) { out ->
             file.inputStream().use { it.copyTo(out) }
+        }
+    }
+
+    private fun handleStream(exchange: HttpCtx) {
+        if (!requireAuth(exchange)) return
+        val pathParam = exchange.query
+            .split("&").firstOrNull { it.startsWith("path=") }
+            ?.removePrefix("path=")
+        val file = safeResolve(pathParam)
+        if (file == null || !file.exists() || !file.isFile) {
+            sendText(exchange, 404, "File not found")
+            return
+        }
+        if (!requestDownloadPermission(exchange.clientIp, file.name)) {
+            sendText(exchange, 403, "Stream request denied by user")
+            return
+        }
+
+        val mimeType = getMimeType(file.name)
+        val fallbackName = file.name.map { c ->
+            if (c.code in 32..126 && c != '"' && c != '\\' && c != ';') c else '_'
+        }.joinToString("")
+        val encodedName = URLEncoder.encode(file.name, "UTF-8").replace("+", "%20")
+
+        val isInline = exchange.query.contains("inline=true") || mimeType.startsWith("video/") || mimeType.startsWith("audio/") || mimeType.startsWith("image/")
+        val dispositionType = if (isInline) "inline" else "attachment"
+
+        exchange.addResponseHeader("Content-Disposition", "$dispositionType; filename=\"$fallbackName\"; filename*=UTF-8''$encodedName")
+        exchange.addResponseHeader("Content-Type", mimeType)
+        exchange.addResponseHeader("Accept-Ranges", "bytes")
+        exchange.addResponseHeader("Access-Control-Allow-Origin", "*")
+
+        val fileLength = file.length()
+        val rangeHeader = exchange.requestHeaders["range"]
+
+        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+            val rangeValue = rangeHeader.removePrefix("bytes=").trim()
+            val dashPos = rangeValue.indexOf('-')
+            if (dashPos != -1) {
+                var start = 0L
+                var end = fileLength - 1
+
+                try {
+                    val startStr = rangeValue.substring(0, dashPos).trim()
+                    val endStr = rangeValue.substring(dashPos + 1).trim()
+
+                    if (startStr.isNotEmpty()) {
+                        start = startStr.toLong()
+                    } else if (endStr.isNotEmpty()) {
+                        val suffixLen = endStr.toLong()
+                        start = fileLength - suffixLen
+                    }
+
+                    if (endStr.isNotEmpty() && startStr.isNotEmpty()) {
+                        end = endStr.toLong()
+                    }
+                } catch (_: NumberFormatException) {
+                    sendText(exchange, 400, "Bad Range Header")
+                    return
+                }
+
+                if (start < 0) start = 0
+                if (end >= fileLength) end = fileLength - 1
+
+                if (start > end || start >= fileLength) {
+                    exchange.addResponseHeader("Content-Range", "bytes */$fileLength")
+                    sendText(exchange, 416, "Range Not Satisfiable")
+                    return
+                }
+
+                val contentLength = end - start + 1
+                exchange.addResponseHeader("Content-Range", "bytes $start-$end/$fileLength")
+
+                exchange.sendResponseStream(206, contentLength) { out ->
+                    java.io.RandomAccessFile(file, "r").use { raf ->
+                        raf.seek(start)
+                        val buffer = ByteArray(64 * 1024)
+                        var bytesRemaining = contentLength
+                        while (bytesRemaining > 0) {
+                            val toRead = minOf(buffer.size.toLong(), bytesRemaining).toInt()
+                            val read = raf.read(buffer, 0, toRead)
+                            if (read <= 0) break
+                            out.write(buffer, 0, read)
+                            bytesRemaining -= read
+                        }
+                    }
+                }
+                return
+            }
+        }
+
+        exchange.sendResponseStream(200, fileLength) { out ->
+            file.inputStream().use { it.copyTo(out) }
+        }
+    }
+
+    private fun getMimeType(fileName: String): String {
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        return when (ext) {
+            "mp4", "m4v" -> "video/mp4"
+            "webm" -> "video/webm"
+            "mkv" -> "video/x-matroska"
+            "avi" -> "video/x-msvideo"
+            "mov" -> "video/quicktime"
+            "3gp", "3g2" -> "video/3gpp"
+            "ts" -> "video/mp2t"
+            "ogv" -> "video/ogg"
+            "flv" -> "video/x-flv"
+            "mp3" -> "audio/mpeg"
+            "wav" -> "audio/wav"
+            "ogg" -> "audio/ogg"
+            "flac" -> "audio/flac"
+            "m4a", "aac" -> "audio/mp4"
+            "opus" -> "audio/opus"
+            "wma" -> "audio/x-ms-wma"
+            "mid", "midi" -> "audio/midi"
+            "png" -> "image/png"
+            "jpg", "jpeg" -> "image/jpeg"
+            "gif" -> "image/gif"
+            "webp" -> "image/webp"
+            "svg" -> "image/svg+xml"
+            "bmp" -> "image/bmp"
+            "ico" -> "image/x-icon"
+            "pdf" -> "application/pdf"
+            "txt" -> "text/plain"
+            "html", "htm" -> "text/html"
+            "json" -> "application/json"
+            "zip" -> "application/zip"
+            else -> "application/octet-stream"
         }
     }
 
@@ -983,20 +1113,34 @@ function hideApprovalOverlay() {
             val safeName = f.name.replace("\\", "\\\\").replace("'", "\\'")
             val type = if (f.isDirectory) "folder" else "file"
 
+            val ext = f.name.substringAfterLast('.', "").lowercase()
+            val isMedia = !f.isDirectory && ext in listOf(
+                "mp4", "mkv", "avi", "mov", "webm", "3gp", "m4v", "ts", "ogv", "flv",
+                "mp3", "wav", "flac", "aac", "ogg", "m4a", "opus", "wma",
+                "jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"
+            )
+
             // Table row (list view)
             val nameCell = if (f.isDirectory)
                 "<a href='/?path=$enc' class='folder-link'>$icon ${f.name}</a>"
             else
                 "<span class='file-name'>$icon ${f.name}</span>"
+
+            val streamBtn = if (isMedia)
+                "<button class='btn btn-stream' onclick=\"openMediaPlayer('$enc', '$safeName', '$ext')\">&#x25B6; Stream</button>"
+            else ""
+
             val actions = if (f.isDirectory)
                 "<a class='btn' href='/download-zip?path=$enc' download onclick=\"showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.'); setTimeout(hideApprovalOverlay, 6000);\">&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',true)\">&#x1F5D1;</button>"
             else
-                "<a class='btn' href='/download?path=$enc' download onclick=\"showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.'); setTimeout(hideApprovalOverlay, 6000);\">&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',false)\">&#x1F5D1;</button>"
+                "$streamBtn<a class='btn' href='/download?path=$enc' download onclick=\"showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.'); setTimeout(hideApprovalOverlay, 6000);\">&#x2B07; Download</a><button class='del' onclick=\"delItem('$enc','$safeName',false)\">&#x1F5D1;</button>"
+
             tableRows.append("<tr><td class='cb-col'><input type='checkbox' class='item-cb' data-path='$enc' data-name='$safeName' data-type='$type' data-size='${if (f.isDirectory) -1 else f.length()}' data-modified='${f.lastModified()}' onchange='updateActionBar()'></td><td>$nameCell</td><td>$size</td><td>$date</td><td class='act'>$actions</td></tr>\n")
 
             // Grid item
-            val gridClick = if (f.isDirectory) "if(!event.target.matches('input,a,button')){window.location='/?path=$enc'}" else ""
-            val gridDownload = "<a class='btn-sm' href='${if (f.isDirectory) "/download-zip?path=" else "/download?path="}$enc' download onclick=\"event.stopPropagation(); showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.'); setTimeout(hideApprovalOverlay, 6000);\">&#x2B07;</a><button class='del-sm' onclick=\"event.stopPropagation();delItem('$enc','$safeName',${f.isDirectory})\">&#x1F5D1;</button>"
+            val gridClick = if (f.isDirectory) "if(!event.target.matches('input,a,button')){window.location='/?path=$enc'}" else if (isMedia) "if(!event.target.matches('input,a,button')){openMediaPlayer('$enc', '$safeName', '$ext')}" else ""
+            val gridStream = if (isMedia) "<button class='btn-sm btn-stream-sm' onclick=\"event.stopPropagation();openMediaPlayer('$enc', '$safeName', '$ext')\">&#x25B6;</button>" else ""
+            val gridDownload = "$gridStream<a class='btn-sm' href='${if (f.isDirectory) "/download-zip?path=" else "/download?path="}$enc' download onclick=\"event.stopPropagation(); showApprovalOverlay('Approving Download', 'Please approve the download request on your phone.'); setTimeout(hideApprovalOverlay, 6000);\">&#x2B07;</a><button class='del-sm' onclick=\"event.stopPropagation();delItem('$enc','$safeName',${f.isDirectory})\">&#x1F5D1;</button>"
             gridItems.append("<div class='grid-item $type' onclick=\"$gridClick\"><input type='checkbox' class='item-cb grid-cb' data-path='$enc' data-name='$safeName' data-type='$type' data-size='${if (f.isDirectory) -1 else f.length()}' data-modified='${f.lastModified()}' onchange='event.stopPropagation();updateActionBar()'><div class='grid-icon'>$icon</div><div class='grid-name' title='${f.name}'>${f.name}</div><div class='grid-size'>$size</div><div class='grid-actions'>$gridDownload</div></div>\n")
         }
 
@@ -1081,6 +1225,104 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
 .btn:hover{filter:brightness(1.15);transform:translateY(-1px)}
 .del{background:rgba(248,81,73,0.06);color:#f85149;border:1px solid rgba(248,81,73,0.15)}
 .del:hover{background:rgba(248,81,73,0.15);border-color:rgba(248,81,73,0.4)}
+.btn-stream{background:linear-gradient(135deg,#1f6feb,#388bfd);color:#fff}
+.btn-stream:hover{filter:brightness(1.15);transform:translateY(-1px)}
+.btn-stream-sm{background:linear-gradient(135deg,#1f6feb,#388bfd);color:#fff;display:inline-flex;align-items:center}
+.btn-stream-sm:hover{filter:brightness(1.15)}
+.media-modal-card {
+  background: rgba(22, 27, 34, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 860px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.media-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.media-modal-header h3 {
+  color: #58a6ff;
+  font-size: 1.15rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 80%;
+}
+.media-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 200px;
+}
+.audio-player-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(15, 20, 30, 0.96);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(88, 166, 255, 0.3);
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  z-index: 900;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+  animation: slideUp 0.3s ease;
+}
+.audio-track-info {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  flex: 1;
+}
+.audio-icon {
+  font-size: 1.4rem;
+  color: #58a6ff;
+}
+.audio-title {
+  color: #e6edf3;
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#mediaAudioPlayer {
+  flex: 2;
+  max-width: 600px;
+  height: 40px;
+  outline: none;
+}
+.audio-close-btn {
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+.audio-close-btn:hover {
+  color: #f85149;
+  background: rgba(248, 81, 73, 0.15);
+}
 .empty{color:#8b949e;text-align:center;padding:3rem 1rem;font-size:1rem}
 .cb-col{width:44px;text-align:center}
 .item-cb{width:16px;height:16px;cursor:pointer;accent-color:#58a6ff;vertical-align:middle}
@@ -1290,6 +1532,43 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   <button class="bar-btn bar-clear" onclick="clearSelection()">&#x2715; Clear</button>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- Media Modal Player -->
+<div id="mediaModal" class="overlay" style="display:none;">
+  <div class="media-modal-card">
+    <div class="media-modal-header">
+      <h3 id="mediaTitle">&#x1F3AC; Media Player</h3>
+      <button class="overlay-close-btn" onclick="closeMediaModal()">&#x2715; Close</button>
+    </div>
+    <div class="media-container" id="mediaContainer">
+      <video id="mediaVideoPlayer" controls autoplay style="display:none;width:100%;max-height:70vh;border-radius:10px;background:#000;"></video>
+      <img id="mediaImageViewer" style="display:none;max-width:100%;max-height:70vh;border-radius:10px;object-fit:contain;" />
+    </div>
+    <div class="media-controls-extra" id="mediaExtraControls" style="display:none;margin-top:0.75rem;align-items:center;justify-content:center;gap:1rem;">
+      <label style="color:#8b949e;font-size:0.85rem;">Speed: 
+        <select id="speedSelect" onchange="changePlaybackSpeed(this.value)" style="background:rgba(13,17,23,0.8);color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:0.85rem;cursor:pointer;">
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1.0" selected>1.0x (Normal)</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2.0">2.0x</option>
+        </select>
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- Sticky Bottom Audio Player Bar -->
+<div id="audioPlayerBar" class="audio-player-bar" style="display:none;">
+  <div class="audio-track-info">
+    <span class="audio-icon">&#x1F3B5;</span>
+    <span id="audioTrackTitle" class="audio-title">Track Name</span>
+  </div>
+  <audio id="mediaAudioPlayer" controls autoplay></audio>
+  <button onclick="closeAudioPlayer()" class="audio-close-btn" title="Close player">&#x2715;</button>
+</div>
+
 <div id="approvalOverlay" class="overlay" style="display:none;">
   <div class="overlay-card">
     <div class="spinner"></div>
@@ -1686,6 +1965,83 @@ function sortTable(col) {
     if (gridEmpty) gridContainer.appendChild(gridEmpty);
   }
 }
+
+// --- Media Player Functions -----------------------------------
+var videoExtensions = ['mp4','mkv','avi','mov','webm','3gp','m4v','ts','ogv','flv'];
+var audioExtensions = ['mp3','wav','flac','aac','ogg','m4a','opus','wma','mid','midi'];
+var imageExtensions = ['jpg','jpeg','png','gif','webp','svg','bmp'];
+
+function openMediaPlayer(enc, name, ext) {
+  ext = (ext || '').toLowerCase();
+  showApprovalOverlay('Approving Stream', 'Please approve media stream request on your phone.');
+  setTimeout(hideApprovalOverlay, 4000);
+
+  var streamUrl = '/stream?path=' + enc + '&inline=true';
+
+  if (audioExtensions.indexOf(ext) !== -1) {
+    closeMediaModal();
+    var audioBar = document.getElementById('audioPlayerBar');
+    var audioEl = document.getElementById('mediaAudioPlayer');
+    var titleEl = document.getElementById('audioTrackTitle');
+    
+    titleEl.textContent = name;
+    audioEl.src = streamUrl;
+    audioBar.style.display = 'flex';
+    audioEl.play().catch(function(_){});
+    toast('Streaming audio: ' + name, true);
+  } else if (videoExtensions.indexOf(ext) !== -1 || imageExtensions.indexOf(ext) !== -1) {
+    var modal = document.getElementById('mediaModal');
+    var title = document.getElementById('mediaTitle');
+    var vPlayer = document.getElementById('mediaVideoPlayer');
+    var imgViewer = document.getElementById('mediaImageViewer');
+    var extraCtrl = document.getElementById('mediaExtraControls');
+
+    title.textContent = name;
+
+    if (videoExtensions.indexOf(ext) !== -1) {
+      imgViewer.style.display = 'none';
+      vPlayer.style.display = 'block';
+      extraCtrl.style.display = 'flex';
+      document.getElementById('speedSelect').value = '1.0';
+      vPlayer.src = streamUrl;
+      vPlayer.play().catch(function(_){});
+    } else {
+      vPlayer.pause();
+      vPlayer.style.display = 'none';
+      extraCtrl.style.display = 'none';
+      imgViewer.style.display = 'block';
+      imgViewer.src = streamUrl;
+    }
+    modal.style.display = 'flex';
+  } else {
+    window.open(streamUrl, '_blank');
+  }
+}
+
+function closeMediaModal() {
+  var modal = document.getElementById('mediaModal');
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  if (vPlayer) { vPlayer.pause(); vPlayer.src = ''; }
+  modal.style.display = 'none';
+}
+
+function closeAudioPlayer() {
+  var audioBar = document.getElementById('audioPlayerBar');
+  var audioEl = document.getElementById('mediaAudioPlayer');
+  if (audioEl) { audioEl.pause(); audioEl.src = ''; }
+  audioBar.style.display = 'none';
+}
+
+function changePlaybackSpeed(val) {
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  if (vPlayer) { vPlayer.playbackRate = parseFloat(val); }
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeMediaModal();
+  }
+});
 </script>
 </body></html>"""
 }
