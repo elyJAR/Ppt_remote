@@ -579,33 +579,46 @@ class WebFileServer(
         val pathParam = exchange.query
             .split("&").firstOrNull { it.startsWith("path=") }
             ?.removePrefix("path=")
-        val videoFile = safeResolve(pathParam)
-        if (videoFile == null || !videoFile.exists() || !videoFile.isFile) {
-            sendJson(exchange, 200, "[]")
+        val target = safeResolve(pathParam)
+        if (target == null || !target.exists()) {
+            sendJson(exchange, 200, "{\"items\":[]}")
             return
         }
 
-        val parentDir = videoFile.parentFile ?: return sendJson(exchange, 200, "[]")
-        val baseName = videoFile.nameWithoutExtension.lowercase()
+        val targetDir = if (target.isDirectory) target else (target.parentFile ?: target)
+        val videoBaseName = if (target.isFile) target.nameWithoutExtension.lowercase() else ""
         val subExtensions = setOf("srt", "vtt", "ass", "sub")
 
-        val matches = (parentDir.listFiles() ?: emptyArray()).filter { f ->
-            f.isFile && f.extension.lowercase() in subExtensions &&
-            (f.nameWithoutExtension.lowercase() == baseName || f.nameWithoutExtension.lowercase().startsWith("$baseName."))
+        val list = mutableListOf<String>()
+        val canonicalDir = targetDir.canonicalFile
+
+        val activeRootPath = allowedRoots.firstOrNull { canonicalDir.path.startsWith(File(it).canonicalPath) } ?: rootPath
+        val isAtRoot = canonicalDir.canonicalPath == File(activeRootPath).canonicalPath
+
+        val parent = canonicalDir.parentFile
+        if (!isAtRoot && parent != null) {
+            val parentEnc = URLEncoder.encode(parent.canonicalPath, "UTF-8")
+            list.add("""{"path":${jsonStr(parentEnc)},"name":".. (Parent Folder)","type":"folder","label":"📁 .. (Parent Folder)"}""")
         }
 
-        val jsonItems = matches.joinToString(",") { f ->
+        val allFiles = (canonicalDir.listFiles() ?: emptyArray()).sortedWith(
+            compareByDescending<File> { it.isDirectory }.thenBy { it.name.lowercase() }
+        )
+
+        allFiles.forEach { f ->
             val enc = URLEncoder.encode(f.canonicalPath, "UTF-8")
-            val label = if (f.nameWithoutExtension.lowercase() == baseName) {
-                "Default (" + f.extension.uppercase(Locale.getDefault()) + ")"
-            } else {
-                val lang = f.nameWithoutExtension.substringAfter(videoFile.nameWithoutExtension + ".").ifBlank { f.extension.uppercase(Locale.getDefault()) }
-                lang.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() } + " (" + f.extension.uppercase(Locale.getDefault()) + ")"
+            if (f.isDirectory) {
+                list.add("""{"path":${jsonStr(enc)},"name":${jsonStr(f.name)},"type":"folder","label":${jsonStr("📁 " + f.name)}}""")
+            } else if (f.isFile && f.extension.lowercase() in subExtensions) {
+                val isMatch = videoBaseName.isNotEmpty() && (f.nameWithoutExtension.lowercase() == videoBaseName || f.nameWithoutExtension.lowercase().startsWith("$videoBaseName."))
+                val prefix = if (isMatch) "⭐ " else "📄 "
+                val label = prefix + f.name
+                list.add("""{"path":${jsonStr(enc)},"name":${jsonStr(f.name)},"type":"file","label":${jsonStr(label)},"ext":${jsonStr(f.extension)}}""")
             }
-            """{"path":${jsonStr(enc)},"label":${jsonStr(label)},"ext":${jsonStr(f.extension)}}"""
         }
 
-        sendJson(exchange, 200, "[$jsonItems]")
+        val dirEnc = URLEncoder.encode(canonicalDir.canonicalPath, "UTF-8")
+        sendJson(exchange, 200, """{"currentPath":${jsonStr(dirEnc)},"items":[${list.joinToString(",")}]}""")
     }
 
     private fun handleDownloadZip(exchange: HttpCtx) {
@@ -2314,11 +2327,14 @@ function clearSubtitleTracks() {
 function fetchServerSubtitles(enc) {
   fetch('/api/subtitles?path=' + enc)
     .then(function(r){ return r.json(); })
-    .then(function(items){
+    .then(function(data){
       var subSel = document.getElementById('subSelect');
       var vPlayer = document.getElementById('mediaVideoPlayer');
-      if (items && items.length > 0) {
-        items.forEach(function(item, idx){
+      var items = (data && data.items) ? data.items : [];
+      var subFiles = items.filter(function(it){ return it.type === 'file'; });
+
+      if (subFiles.length > 0) {
+        subFiles.forEach(function(item, idx){
           var opt = document.createElement('option');
           opt.value = item.path;
           opt.textContent = item.label;
@@ -2343,7 +2359,7 @@ function fetchServerSubtitles(enc) {
           }
         }, 500);
 
-        toast('Found ' + items.length + ' subtitle track(s) — Auto-enabled', true);
+        toast('Found ' + subFiles.length + ' subtitle track(s) — Auto-enabled', true);
       }
     })
     .catch(function(_){});
@@ -2625,38 +2641,37 @@ function initGestureOverlay() {
   };
 }
 
-function browseServerSubtitles() {
+function browseServerSubtitles(targetPath) {
   var serverSubModal = document.getElementById('serverSubModal');
   if (!serverSubModal) return;
   serverSubModal.style.display = 'flex';
   var listEl = document.getElementById('serverSubList');
-  listEl.innerHTML = '<div style="color:#8b949e;padding:1rem;">Scanning folder for subtitle files...</div>';
+  listEl.innerHTML = '<div style="color:#8b949e;padding:1rem;">Scanning folder for subtitles...</div>';
 
-  fetch('/api/files?path=' + encodeURIComponent(currentPath))
+  var pathEnc = targetPath ? targetPath : (activeVideoEnc ? activeVideoEnc : encodeURIComponent(currentPath));
+
+  fetch('/api/subtitles?path=' + pathEnc)
     .then(function(r){ return r.json(); })
-    .then(function(items){
-      if (!items || !items.length) {
-        listEl.innerHTML = '<div style="color:#8b949e;padding:1rem;">No items found in this directory.</div>';
-        return;
-      }
-      var subExts = ['srt', 'vtt', 'ass', 'sub'];
-      var subFiles = items.filter(function(it){
-        if (it.isDir) return false;
-        var ext = (it.name.substring(it.name.lastIndexOf('.') + 1) || '').toLowerCase();
-        return subExts.indexOf(ext) !== -1;
-      });
-
-      if (!subFiles.length) {
-        listEl.innerHTML = '<div style="color:#8b949e;padding:1rem;">No subtitle files (.srt, .vtt, .ass) found in current server folder.</div>';
+    .then(function(data){
+      var items = (data && data.items) ? data.items : [];
+      if (!items.length) {
+        listEl.innerHTML = '<div style="color:#8b949e;padding:1rem;">No subtitle files or subfolders found in this directory.</div>';
         return;
       }
 
-      var html = '<div style="display:flex;flex-direction:column;gap:0.5rem;max-height:250px;overflow-y:auto;">';
-      subFiles.forEach(function(f){
-        html += '<button class="btn-sm" style="background:rgba(255,255,255,0.05);color:#e6edf3;border:1px solid rgba(255,255,255,0.1);padding:8px 12px;text-align:left;width:100%;display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="selectServerSubtitleFile(\'' + encodeURIComponent(f.path) + '\', \'' + f.name.replace(/'/g, "\\'") + '\')">';
-        html += '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px;">📄 ' + f.name + '</span>';
-        html += '<span style="color:#3fb950;font-size:0.75rem;flex-shrink:0;">Select</span>';
-        html += '</button>';
+      var html = '<div style="display:flex;flex-direction:column;gap:0.5rem;max-height:300px;overflow-y:auto;">';
+      items.forEach(function(f){
+        if (f.type === 'folder') {
+          html += '<button class="btn-sm" style="background:rgba(88,166,255,0.1);color:#58a6ff;border:1px solid rgba(88,166,255,0.2);padding:8px 12px;text-align:left;width:100%;display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="browseServerSubtitles(\'' + f.path + '\')">';
+          html += '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px;font-weight:600;">' + f.label + '</span>';
+          html += '<span style="color:#58a6ff;font-size:0.75rem;flex-shrink:0;">Open 📁</span>';
+          html += '</button>';
+        } else {
+          html += '<button class="btn-sm" style="background:rgba(255,255,255,0.05);color:#e6edf3;border:1px solid rgba(255,255,255,0.1);padding:8px 12px;text-align:left;width:100%;display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="selectServerSubtitleFile(\'' + f.path + '\', \'' + f.name.replace(/'/g, "\\'") + '\')">';
+          html += '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px;">' + f.label + '</span>';
+          html += '<span style="color:#3fb950;font-size:0.75rem;flex-shrink:0;">Select</span>';
+          html += '</button>';
+        }
       });
       html += '</div>';
       listEl.innerHTML = html;
