@@ -29,7 +29,7 @@ import android.widget.Toast
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.activity.ComponentActivity
@@ -368,6 +368,7 @@ class MainActivity : ComponentActivity() {
         ensureNotificationPermissionAndStartService()
         
         setContent {
+            val state by viewModel.state.collectAsState()
             val systemInDark = isSystemInDarkTheme()
             val isDarkTheme = when (state.themeMode) {
                 ThemeMode.DARK -> true
