@@ -997,7 +997,7 @@ private fun RemoteScreen(
                                 selected = false,
                                 onClick = { 
                                     scope.launch { drawerState.close() }
-                                    MediaStreamActivity.launch(context, state.webServerUrl.ifBlank { "http://127.0.0.1:8686" })
+                                    MediaStreamActivity.launch(context, (state.webServerUrl ?: "").ifBlank { "http://127.0.0.1:8686" })
                                 },
                                 icon = { Icon(Icons.Default.PlayCircle, contentDescription = "Stream Media", tint = iOSAccent) },
                                 colors = NavigationDrawerItemDefaults.colors(
@@ -1053,7 +1053,7 @@ private fun RemoteScreen(
                     },
                     actions = {
                         val context = LocalContext.current
-                        IconButton(onClick = { MediaStreamActivity.launch(context, state.webServerUrl.ifBlank { "http://127.0.0.1:8686" }) }) {
+                        IconButton(onClick = { MediaStreamActivity.launch(context, (state.webServerUrl ?: "").ifBlank { "http://127.0.0.1:8686" }) }) {
                             Icon(Icons.Default.PlayCircle, contentDescription = "Stream Server Media", tint = iOSAccent)
                         }
                         IconButton(onClick = onRefresh) {
@@ -1370,7 +1370,7 @@ private fun WebServerCard(
                 )
                 val context = LocalContext.current
                 Button(
-                    onClick = { MediaStreamActivity.launch(context, state.webServerUrl.ifBlank { "http://127.0.0.1:8686" }) },
+                    onClick = { MediaStreamActivity.launch(context, (state.webServerUrl ?: "").ifBlank { "http://127.0.0.1:8686" }) },
                     shape = iOSSquircleSmall,
                     colors = ButtonDefaults.buttonColors(containerColor = iOSAccent),
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
