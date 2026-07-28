@@ -899,8 +899,11 @@ class WebFileServer(
     private fun requestDownloadPermission(clientIp: String, fileName: String): Boolean {
         val now = System.currentTimeMillis()
         synchronized(approvalsLock) {
-            recentApprovals.removeAll { now - it.timestamp > 30000 }
-            if (recentApprovals.any { it.clientIp == clientIp && it.fileName == fileName }) {
+            // Keep stream/download approvals active for 2 hours and refresh timestamp on each byte range request
+            recentApprovals.removeAll { now - it.timestamp > 7200000L }
+            val existing = recentApprovals.firstOrNull { it.clientIp == clientIp && it.fileName == fileName }
+            if (existing != null) {
+                existing.timestamp = now
                 return true
             }
         }
