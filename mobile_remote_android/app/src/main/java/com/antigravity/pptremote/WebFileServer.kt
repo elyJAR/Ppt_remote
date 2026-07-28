@@ -665,6 +665,10 @@ class WebFileServer(
         val pathParam = exchange.query
             .split("&").firstOrNull { it.startsWith("path=") }
             ?.removePrefix("path=")
+        val conflictParam = exchange.query
+            .split("&").firstOrNull { it.startsWith("conflict=") }
+            ?.removePrefix("conflict=") ?: "rename"
+
         val dir = if (!pathParam.isNullOrBlank()) safeResolve(pathParam) else File(rootPath).canonicalFile
         if (dir == null || !dir.exists() || !dir.isDirectory) {
             sendJson(exchange, 400, """{"error":"Invalid target directory"}""")
@@ -679,7 +683,7 @@ class WebFileServer(
         }
         try {
             val contentLength = exchange.requestHeaders["content-length"]?.toLongOrNull() ?: -1L
-            val savedName = parseMultipartAndSave(exchange.bodyStream, boundary, dir, exchange.clientIp, contentLength)
+            val savedName = parseMultipartAndSave(exchange.bodyStream, boundary, dir, exchange.clientIp, contentLength, conflictParam)
             if (savedName != null) {
                 sendJson(exchange, 200, """{"ok":true,"name":${jsonStr(savedName)}}""")
             } else {
@@ -692,7 +696,31 @@ class WebFileServer(
         }
     }
 
-    private fun parseMultipartAndSave(input: InputStream, boundary: String, dir: File, clientIp: String, totalRequestBytes: Long): String? {
+    private fun getUniqueDestinationFile(dir: File, originalName: String): File {
+        var dest = File(dir, originalName)
+        if (!dest.exists()) return dest
+
+        val dotIndex = originalName.lastIndexOf('.')
+        val baseName = if (dotIndex != -1) originalName.substring(0, dotIndex) else originalName
+        val extension = if (dotIndex != -1) originalName.substring(dotIndex) else ""
+
+        var counter = 1
+        while (dest.exists()) {
+            val newName = "$baseName ($counter)$extension"
+            dest = File(dir, newName)
+            counter++
+        }
+        return dest
+    }
+
+    private fun parseMultipartAndSave(
+        input: InputStream,
+        boundary: String,
+        dir: File,
+        clientIp: String,
+        totalRequestBytes: Long,
+        conflictMode: String
+    ): String? {
         val boundaryStr = "\r\n--$boundary"
         val boundaryBytes = boundaryStr.toByteArray(StandardCharsets.ISO_8859_1)
         val bis = java.io.BufferedInputStream(input, 64 * 1024)
@@ -716,7 +744,16 @@ class WebFileServer(
             throw java.io.IOException("Upload request denied by user")
         }
 
-        val dest = File(dir, File(filename).name)
+        val originalName = File(filename).name
+        val rawFile = File(dir, originalName)
+        val dest = if (rawFile.exists() && conflictMode == "replace") {
+            try { rawFile.delete() } catch (_: Exception) {}
+            rawFile
+        } else if (rawFile.exists()) {
+            getUniqueDestinationFile(dir, originalName)
+        } else {
+            rawFile
+        }
         val out = FileOutputStream(dest)
 
         RemoteControlService.isUploadCancelled = false
@@ -1744,6 +1781,29 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   </div>
 </div>
 
+<!-- Upload File Conflict Modal -->
+<div id="uploadConflictModal" class="overlay" style="display:none;z-index:1150;">
+  <div class="overlay-card" style="width:380px;text-align:left;padding:2rem;">
+    <h3 style="color:#f2cc60;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem;font-size:1.2rem;">
+      <span>⚠️</span> File Already Exists
+    </h3>
+    <p id="uploadConflictText" style="color:#8b949e;font-size:0.9rem;line-height:1.5;margin-bottom:1.25rem;">
+      A file with the same name already exists in this folder. What would you like to do?
+    </p>
+    <div style="display:flex;flex-direction:column;gap:0.6rem;">
+      <button class="btn" style="background:linear-gradient(135deg,#1f6feb,#388bfd);color:#fff;padding:0.6rem 1rem;font-weight:600;border-radius:8px;cursor:pointer;" onclick="resolveUploadConflict('rename')">
+        📄 Keep Both (Auto-Rename)
+      </button>
+      <button class="btn" style="background:rgba(248,81,73,0.15);color:#f85149;border:1px solid rgba(248,81,73,0.3);padding:0.6rem 1rem;font-weight:600;border-radius:8px;cursor:pointer;" onclick="resolveUploadConflict('replace')">
+        🔄 Replace Existing File
+      </button>
+      <button class="btn-clear" style="background:transparent;color:#8b949e;border:1px solid rgba(255,255,255,0.1);padding:0.5rem 1rem;border-radius:8px;cursor:pointer;margin-top:0.2rem;" onclick="resolveUploadConflict('cancel')">
+        ✕ Cancel Upload
+      </button>
+    </div>
+  </div>
+</div>
+
 <div id="approvalOverlay" class="overlay" style="display:none;">
   <div class="overlay-card">
     <div class="spinner"></div>
@@ -1883,6 +1943,16 @@ function updateSelectedFilesText() {
   html += '</div>';
   prog.innerHTML = html;
 }
+var pendingUploadConflictCallback = null;
+
+function resolveUploadConflict(mode) {
+  if (pendingUploadConflictCallback) {
+    var cb = pendingUploadConflictCallback;
+    pendingUploadConflictCallback = null;
+    cb(mode);
+  }
+}
+
 function uploadFiles() {
   var inp = document.getElementById('fileInput');
   var prog = document.getElementById('prog');
@@ -1891,6 +1961,40 @@ function uploadFiles() {
   if (!inp.files.length) { toast('Select at least one file', false); return; }
   
   var files = Array.from(inp.files);
+
+  fetch('/api/files?path=' + encodeURIComponent(currentPath))
+    .then(function(r){ return r.json(); })
+    .then(function(items){
+      var existingNames = (items || []).map(function(it){ return (it.name || '').toLowerCase(); });
+      var conflictingFiles = files.filter(function(f){
+        return existingNames.indexOf(f.name.toLowerCase()) !== -1;
+      });
+
+      if (conflictingFiles.length > 0) {
+        var conflictModal = document.getElementById('uploadConflictModal');
+        var conflictText = document.getElementById('uploadConflictText');
+        var namesStr = conflictingFiles.map(function(f){ return '"' + f.name + '"'; }).join(', ');
+        conflictText.innerHTML = 'The file ' + namesStr + ' already exists in this folder.<br>Choose whether to replace the existing file or keep both files (new file will be auto-renamed):';
+        conflictModal.style.display = 'flex';
+
+        pendingUploadConflictCallback = function(mode) {
+          conflictModal.style.display = 'none';
+          if (mode === 'cancel') return;
+          startUploadingQueue(files, mode);
+        };
+      } else {
+        startUploadingQueue(files, 'rename');
+      }
+    })
+    .catch(function(){
+      startUploadingQueue(files, 'rename');
+    });
+}
+
+function startUploadingQueue(files, conflictMode) {
+  var prog = document.getElementById('prog');
+  var container = document.getElementById('progContainer');
+  var bar = document.getElementById('progBar');
   var currentIndex = 0;
   
   container.style.display = 'block';
@@ -1909,7 +2013,7 @@ function uploadFiles() {
     fd.append('file', file);
     
     var xhr = new XMLHttpRequest();
-    xhr.open('POST', '/upload?path=' + encodeURIComponent(currentPath), true);
+    xhr.open('POST', '/upload?path=' + encodeURIComponent(currentPath) + '&conflict=' + conflictMode, true);
     
     xhr.upload.onprogress = function(e) {
       hideApprovalOverlay();
