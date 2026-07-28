@@ -87,6 +87,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1664,6 +1665,7 @@ private fun FilesScreen(
     var showHelp by remember { mutableStateOf(false) }
     var viewMode by remember { mutableStateOf(FileViewMode.LIST) }
     var showSortMenu by remember { mutableStateOf(false) }
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -1777,32 +1779,67 @@ private fun FilesScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onOpenCurrentFilesFolderOnPc,
-                icon = { Icon(Icons.Default.OpenInBrowser, contentDescription = null) },
-                text = { Text("Open current folder on PC") },
-                containerColor = colorScheme.primary,
-                contentColor = colorScheme.onPrimary,
-                shape = iOSSquircleSmall
-            )
+            if (selectedTabIndex == 0) {
+                ExtendedFloatingActionButton(
+                    onClick = onOpenCurrentFilesFolderOnPc,
+                    icon = { Icon(Icons.Default.OpenInBrowser, contentDescription = null) },
+                    text = { Text("Open current folder on PC") },
+                    containerColor = colorScheme.primary,
+                    contentColor = colorScheme.onPrimary,
+                    shape = iOSSquircleSmall
+                )
+            }
         },
         containerColor = colorScheme.screenBg
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Mobile Files", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                TabRow(
+                    selectedTabIndex = selectedTabIndex,
+                    containerColor = Color.Transparent,
+                    contentColor = iOSAccent,
+                    divider = { HorizontalDivider(color = colorScheme.divider) }
+                ) {
+                    Tab(
+                        selected = selectedTabIndex == 0,
+                        onClick = { selectedTabIndex = 0 },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("Local Files", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    )
+                    Tab(
+                        selected = selectedTabIndex == 1,
+                        onClick = { selectedTabIndex = 1 },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Text("Web Server & Stream", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    )
+                }
 
-                // ── Browser File Transfer card ───────────────────────────────
-                WebServerCard(
-                    state = state,
-                    colorScheme = colorScheme,
-                    onToggle = onToggleWebServer,
-                    onPinChange = onUpdateWebServerPin,
-                    onSelectFolder = onSelectSharedFolder,
-                    onResetFolder = onResetSharedFolder,
-                    onRefreshUrl = onRefreshWebServerUrl
-                )
-                // ────────────────────────────────────────────────────────────
+                if (selectedTabIndex == 1) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        WebServerCard(
+                            state = state,
+                            colorScheme = colorScheme,
+                            onToggle = onToggleWebServer,
+                            onPinChange = onUpdateWebServerPin,
+                            onSelectFolder = onSelectSharedFolder,
+                            onResetFolder = onResetSharedFolder,
+                            onRefreshUrl = onRefreshWebServerUrl
+                        )
+                    }
+                } else {
                 val filesRootPath = state.filesRootPath ?: state.activeFtpPath
                 val currentFilesPath = state.currentFilesPath ?: filesRootPath
 
