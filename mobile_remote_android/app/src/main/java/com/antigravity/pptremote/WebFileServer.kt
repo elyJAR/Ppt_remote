@@ -147,6 +147,8 @@ class WebFileServer(
                 path == "/api/files" -> handleList(exchange)
                 path == "/download-zip" -> handleDownloadZip(exchange)
                 path.startsWith("/stream") -> handleStream(exchange)
+                path.startsWith("/subtitle") -> handleSubtitle(exchange)
+                path.startsWith("/api/subtitles") -> handleApiSubtitles(exchange)
                 path.startsWith("/download") -> handleDownload(exchange)
                 path.startsWith("/upload") -> handleUpload(exchange)
                 path.startsWith("/delete") -> handleDelete(exchange)
@@ -515,6 +517,82 @@ class WebFileServer(
             "zip" -> "application/zip"
             else -> "application/octet-stream"
         }
+    }
+
+    private fun handleSubtitle(exchange: HttpCtx) {
+        if (!requireAuth(exchange)) return
+        val pathParam = exchange.query
+            .split("&").firstOrNull { it.startsWith("path=") }
+            ?.removePrefix("path=")
+        val file = safeResolve(pathParam)
+        if (file == null || !file.exists() || !file.isFile) {
+            sendText(exchange, 404, "Subtitle not found")
+            return
+        }
+
+        val ext = file.name.substringAfterLast('.', "").lowercase()
+        val content = try {
+            file.readText(StandardCharsets.UTF_8)
+        } catch (_: Exception) {
+            sendText(exchange, 500, "Could not read subtitle file")
+            return
+        }
+
+        val vttContent = if (ext == "vtt") {
+            content
+        } else {
+            convertSrtToVtt(content)
+        }
+
+        val bytes = vttContent.toByteArray(StandardCharsets.UTF_8)
+        exchange.addResponseHeader("Content-Type", "text/vtt; charset=utf-8")
+        exchange.addResponseHeader("Access-Control-Allow-Origin", "*")
+        exchange.sendResponse(200, bytes)
+    }
+
+    private fun convertSrtToVtt(srt: String): String {
+        val sb = StringBuilder()
+        sb.append("WEBVTT\n\n")
+        val lines = srt.replace("\r\n", "\n").replace('\r', '\n').split('\n')
+        for (line in lines) {
+            val converted = line.replace(Regex("(\\d{2}:\\d{2}:\\d{2}),(\\d{3})"), "$1.$2")
+            sb.append(converted).append("\n")
+        }
+        return sb.toString()
+    }
+
+    private fun handleApiSubtitles(exchange: HttpCtx) {
+        if (!requireAuth(exchange)) return
+        val pathParam = exchange.query
+            .split("&").firstOrNull { it.startsWith("path=") }
+            ?.removePrefix("path=")
+        val videoFile = safeResolve(pathParam)
+        if (videoFile == null || !videoFile.exists() || !videoFile.isFile) {
+            sendJson(exchange, 200, "[]")
+            return
+        }
+
+        val parentDir = videoFile.parentFile ?: return sendJson(exchange, 200, "[]")
+        val baseName = videoFile.nameWithoutExtension.lowercase()
+        val subExtensions = setOf("srt", "vtt", "ass", "sub")
+
+        val matches = (parentDir.listFiles() ?: emptyArray()).filter { f ->
+            f.isFile && f.extension.lowercase() in subExtensions &&
+            (f.nameWithoutExtension.lowercase() == baseName || f.nameWithoutExtension.lowercase().startsWith("$baseName."))
+        }
+
+        val jsonItems = matches.joinToString(",") { f ->
+            val enc = URLEncoder.encode(f.canonicalPath, "UTF-8")
+            val label = if (f.nameWithoutExtension.lowercase() == baseName) {
+                "Default (" + f.extension.uppercase(Locale.getDefault()) + ")"
+            } else {
+                val lang = f.nameWithoutExtension.substringAfter(videoFile.nameWithoutExtension + ".").ifBlank { f.extension.uppercase(Locale.getDefault()) }
+                lang.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() } + " (" + f.extension.uppercase(Locale.getDefault()) + ")"
+            }
+            """{"path":${jsonStr(enc)},"label":${jsonStr(label)},"ext":${jsonStr(f.extension)}}"""
+        }
+
+        sendJson(exchange, 200, "[$jsonItems]")
     }
 
     private fun handleDownloadZip(exchange: HttpCtx) {
@@ -1243,6 +1321,64 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   display: flex;
   flex-direction: column;
 }
+.media-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 220px;
+}
+.gesture-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 10;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+.gesture-badge {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%) scale(0);
+  background: rgba(15, 23, 42, 0.85);
+  color: #58a6ff;
+  border: 1.5px solid rgba(88, 166, 255, 0.5);
+  border-radius: 50%;
+  width: 72px; height: 72px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1.1rem;
+  pointer-events: none;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+  opacity: 0;
+  box-shadow: 0 0 20px rgba(88,166,255,0.3);
+}
+.gesture-badge.show {
+  transform: translateY(-50%) scale(1);
+  opacity: 1;
+}
+.gesture-left { left: 15%; }
+.gesture-center { left: 50%; transform: translate(-50%, -50%) scale(0); }
+.gesture-center.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+.gesture-right { right: 15%; }
+.gesture-hud {
+  position: absolute;
+  top: 15px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 20, 30, 0.9);
+  border: 1px solid rgba(88,166,255,0.4);
+  border-radius: 20px;
+  padding: 5px 16px;
+  color: #58a6ff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: none;
+  pointer-events: none;
+  z-index: 15;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
 .media-modal-header {
   display: flex;
   justify-content: space-between;
@@ -1543,9 +1679,15 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
     <div class="media-container" id="mediaContainer">
       <video id="mediaVideoPlayer" controls autoplay style="display:none;width:100%;max-height:70vh;border-radius:10px;background:#000;"></video>
       <img id="mediaImageViewer" style="display:none;max-width:100%;max-height:70vh;border-radius:10px;object-fit:contain;" />
+      <div id="gestureOverlay" class="gesture-overlay" style="display:none;">
+        <div id="gestureBadgeLeft" class="gesture-badge gesture-left">-10s</div>
+        <div id="gestureBadgeCenter" class="gesture-badge gesture-center">⏯</div>
+        <div id="gestureBadgeRight" class="gesture-badge gesture-right">+10s</div>
+        <div id="gestureHUD" class="gesture-hud"></div>
+      </div>
     </div>
-    <div class="media-controls-extra" id="mediaExtraControls" style="display:none;margin-top:0.75rem;align-items:center;justify-content:center;gap:1rem;">
-      <label style="color:#8b949e;font-size:0.85rem;">Speed: 
+    <div class="media-controls-extra" id="mediaExtraControls" style="display:none;margin-top:0.75rem;align-items:center;justify-content:center;gap:1rem;flex-wrap:wrap;">
+      <label style="color:#8b949e;font-size:0.85rem;display:flex;align-items:center;gap:0.4rem;">Speed: 
         <select id="speedSelect" onchange="changePlaybackSpeed(this.value)" style="background:rgba(13,17,23,0.8);color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:0.85rem;cursor:pointer;">
           <option value="0.5">0.5x</option>
           <option value="0.75">0.75x</option>
@@ -1555,6 +1697,13 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
           <option value="2.0">2.0x</option>
         </select>
       </label>
+      <label style="color:#8b949e;font-size:0.85rem;display:flex;align-items:center;gap:0.4rem;">Subtitles: 
+        <select id="subSelect" onchange="changeSubtitleTrack(this.value)" style="background:rgba(13,17,23,0.8);color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:0.85rem;cursor:pointer;">
+          <option value="off">Off</option>
+        </select>
+      </label>
+      <button class="btn-sm" style="background:rgba(88,166,255,0.15);color:#58a6ff;border:1px solid rgba(88,166,255,0.3);padding:3px 10px;" onclick="document.getElementById('subFileInput').click()">📁 Load Local Subtitle</button>
+      <input type="file" id="subFileInput" accept=".srt,.vtt" style="display:none" onchange="handleLocalSubtitle(event)">
     </div>
   </div>
 </div>
@@ -1971,8 +2120,11 @@ var videoExtensions = ['mp4','mkv','avi','mov','webm','3gp','m4v','ts','ogv','fl
 var audioExtensions = ['mp3','wav','flac','aac','ogg','m4a','opus','wma','mid','midi'];
 var imageExtensions = ['jpg','jpeg','png','gif','webp','svg','bmp'];
 
+var activeVideoEnc = '';
+
 function openMediaPlayer(enc, name, ext) {
   ext = (ext || '').toLowerCase();
+  activeVideoEnc = enc;
   showApprovalOverlay('Approving Stream', 'Please approve media stream request on your phone.');
   setTimeout(hideApprovalOverlay, 4000);
 
@@ -1995,6 +2147,7 @@ function openMediaPlayer(enc, name, ext) {
     var vPlayer = document.getElementById('mediaVideoPlayer');
     var imgViewer = document.getElementById('mediaImageViewer');
     var extraCtrl = document.getElementById('mediaExtraControls');
+    var gOverlay = document.getElementById('gestureOverlay');
 
     title.textContent = name;
 
@@ -2002,13 +2155,18 @@ function openMediaPlayer(enc, name, ext) {
       imgViewer.style.display = 'none';
       vPlayer.style.display = 'block';
       extraCtrl.style.display = 'flex';
+      gOverlay.style.display = 'block';
       document.getElementById('speedSelect').value = '1.0';
       vPlayer.src = streamUrl;
+      clearSubtitleTracks();
+      fetchServerSubtitles(enc);
+      initGestureOverlay();
       vPlayer.play().catch(function(_){});
     } else {
       vPlayer.pause();
       vPlayer.style.display = 'none';
       extraCtrl.style.display = 'none';
+      gOverlay.style.display = 'none';
       imgViewer.style.display = 'block';
       imgViewer.src = streamUrl;
     }
@@ -2016,6 +2174,96 @@ function openMediaPlayer(enc, name, ext) {
   } else {
     window.open(streamUrl, '_blank');
   }
+}
+
+function clearSubtitleTracks() {
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  var tracks = vPlayer.querySelectorAll('track');
+  tracks.forEach(function(t){ t.remove(); });
+  var subSel = document.getElementById('subSelect');
+  subSel.innerHTML = '<option value="off">Off</option>';
+}
+
+function fetchServerSubtitles(enc) {
+  fetch('/api/subtitles?path=' + enc)
+    .then(function(r){ return r.json(); })
+    .then(function(items){
+      var subSel = document.getElementById('subSelect');
+      if (items && items.length > 0) {
+        items.forEach(function(item, idx){
+          var opt = document.createElement('option');
+          opt.value = item.path;
+          opt.textContent = item.label;
+          subSel.appendChild(opt);
+          
+          var track = document.createElement('track');
+          track.kind = 'subtitles';
+          track.label = item.label;
+          track.src = '/subtitle?path=' + item.path;
+          if (idx === 0) {
+            track.default = true;
+            opt.selected = true;
+          }
+          document.getElementById('mediaVideoPlayer').appendChild(track);
+        });
+        toast('Found ' + items.length + ' subtitle track(s)', true);
+      }
+    })
+    .catch(function(_){});
+}
+
+function changeSubtitleTrack(val) {
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  var tracks = vPlayer.textTracks;
+  for (var i = 0; i < tracks.length; i++) {
+    if (val === 'off') {
+      tracks[i].mode = 'disabled';
+    } else {
+      var trackSrc = tracks[i].src || '';
+      if (trackSrc.indexOf(val) !== -1 || val.indexOf(trackSrc) !== -1) {
+        tracks[i].mode = 'showing';
+      } else {
+        tracks[i].mode = 'disabled';
+      }
+    }
+  }
+}
+
+function handleLocalSubtitle(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    var text = evt.target.result;
+    var vttText = text;
+    if (file.name.toLowerCase().endsWith('.srt')) {
+      vttText = 'WEBVTT\n\n' + text.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+    }
+    var blob = new Blob([vttText], { type: 'text/vtt' });
+    var blobUrl = URL.createObjectURL(blob);
+
+    var vPlayer = document.getElementById('mediaVideoPlayer');
+    var track = document.createElement('track');
+    track.kind = 'subtitles';
+    track.label = 'Local: ' + file.name;
+    track.src = blobUrl;
+    track.default = true;
+    vPlayer.appendChild(track);
+
+    var subSel = document.getElementById('subSelect');
+    var opt = document.createElement('option');
+    opt.value = blobUrl;
+    opt.textContent = 'Local: ' + file.name;
+    opt.selected = true;
+    subSel.appendChild(opt);
+
+    for (var i = 0; i < vPlayer.textTracks.length; i++) {
+      vPlayer.textTracks[i].mode = 'disabled';
+    }
+    vPlayer.textTracks[vPlayer.textTracks.length - 1].mode = 'showing';
+    toast('Loaded subtitle: ' + file.name, true);
+  };
+  reader.readAsText(file);
 }
 
 function closeMediaModal() {
@@ -2035,6 +2283,96 @@ function closeAudioPlayer() {
 function changePlaybackSpeed(val) {
   var vPlayer = document.getElementById('mediaVideoPlayer');
   if (vPlayer) { vPlayer.playbackRate = parseFloat(val); }
+}
+
+// --- Gesture Controls -----------------------------------------
+var lastTapTime = 0;
+var lastTapX = 0;
+var touchStartX = 0;
+var touchStartY = 0;
+var isSwiping = false;
+var hudTimer = null;
+
+function showGestureBadge(badgeId) {
+  var badge = document.getElementById(badgeId);
+  if (!badge) return;
+  badge.classList.remove('show');
+  void badge.offsetWidth;
+  badge.classList.add('show');
+  setTimeout(function(){ badge.classList.remove('show'); }, 600);
+}
+
+function showHUD(text) {
+  var hud = document.getElementById('gestureHUD');
+  if (!hud) return;
+  hud.textContent = text;
+  hud.style.display = 'block';
+  clearTimeout(hudTimer);
+  hudTimer = setTimeout(function(){ hud.style.display = 'none'; }, 1500);
+}
+
+function initGestureOverlay() {
+  var overlay = document.getElementById('gestureOverlay');
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  if (!overlay || !vPlayer) return;
+
+  overlay.onpointerdown = function(e) {
+    touchStartX = e.clientX;
+    touchStartY = e.clientY;
+    isSwiping = false;
+  };
+
+  overlay.onpointermove = function(e) {
+    var dx = e.clientX - touchStartX;
+    var dy = e.clientY - touchStartY;
+
+    if (Math.abs(dy) > 30 && Math.abs(dy) > Math.abs(dx)) {
+      isSwiping = true;
+      var rect = overlay.getBoundingClientRect();
+      var isRightSide = (touchStartX - rect.left) > (rect.width / 2);
+
+      if (isRightSide) {
+        var deltaVol = -dy / rect.height;
+        var newVol = Math.max(0, Math.min(1, vPlayer.volume + deltaVol * 0.1));
+        vPlayer.volume = newVol;
+        showHUD('🔊 Volume: ' + Math.round(newVol * 100) + '%');
+        touchStartY = e.clientY;
+      }
+    } else if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      isSwiping = true;
+      var deltaSeek = (dx / overlay.clientWidth) * 60;
+      var targetTime = Math.max(0, Math.min(vPlayer.duration || 0, vPlayer.currentTime + deltaSeek * 0.05));
+      vPlayer.currentTime = targetTime;
+      var sign = deltaSeek > 0 ? '+' : '';
+      showHUD('⏩ Seek: ' + sign + Math.round(deltaSeek) + 's');
+      touchStartX = e.clientX;
+    }
+  };
+
+  overlay.onclick = function(e) {
+    if (isSwiping) return;
+    var now = Date.now();
+    var rect = overlay.getBoundingClientRect();
+    var clickX = e.clientX - rect.left;
+    var width = rect.width;
+
+    if (now - lastTapTime < 300 && Math.abs(clickX - lastTapX) < 100) {
+      if (clickX < width * 0.35) {
+        vPlayer.currentTime = Math.max(0, vPlayer.currentTime - 10);
+        showGestureBadge('gestureBadgeLeft');
+      } else if (clickX > width * 0.65) {
+        vPlayer.currentTime = Math.min(vPlayer.duration || 0, vPlayer.currentTime + 10);
+        showGestureBadge('gestureBadgeRight');
+      } else {
+        if (vPlayer.paused) vPlayer.play(); else vPlayer.pause();
+        showGestureBadge('gestureBadgeCenter');
+      }
+      lastTapTime = 0;
+    } else {
+      lastTapTime = now;
+      lastTapX = clickX;
+    }
+  };
 }
 
 document.addEventListener('keydown', function(e) {
