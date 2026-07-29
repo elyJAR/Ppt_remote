@@ -459,17 +459,21 @@ class WebFileServer(
 
                 val contentLength = end - start + 1
                 exchange.addResponseHeader("Content-Range", "bytes $start-$end/$fileLength")
+                exchange.addResponseHeader("Connection", "keep-alive")
+                exchange.addResponseHeader("Keep-Alive", "timeout=30, max=1000")
+                exchange.addResponseHeader("Cache-Control", "no-cache, private")
 
                 exchange.sendResponseStream(206, contentLength) { out ->
                     java.io.RandomAccessFile(file, "r").use { raf ->
                         raf.seek(start)
-                        val buffer = ByteArray(64 * 1024)
+                        val buffer = ByteArray(32 * 1024)
                         var bytesRemaining = contentLength
                         while (bytesRemaining > 0) {
                             val toRead = minOf(buffer.size.toLong(), bytesRemaining).toInt()
                             val read = raf.read(buffer, 0, toRead)
                             if (read <= 0) break
                             out.write(buffer, 0, read)
+                            out.flush()
                             bytesRemaining -= read
                         }
                     }
@@ -2349,10 +2353,27 @@ function openMediaPlayer(enc, name, ext) {
       if (customCtrl) customCtrl.style.display = 'flex';
       document.getElementById('speedSelect').value = '1.0';
       vPlayer.crossOrigin = 'anonymous';
+      vPlayer.preload = 'metadata';
       vPlayer.src = streamUrl;
 
       var errNotice = document.getElementById('videoErrorNotice');
       if (errNotice) errNotice.style.display = 'none';
+
+      var stallTimer = null;
+      vPlayer.onwaiting = function() {
+        if (stallTimer) clearTimeout(stallTimer);
+        stallTimer = setTimeout(function() {
+          if (vPlayer.paused) return;
+          var currTime = vPlayer.currentTime;
+          toast('Hotspot connection recovering...', true);
+          vPlayer.src = streamUrl;
+          vPlayer.currentTime = currTime;
+          vPlayer.play().catch(function(_){});
+        }, 3500);
+      };
+      vPlayer.onplaying = function() {
+        if (stallTimer) clearTimeout(stallTimer);
+      };
 
       vPlayer.onerror = function() {
         if (errNotice) {
