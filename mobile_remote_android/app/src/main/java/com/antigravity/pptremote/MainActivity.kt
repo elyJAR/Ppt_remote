@@ -140,17 +140,14 @@ private val iOSGray       = Color(0xFF8E8E93)
 private val iOSAmber      = Color(0xFFFF9F0A)
 private val iOSRed        = Color(0xFFFF453A)
 
-private val DarkTextPrimary   = Color(0xFFFFFFFF)
-private val DarkTextSecondary = Color(0xFFEBEBF5).copy(alpha = 0.6f)
-
-// ---  Colour palette — light ──────────────────────────────────────────────────
-private val LightTextPrimary   = Color(0xFF000000)
-private val LightTextSecondary = Color(0xFF3C3C43).copy(alpha = 0.85f)
+private val LightTextPrimary   = Color(0xFF1C1C1E)
+private val LightTextSecondary = Color(0xFF48484A)
 
 private val DarkColorScheme = darkColorScheme(
     primary          = iOSAccent,
     onPrimary        = Color.White,
-    primaryContainer = iOSAccentDim,
+    primaryContainer = Color(0xFF1E3A8A),
+    onPrimaryContainer = Color(0xFFDBEAFE),
     background       = iOSBlack,
     surface          = iOSGray900,
     surfaceVariant   = iOSGray800,
@@ -164,13 +161,14 @@ private val LightColorScheme = lightColorScheme(
     primary          = iOSAccent,
     onPrimary        = Color.White,
     primaryContainer = Color(0xFFDBEAFE),
+    onPrimaryContainer = Color(0xFF1E40AF),
     background       = Color(0xFFF2F2F7),
     surface          = Color(0xFFFFFFFF),
     surfaceVariant   = Color(0xFFE5E5EA),
     onBackground     = LightTextPrimary,
     onSurface        = LightTextPrimary,
     onSurfaceVariant = LightTextSecondary,
-    outline          = Color(0xFFC7C7CC),
+    outline          = Color(0xFFD1D1D6),
 )
 
 // ---  Theme-aware color shorthand ────────
@@ -2891,7 +2889,7 @@ private fun SettingsScreen(
                                     Text(
                                         text = desc,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                     )
                                 }
                             }
