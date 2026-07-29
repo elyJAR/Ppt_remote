@@ -140,6 +140,8 @@ private val iOSGray       = Color(0xFF8E8E93)
 private val iOSAmber      = Color(0xFFFF9F0A)
 private val iOSRed        = Color(0xFFFF453A)
 
+private val DarkTextPrimary   = Color(0xFFFFFFFF)
+private val DarkTextSecondary = Color(0xFFEBEBF5).copy(alpha = 0.6f)
 private val LightTextPrimary   = Color(0xFF1C1C1E)
 private val LightTextSecondary = Color(0xFF48484A)
 

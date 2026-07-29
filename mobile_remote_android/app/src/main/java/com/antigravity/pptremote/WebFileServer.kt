@@ -1383,8 +1383,14 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   overflow: hidden;
   min-height: 220px;
 }
+.media-container.fullscreen-mode,
 .media-container:fullscreen,
 .media-container:-webkit-full-screen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   width: 100vw !important;
   height: 100vh !important;
   max-width: 100vw !important;
@@ -1396,7 +1402,9 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   justify-content: center !important;
   padding: 0 !important;
   margin: 0 !important;
+  z-index: 999999 !important;
 }
+.media-container.fullscreen-mode #mediaVideoPlayer,
 .media-container:fullscreen #mediaVideoPlayer,
 .media-container:-webkit-full-screen #mediaVideoPlayer {
   width: 100vw !important;
@@ -1405,6 +1413,18 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   max-height: 100vh !important;
   object-fit: contain !important;
   border-radius: 0 !important;
+}
+.media-container.fullscreen-mode .video-custom-controls,
+.media-container:fullscreen .video-custom-controls,
+.media-container:-webkit-full-screen .video-custom-controls {
+  border-radius: 0 !important;
+  border: none !important;
+  background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.5) 70%, transparent) !important;
+  padding: 1rem 1.5rem !important;
+  z-index: 1000000 !important;
+}
+body.v-fullscreen-active {
+  overflow: hidden !important;
 }
 .gesture-overlay {
   position: absolute;
@@ -2538,6 +2558,9 @@ function handleLocalSubtitle(e) {
 function closeMediaModal() {
   var modal = document.getElementById('mediaModal');
   var vPlayer = document.getElementById('mediaVideoPlayer');
+  var container = document.getElementById('mediaContainer');
+  if (container) container.classList.remove('fullscreen-mode');
+  document.body.classList.remove('v-fullscreen-active');
   if (vPlayer) { vPlayer.pause(); vPlayer.src = ''; }
   var customCtrl = document.getElementById('videoCustomControls');
   if (customCtrl) customCtrl.style.display = 'none';
@@ -2692,11 +2715,23 @@ function onVolumeChange(val) {
 function toggleVideoFullscreen() {
   var container = document.getElementById('mediaContainer');
   if (!container) return;
-  if (!document.fullscreenElement) {
-    if (container.requestFullscreen) container.requestFullscreen();
-    else if (container.webkitRequestFullscreen) container.webkitRequestFullscreen();
+  var isFs = container.classList.contains('fullscreen-mode') || document.fullscreenElement || document.webkitFullscreenElement;
+  if (!isFs) {
+    container.classList.add('fullscreen-mode');
+    document.body.classList.add('v-fullscreen-active');
+    if (container.requestFullscreen) {
+      container.requestFullscreen().catch(function(_){});
+    } else if (container.webkitRequestFullscreen) {
+      container.webkitRequestFullscreen();
+    }
   } else {
-    if (document.exitFullscreen) document.exitFullscreen();
+    container.classList.remove('fullscreen-mode');
+    document.body.classList.remove('v-fullscreen-active');
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(function(_){});
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
   }
 }
 
