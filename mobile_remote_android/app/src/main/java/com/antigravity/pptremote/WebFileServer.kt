@@ -457,19 +457,6 @@ class WebFileServer(
                     return
                 }
 
-                val qualityParam = exchange.query
-                    .split("&")
-                    .firstOrNull { it.startsWith("quality=") }
-                    ?.removePrefix("quality=") ?: "original"
-
-                val bufferSize = when (qualityParam) {
-                    "360p" -> 16 * 1024
-                    "480p" -> 24 * 1024
-                    "720p" -> 32 * 1024
-                    "1080p" -> 48 * 1024
-                    else -> 32 * 1024
-                }
-
                 val contentLength = end - start + 1
                 exchange.addResponseHeader("Content-Range", "bytes $start-$end/$fileLength")
                 exchange.addResponseHeader("Connection", "keep-alive")
@@ -479,14 +466,13 @@ class WebFileServer(
                 exchange.sendResponseStream(206, contentLength) { out ->
                     java.io.RandomAccessFile(file, "r").use { raf ->
                         raf.seek(start)
-                        val buffer = ByteArray(bufferSize)
+                        val buffer = ByteArray(64 * 1024)
                         var bytesRemaining = contentLength
                         while (bytesRemaining > 0) {
                             val toRead = minOf(buffer.size.toLong(), bytesRemaining).toInt()
                             val read = raf.read(buffer, 0, toRead)
                             if (read <= 0) break
                             out.write(buffer, 0, read)
-                            out.flush()
                             bytesRemaining -= read
                         }
                     }
@@ -1055,9 +1041,6 @@ class WebFileServer(
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PPT Remote &mdash; Unlock Files</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%231f6feb%22/><text x=%2250%22 y=%2270%22 font-family=%22sans-serif%22 font-size=%2260%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>P</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:radial-gradient(circle at top right, rgba(29, 78, 216, 0.12), transparent 45%), #0d1117;color:#e6edf3;font-family:'Outfit',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
@@ -1311,9 +1294,6 @@ function hideApprovalOverlay() {
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PPT Remote &mdash; Files</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%231f6feb%22/><text x=%2250%22 y=%2270%22 font-family=%22sans-serif%22 font-size=%2260%22 font-weight=%22bold%22 fill=%22white%22 text-anchor=%22middle%22>P</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:radial-gradient(circle at top right, rgba(29,78,216,0.08), transparent 45%), #0a0d16;color:#e6edf3;font-family:'Outfit',system-ui,sans-serif;font-size:14px;min-height:100vh}
@@ -1834,15 +1814,6 @@ body.v-fullscreen-active {
       <a id="videoDownloadLink" href="#" download class="btn-sm" style="background:rgba(255,255,255,0.1);color:#fff;text-decoration:none;padding:6px 14px;display:inline-block;margin-top:8px;margin-left:6px;">📥 Download File</a>
     </div>
     <div class="media-controls-extra" id="mediaExtraControls" style="display:none;margin-top:0.75rem;align-items:center;justify-content:center;gap:1rem;flex-wrap:wrap;">
-      <label style="color:#8b949e;font-size:0.85rem;display:flex;align-items:center;gap:0.4rem;">Quality: 
-        <select id="qualitySelect" onchange="changeVideoQuality(this.value)" style="background:rgba(13,17,23,0.8);color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:0.85rem;cursor:pointer;">
-          <option value="original" selected>Original (Direct)</option>
-          <option value="1080p">1080p (High)</option>
-          <option value="720p">720p (Medium)</option>
-          <option value="480p">480p (512MB RAM Saver)</option>
-          <option value="360p">360p (Slow Hotspot)</option>
-        </select>
-      </label>
       <label style="color:#8b949e;font-size:0.85rem;display:flex;align-items:center;gap:0.4rem;">Speed: 
         <select id="speedSelect" onchange="changePlaybackSpeed(this.value)" style="background:rgba(13,17,23,0.8);color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:0.85rem;cursor:pointer;">
           <option value="0.5">0.5x</option>
@@ -2589,20 +2560,7 @@ function changePlaybackSpeed(val) {
   if (vPlayer) { vPlayer.playbackRate = parseFloat(val); }
 }
 
-function changeVideoQuality(quality) {
-  var vPlayer = document.getElementById('mediaVideoPlayer');
-  if (!vPlayer || !activeVideoEnc) return;
-  var currentTime = vPlayer.currentTime;
-  var wasPlaying = !vPlayer.paused;
-  
-  var newStreamUrl = '/stream?path=' + activeVideoEnc + '&inline=true&quality=' + encodeURIComponent(quality);
-  vPlayer.src = newStreamUrl;
-  vPlayer.currentTime = currentTime;
-  if (wasPlaying) {
-    vPlayer.play().catch(function(_){});
-  }
-  toast('Switched video quality: ' + quality, true);
-}
+
 
 var isSeeking = false;
 var hideControlsTimer = null;
