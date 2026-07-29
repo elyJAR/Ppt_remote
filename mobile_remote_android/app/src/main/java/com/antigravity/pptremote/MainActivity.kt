@@ -395,7 +395,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     when {
                         state.showOnboarding -> {
                             OnboardingScreen(onComplete = viewModel::completeOnboarding)

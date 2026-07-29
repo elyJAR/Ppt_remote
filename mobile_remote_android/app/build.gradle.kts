@@ -19,7 +19,7 @@ android {
 
     defaultConfig {
         applicationId = "com.antigravity.pptremote"
-        minSdk = 26
+        minSdk = 24
         targetSdk = 35
         versionCode = 6
         versionName = "2.2.16"
