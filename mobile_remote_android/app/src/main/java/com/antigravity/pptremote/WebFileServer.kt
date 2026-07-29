@@ -457,6 +457,19 @@ class WebFileServer(
                     return
                 }
 
+                val qualityParam = exchange.query
+                    .split("&")
+                    .firstOrNull { it.startsWith("quality=") }
+                    ?.removePrefix("quality=") ?: "original"
+
+                val bufferSize = when (qualityParam) {
+                    "360p" -> 16 * 1024
+                    "480p" -> 24 * 1024
+                    "720p" -> 32 * 1024
+                    "1080p" -> 48 * 1024
+                    else -> 32 * 1024
+                }
+
                 val contentLength = end - start + 1
                 exchange.addResponseHeader("Content-Range", "bytes $start-$end/$fileLength")
                 exchange.addResponseHeader("Connection", "keep-alive")
@@ -466,7 +479,7 @@ class WebFileServer(
                 exchange.sendResponseStream(206, contentLength) { out ->
                     java.io.RandomAccessFile(file, "r").use { raf ->
                         raf.seek(start)
-                        val buffer = ByteArray(32 * 1024)
+                        val buffer = ByteArray(bufferSize)
                         var bytesRemaining = contentLength
                         while (bytesRemaining > 0) {
                             val toRead = minOf(buffer.size.toLong(), bytesRemaining).toInt()
@@ -1801,6 +1814,15 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
       <a id="videoDownloadLink" href="#" download class="btn-sm" style="background:rgba(255,255,255,0.1);color:#fff;text-decoration:none;padding:6px 14px;display:inline-block;margin-top:8px;margin-left:6px;">📥 Download File</a>
     </div>
     <div class="media-controls-extra" id="mediaExtraControls" style="display:none;margin-top:0.75rem;align-items:center;justify-content:center;gap:1rem;flex-wrap:wrap;">
+      <label style="color:#8b949e;font-size:0.85rem;display:flex;align-items:center;gap:0.4rem;">Quality: 
+        <select id="qualitySelect" onchange="changeVideoQuality(this.value)" style="background:rgba(13,17,23,0.8);color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:0.85rem;cursor:pointer;">
+          <option value="original" selected>Original (Direct)</option>
+          <option value="1080p">1080p (High)</option>
+          <option value="720p">720p (Medium)</option>
+          <option value="480p">480p (512MB RAM Saver)</option>
+          <option value="360p">360p (Slow Hotspot)</option>
+        </select>
+      </label>
       <label style="color:#8b949e;font-size:0.85rem;display:flex;align-items:center;gap:0.4rem;">Speed: 
         <select id="speedSelect" onchange="changePlaybackSpeed(this.value)" style="background:rgba(13,17,23,0.8);color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:0.85rem;cursor:pointer;">
           <option value="0.5">0.5x</option>
@@ -2352,6 +2374,8 @@ function openMediaPlayer(enc, name, ext) {
       var customCtrl = document.getElementById('videoCustomControls');
       if (customCtrl) customCtrl.style.display = 'flex';
       document.getElementById('speedSelect').value = '1.0';
+      var qSel = document.getElementById('qualitySelect');
+      if (qSel) qSel.value = 'original';
       vPlayer.crossOrigin = 'anonymous';
       vPlayer.preload = 'metadata';
       vPlayer.src = streamUrl;
@@ -2540,6 +2564,21 @@ function closeAudioPlayer() {
 function changePlaybackSpeed(val) {
   var vPlayer = document.getElementById('mediaVideoPlayer');
   if (vPlayer) { vPlayer.playbackRate = parseFloat(val); }
+}
+
+function changeVideoQuality(quality) {
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  if (!vPlayer || !activeVideoEnc) return;
+  var currentTime = vPlayer.currentTime;
+  var wasPlaying = !vPlayer.paused;
+  
+  var newStreamUrl = '/stream?path=' + activeVideoEnc + '&inline=true&quality=' + encodeURIComponent(quality);
+  vPlayer.src = newStreamUrl;
+  vPlayer.currentTime = currentTime;
+  if (wasPlaying) {
+    vPlayer.play().catch(function(_){});
+  }
+  toast('Switched video quality: ' + quality, true);
 }
 
 var isSeeking = false;
