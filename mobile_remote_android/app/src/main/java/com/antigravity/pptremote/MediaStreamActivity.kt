@@ -22,6 +22,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import android.view.KeyEvent
 
 class MediaStreamActivity : ComponentActivity() {
 
@@ -39,6 +40,8 @@ class MediaStreamActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val serverUrl = intent.getStringExtra(EXTRA_SERVER_URL) ?: "http://127.0.0.1:8686"
+        
+        setupLayout(serverUrl)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -52,6 +55,17 @@ class MediaStreamActivity : ComponentActivity() {
                 }
             }
         })
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            onBackPressedDispatcher.onBackPressed()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    private fun setupLayout(serverUrl: String) {
 
         // Root Layout
         val rootLayout = FrameLayout(this).apply {
