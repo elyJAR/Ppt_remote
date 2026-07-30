@@ -903,7 +903,7 @@ class WebFileServer(
         val activeListener = RemoteControlService.securityListener
         if (activeListener != null) {
             activeListener.onRequestConnection(clientIp) { approved ->
-                RemoteControlService.resolveRequest(requestId, approved)
+                RemoteControlService.resolveRequest(requestId, approved, context)
             }
         }
         return decision.getDecision()
@@ -920,7 +920,7 @@ class WebFileServer(
         val activeListener = RemoteControlService.securityListener
         if (activeListener != null) {
             activeListener.onRequestDelete(clientIp, fileName) { approved ->
-                RemoteControlService.resolveRequest(requestId, approved)
+                RemoteControlService.resolveRequest(requestId, approved, context)
             }
         }
         return decision.getDecision()
@@ -947,7 +947,7 @@ class WebFileServer(
         val activeListener = RemoteControlService.securityListener
         if (activeListener != null) {
             activeListener.onRequestUpload(clientIp, fileName) { approved ->
-                RemoteControlService.resolveRequest(requestId, approved)
+                RemoteControlService.resolveRequest(requestId, approved, context)
             }
         }
 
@@ -981,7 +981,7 @@ class WebFileServer(
         val activeListener = RemoteControlService.securityListener
         if (activeListener != null) {
             activeListener.onRequestDownload(clientIp, fileName) { approved ->
-                RemoteControlService.resolveRequest(requestId, approved)
+                RemoteControlService.resolveRequest(requestId, approved, context)
             }
         }
 
