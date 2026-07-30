@@ -2499,14 +2499,20 @@ function fetchServerSubtitles(enc) {
 }
 
 function changeSubtitleTrack(val) {
+  var subSel = document.getElementById('subSelect');
+  var selectedLabel = '';
+  if (val !== 'off' && subSel.selectedIndex >= 0) {
+    selectedLabel = subSel.options[subSel.selectedIndex].textContent;
+  }
+  
   var vPlayer = document.getElementById('mediaVideoPlayer');
   var tracks = vPlayer.textTracks;
+  if (!tracks) return;
   for (var i = 0; i < tracks.length; i++) {
     if (val === 'off') {
       tracks[i].mode = 'disabled';
     } else {
-      var trackSrc = tracks[i].src || '';
-      if (trackSrc.indexOf(val) !== -1 || val.indexOf(trackSrc) !== -1) {
+      if (tracks[i].label === selectedLabel) {
         tracks[i].mode = 'showing';
       } else {
         tracks[i].mode = 'disabled';
