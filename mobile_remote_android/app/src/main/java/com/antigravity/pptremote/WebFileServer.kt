@@ -2875,6 +2875,66 @@ document.addEventListener('keydown', function(e) {
     closeMediaModal();
     closeServerSubModal();
   }
+  
+  var video = document.getElementById('mediaVideoPlayer');
+  var modal = document.getElementById('mediaModal');
+  if (video && modal && modal.style.display !== 'none') {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    switch(e.key) {
+      case ' ':
+      case 'k':
+      case 'K':
+        e.preventDefault();
+        if (video.paused) video.play(); else video.pause();
+        break;
+      case 'ArrowRight':
+      case 'l':
+      case 'L':
+        e.preventDefault();
+        video.currentTime += 5;
+        break;
+      case 'ArrowLeft':
+      case 'j':
+      case 'J':
+        e.preventDefault();
+        video.currentTime -= 5;
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        video.volume = Math.min(1, video.volume + 0.05);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        video.volume = Math.max(0, video.volume - 0.05);
+        break;
+      case 'm':
+      case 'M':
+        e.preventDefault();
+        video.muted = !video.muted;
+        break;
+      case 'f':
+      case 'F':
+        e.preventDefault();
+        if (video.requestFullscreen) {
+            if (!document.fullscreenElement) video.requestFullscreen();
+            else document.exitFullscreen();
+        } else if (video.webkitRequestFullscreen) {
+            if (!document.webkitFullscreenElement) video.webkitRequestFullscreen();
+            else document.webkitExitFullscreen();
+        }
+        break;
+    }
+    
+    // 0-9 seeking
+    if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        var percent = parseInt(e.key) / 10;
+        if (!isNaN(video.duration)) {
+            video.currentTime = video.duration * percent;
+        }
+    }
+  }
 });
 </script>
 </body></html>"""
