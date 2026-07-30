@@ -50,6 +50,14 @@ class BrowserActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_ESCAPE) {
+            onBackPressedDispatcher.onBackPressed()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -78,12 +86,32 @@ fun BrowserScreen() {
         }
     }
 
-    // Handle physical back button
-    BackHandler(enabled = canGoBack) {
+    var customView by remember { mutableStateOf<android.view.View?>(null) }
+    var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
+    var originalOrientation by remember { mutableStateOf(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) }
+
+    // Handle physical back button or ESC for fullscreen
+    BackHandler(enabled = customView != null) {
+        webView?.webChromeClient?.onHideCustomView()
+    }
+
+    // Handle physical back button for browsing history
+    BackHandler(enabled = canGoBack && customView == null) {
         webView?.goBack()
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    if (customView != null) {
+        AndroidView(
+            factory = { context ->
+                android.widget.FrameLayout(context).apply {
+                    setBackgroundColor(android.graphics.Color.BLACK)
+                    addView(customView, android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+    } else {
+        Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Top App Bar / Omnibox
         TopAppBar(
             title = {
@@ -181,6 +209,37 @@ fun BrowserScreen() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                 super.onProgressChanged(view, newProgress)
                                 progress = newProgress / 100f
+                            }
+                            
+                            override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
+                                if (customView != null) {
+                                    callback?.onCustomViewHidden()
+                                    return
+                                }
+                                customView = view
+                                customViewCallback = callback
+                                if (context is android.app.Activity) {
+                                    originalOrientation = context.requestedOrientation
+                                    context.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                    @Suppress("DEPRECATION")
+                                    context.window.decorView.systemUiVisibility = (
+                                        android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                                            or android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                            or android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                                    )
+                                }
+                            }
+
+                            override fun onHideCustomView() {
+                                if (customView == null) return
+                                customView = null
+                                customViewCallback?.onCustomViewHidden()
+                                customViewCallback = null
+                                if (context is android.app.Activity) {
+                                    context.requestedOrientation = originalOrientation
+                                    @Suppress("DEPRECATION")
+                                    context.window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+                                }
                             }
                         }
                         
@@ -323,6 +382,7 @@ fun BrowserScreen() {
                 }
                 Spacer(modifier = Modifier.height(32.dp))
             }
+        }
         }
     }
 }
