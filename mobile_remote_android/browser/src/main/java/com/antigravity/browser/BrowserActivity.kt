@@ -190,7 +190,30 @@ fun BrowserScreen() {
                                 request.setMimeType(mimetype)
                                 request.addRequestHeader("User-Agent", userAgent)
                                 request.setDescription("Downloading file...")
-                                val fileName = android.webkit.URLUtil.guessFileName(downloadUrl, contentDisposition, mimetype)
+                                var fileName = android.webkit.URLUtil.guessFileName(downloadUrl, contentDisposition, mimetype)
+                                if (fileName.endsWith(".bin") || !fileName.contains(".")) {
+                                    if (contentDisposition != null) {
+                                        val match = Regex("filename=\"([^\"]+)\"").find(contentDisposition)
+                                        if (match != null) {
+                                            fileName = match.groupValues[1]
+                                        } else {
+                                            val utf8Match = Regex("filename\\*=UTF-8''(.+)").find(contentDisposition)
+                                            if (utf8Match != null) {
+                                                fileName = java.net.URLDecoder.decode(utf8Match.groupValues[1], "UTF-8")
+                                            }
+                                        }
+                                    }
+                                    if (fileName.endsWith(".bin") || !fileName.contains(".")) {
+                                        try {
+                                            val uri = android.net.Uri.parse(downloadUrl)
+                                            val pathQuery = uri.getQueryParameter("path")
+                                            if (pathQuery != null) {
+                                                val lastSlash = pathQuery.lastIndexOf('/')
+                                                fileName = if (lastSlash != -1) pathQuery.substring(lastSlash + 1) else pathQuery
+                                            }
+                                        } catch (_: Exception) {}
+                                    }
+                                }
                                 request.setTitle(fileName)
                                 request.allowScanningByMediaScanner()
                                 request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
