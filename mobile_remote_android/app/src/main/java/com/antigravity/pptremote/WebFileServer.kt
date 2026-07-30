@@ -2898,8 +2898,17 @@ function selectServerSubtitleFile(encPath, name) {
 
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
-    closeMediaModal();
-    closeServerSubModal();
+    var container = document.getElementById('mediaContainer');
+    var isFs = (container && container.classList.contains('fullscreen-mode')) || document.fullscreenElement || document.webkitFullscreenElement;
+    if (isFs) {
+      if (container) container.classList.remove('fullscreen-mode');
+      document.body.classList.remove('v-fullscreen-active');
+      if (document.exitFullscreen) document.exitFullscreen().catch(function(_){});
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    } else {
+      closeMediaModal();
+      closeServerSubModal();
+    }
   }
   
   var video = document.getElementById('mediaVideoPlayer');
@@ -2942,13 +2951,7 @@ document.addEventListener('keydown', function(e) {
       case 'f':
       case 'F':
         e.preventDefault();
-        if (video.requestFullscreen) {
-            if (!document.fullscreenElement) video.requestFullscreen();
-            else document.exitFullscreen();
-        } else if (video.webkitRequestFullscreen) {
-            if (!document.webkitFullscreenElement) video.webkitRequestFullscreen();
-            else document.webkitExitFullscreen();
-        }
+        toggleVideoFullscreen();
         break;
     }
     
@@ -2960,6 +2963,21 @@ document.addEventListener('keydown', function(e) {
             video.currentTime = video.duration * percent;
         }
     }
+  }
+});
+
+document.addEventListener('fullscreenchange', function() {
+  if (!document.fullscreenElement) {
+    var container = document.getElementById('mediaContainer');
+    if (container) container.classList.remove('fullscreen-mode');
+    document.body.classList.remove('v-fullscreen-active');
+  }
+});
+document.addEventListener('webkitfullscreenchange', function() {
+  if (!document.webkitFullscreenElement) {
+    var container = document.getElementById('mediaContainer');
+    if (container) container.classList.remove('fullscreen-mode');
+    document.body.classList.remove('v-fullscreen-active');
   }
 });
 </script>
