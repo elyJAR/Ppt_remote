@@ -41,8 +41,7 @@ class WebFileServer(
         private set
 
     @Volatile private var serverSocket: ServerSocket? = null
-    @Volatile var activeSessionToken: String? = null
-        private set
+    private val activeSessionTokens = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     private val executor = Executors.newFixedThreadPool(4)
 
@@ -99,7 +98,7 @@ class WebFileServer(
     fun stop() {
         try { serverSocket?.close() } catch (_: Exception) {}
         serverSocket = null
-        activeSessionToken = null
+        activeSessionTokens.clear()
         Log.i("WebFileServer", "Stopped")
     }
 
@@ -254,9 +253,19 @@ class WebFileServer(
 
     private fun sessionValid(exchange: HttpCtx): Boolean {
         if (!isPinRequired()) return true
-        val token = activeSessionToken ?: return false
         val cookieHeader = exchange.requestHeaders["cookie"] ?: return false
-        return cookieHeader.split(";").any { it.trim() == "session=$token" }
+        val tokens = cookieHeader.split(";").map { it.trim() }.filter { it.startsWith("session=") }.map { it.removePrefix("session=") }
+        val now = System.currentTimeMillis()
+        for (token in tokens) {
+            val timestamp = activeSessionTokens[token]
+            if (timestamp != null && now - timestamp < 86400000L) {
+                activeSessionTokens[token] = now
+                return true
+            } else if (timestamp != null) {
+                activeSessionTokens.remove(token)
+            }
+        }
+        return false
     }
 
     private fun requireAuth(exchange: HttpCtx): Boolean {
@@ -330,8 +339,8 @@ class WebFileServer(
                         return
                     }
                     val token = UUID.randomUUID().toString()
-                    activeSessionToken = token
-                    exchange.addResponseHeader("Set-Cookie", "session=$token; Path=/; HttpOnly")
+                    activeSessionTokens[token] = System.currentTimeMillis()
+                    exchange.addResponseHeader("Set-Cookie", "session=$token; Path=/; HttpOnly; Max-Age=86400")
                     exchange.sendRedirect("/")
                 } else {
                     sendHtml(exchange, 401, buildLoginHtml(true))
@@ -964,7 +973,7 @@ class WebFileServer(
         val now = System.currentTimeMillis()
         synchronized(approvalsLock) {
             recentApprovals.removeAll { now - it.timestamp > 7200000L }
-            val existing = recentApprovals.firstOrNull { it.clientIp == clientIp }
+            val existing = recentApprovals.firstOrNull { it.clientIp == clientIp && it.fileName == fileName }
             if (existing != null) {
                 existing.timestamp = now
                 return true

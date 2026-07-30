@@ -289,7 +289,16 @@ class MediaStreamActivity : ComponentActivity() {
             }
 
             override fun onPermissionRequest(request: PermissionRequest?) {
-                request?.grant(request.resources)
+                if (request == null) return
+                runOnUiThread {
+                    android.app.AlertDialog.Builder(this@MediaStreamActivity)
+                        .setTitle("Permission Request")
+                        .setMessage("The webpage is requesting access to: " + request.resources.joinToString(", "))
+                        .setPositiveButton("Allow") { _, _ -> request.grant(request.resources) }
+                        .setNegativeButton("Deny") { _, _ -> request.deny() }
+                        .setCancelable(false)
+                        .show()
+                }
             }
         }
     }
