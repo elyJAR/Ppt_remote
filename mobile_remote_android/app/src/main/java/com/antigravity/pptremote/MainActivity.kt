@@ -1675,7 +1675,7 @@ private fun FilesScreen(
     onResetSharedFolder: () -> Unit = {},
     onRefreshWebServerUrl: () -> Unit = {}
 ) {
-    val colorScheme = if (state.isDarkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = MaterialTheme.colorScheme
     var showHelp by remember { mutableStateOf(false) }
     var viewMode by remember { mutableStateOf(FileViewMode.LIST) }
     var showSortMenu by remember { mutableStateOf(false) }
