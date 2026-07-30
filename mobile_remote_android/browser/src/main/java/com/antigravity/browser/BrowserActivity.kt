@@ -27,9 +27,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.ImeAction
@@ -61,6 +67,7 @@ fun BrowserScreen() {
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
     var pendingDownload by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var showHistory by remember { mutableStateOf(false) }
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -251,6 +258,12 @@ fun BrowserScreen() {
                 }
                 
                 IconButton(
+                    onClick = { showHistory = true }
+                ) {
+                    Icon(Icons.Default.History, contentDescription = "History")
+                }
+                
+                IconButton(
                     onClick = { 
                         urlInput = "https://www.google.com"
                         webView?.loadUrl(urlInput)
@@ -258,6 +271,36 @@ fun BrowserScreen() {
                 ) {
                     Icon(Icons.Default.Home, contentDescription = "Home")
                 }
+            }
+        }
+        
+        if (showHistory) {
+            @OptIn(ExperimentalMaterial3Api::class)
+            ModalBottomSheet(onDismissRequest = { showHistory = false }) {
+                val historyList = webView?.copyBackForwardList()
+                if (historyList != null && historyList.size > 0) {
+                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(historyList.size) { index ->
+                            val reverseIndex = historyList.size - 1 - index
+                            val item = historyList.getItemAtIndex(reverseIndex)
+                            val isCurrent = reverseIndex == historyList.currentIndex
+                            ListItem(
+                                headlineContent = { Text(item.title ?: item.url, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                supportingContent = { Text(item.url, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                leadingContent = { 
+                                    if (isCurrent) Icon(Icons.AutoMirrored.Filled.ArrowForward, "Current") 
+                                },
+                                modifier = Modifier.clickable {
+                                    webView?.goBackOrForward(reverseIndex - historyList.currentIndex)
+                                    showHistory = false
+                                }
+                            )
+                        }
+                    }
+                } else {
+                    Text("No history yet.", modifier = Modifier.padding(16.dp))
+                }
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
