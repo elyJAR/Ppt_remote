@@ -76,11 +76,15 @@ fun BrowserScreen() {
                     keyboardActions = KeyboardActions(
                         onGo = {
                             var loadUrl = urlInput.trim()
-                            if (!loadUrl.contains(".") || loadUrl.contains(" ")) {
+                            val isIpOrLocalhost = loadUrl.startsWith("localhost") || loadUrl.matches(Regex("^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+.*"))
+                            
+                            if (loadUrl.contains(" ") && !loadUrl.startsWith("http")) {
+                                loadUrl = "https://www.google.com/search?q=${android.net.Uri.encode(loadUrl)}"
+                            } else if (!loadUrl.contains(".") && !isIpOrLocalhost) {
                                 // Simple fallback to google search if not a direct domain
                                 loadUrl = "https://www.google.com/search?q=${android.net.Uri.encode(loadUrl)}"
                             } else if (!loadUrl.startsWith("http://") && !loadUrl.startsWith("https://")) {
-                                loadUrl = "https://$loadUrl"
+                                loadUrl = if (isIpOrLocalhost) "http://$loadUrl" else "https://$loadUrl"
                             }
                             webView?.loadUrl(loadUrl)
                         }
