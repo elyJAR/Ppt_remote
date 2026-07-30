@@ -100,17 +100,7 @@ fun BrowserScreen() {
         webView?.goBack()
     }
 
-    if (customView != null) {
-        AndroidView(
-            factory = { context ->
-                android.widget.FrameLayout(context).apply {
-                    setBackgroundColor(android.graphics.Color.BLACK)
-                    addView(customView, android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-    } else {
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // Top App Bar / Omnibox
         TopAppBar(
@@ -383,6 +373,18 @@ fun BrowserScreen() {
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
+        }
+        
+        if (customView != null) {
+            AndroidView(
+                factory = { context ->
+                    android.widget.FrameLayout(context).apply {
+                        setBackgroundColor(android.graphics.Color.BLACK)
+                        addView(customView, android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
