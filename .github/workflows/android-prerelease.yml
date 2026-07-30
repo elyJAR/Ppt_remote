@@ -101,11 +101,11 @@ jobs:
 
       - name: Run lint
         continue-on-error: true
-        run: ./gradlew :app:lint
+        run: ./gradlew :app:lint :browser:lint
 
       - name: Run unit tests
         continue-on-error: true
-        run: ./gradlew :app:test
+        run: ./gradlew :app:test :browser:test
 
       - name: Upload lint report
         if: always()
@@ -189,7 +189,7 @@ jobs:
       # ── Build signed release APK ─────────────────────────────────────────────
       - name: Build signed release APK
         shell: bash
-        run: ./gradlew :app:assembleRelease
+        run: ./gradlew :app:assembleRelease :browser:assembleRelease
 
       # ── Resolve tag ──────────────────────────────────────────────────────────
       - name: Resolve release tag
@@ -210,8 +210,9 @@ jobs:
         shell: bash
         run: |
           APK=$(find app/build/outputs/apk/release -name "PptRemote-*.apk" | head -1)
-          echo "path=mobile_remote_android/$APK" >> "$GITHUB_OUTPUT"
-          echo "Found APK: $APK"
+          BROWSER_APK=$(find browser/build/outputs/apk/release -name "*.apk" | head -1)
+          echo "path=mobile_remote_android/$APK,mobile_remote_android/$BROWSER_APK" >> "$GITHUB_OUTPUT"
+          echo "Found APKs: $APK, $BROWSER_APK"
 
       # ── Publish pre-release ──────────────────────────────────────────────────
       - name: Publish GitHub prerelease

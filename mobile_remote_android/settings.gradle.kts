@@ -19,3 +19,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "PptRemote"
 include(":app")
+include(":browser")
