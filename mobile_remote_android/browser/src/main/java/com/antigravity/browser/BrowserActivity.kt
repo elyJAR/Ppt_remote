@@ -1,5 +1,11 @@
 package com.antigravity.browser
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.compose.ui.platform.LocalContext
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.os.Bundle
@@ -46,6 +52,7 @@ class BrowserActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrowserScreen() {
+    val context = LocalContext.current
     var webView: WebView? by remember { mutableStateOf(null) }
     var currentUrl by remember { mutableStateOf("https://www.google.com") }
     var urlInput by remember { mutableStateOf(currentUrl) }
@@ -53,6 +60,18 @@ fun BrowserScreen() {
     var progress by remember { mutableStateOf(0f) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
+    var pendingDownload by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    val requestPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            pendingDownload?.invoke()
+            pendingDownload = null
+        } else {
+            android.widget.Toast.makeText(context, "Storage permission denied", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // Handle physical back button
     BackHandler(enabled = canGoBack) {
@@ -160,6 +179,36 @@ fun BrowserScreen() {
                             }
                         }
                         
+                        setDownloadListener { downloadUrl, userAgent, contentDisposition, mimetype, _ ->
+                            val enqueueDownload = {
+                                val request = android.app.DownloadManager.Request(android.net.Uri.parse(downloadUrl))
+                                request.setMimeType(mimetype)
+                                request.addRequestHeader("User-Agent", userAgent)
+                                request.setDescription("Downloading file...")
+                                val fileName = android.webkit.URLUtil.guessFileName(downloadUrl, contentDisposition, mimetype)
+                                request.setTitle(fileName)
+                                request.allowScanningByMediaScanner()
+                                request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                request.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, fileName)
+                                
+                                val dm = context.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                try {
+                                    dm.enqueue(request)
+                                    android.widget.Toast.makeText(context, "Downloading...", android.widget.Toast.LENGTH_SHORT).show()
+                                } catch (e: Exception) {
+                                    android.widget.Toast.makeText(context, "Download failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
+
+                            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q && 
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                                pendingDownload = enqueueDownload
+                                requestPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                            } else {
+                                enqueueDownload()
+                            }
+                        }
+
                         loadUrl(currentUrl)
                         webView = this
                     }
