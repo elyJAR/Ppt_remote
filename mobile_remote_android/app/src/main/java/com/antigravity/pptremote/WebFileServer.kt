@@ -1406,10 +1406,10 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  max-width: 100vw !important;
-  max-height: 100vh !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
   border-radius: 0 !important;
   background: #000 !important;
   display: flex !important;
@@ -1422,10 +1422,10 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
 .media-container.fullscreen-mode #mediaVideoPlayer,
 .media-container:fullscreen #mediaVideoPlayer,
 .media-container:-webkit-full-screen #mediaVideoPlayer {
-  width: 100vw !important;
-  height: 100vh !important;
-  max-width: 100vw !important;
-  max-height: 100vh !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
   object-fit: contain !important;
   border-radius: 0 !important;
 }
@@ -1760,11 +1760,6 @@ body.v-fullscreen-active {
   </div>
 </header>
 <main>
-  <div class="current-location-bar">
-    <span class="location-icon">&#x1F4C2;</span>
-    <span class="location-label">Current Location:</span>
-    <div class="location-breadcrumbs">$breadcrumbs</div>
-  </div>
   <div class="search-bar-container" style="margin: 0 0 1.25rem 0; max-width: 100%;">
     <span class="search-icon">&#x1F50D;</span>
     <input type="text" id="searchInput" placeholder="Search files and folders in current directory..." oninput="filterItems()">
@@ -1857,6 +1852,10 @@ body.v-fullscreen-active {
           <option value="1.25">1.25x</option>
           <option value="1.5">1.5x</option>
           <option value="2.0">2.0x</option>
+        </select>
+      </label>
+      <label id="audioTrackLabel" style="display:none;color:#8b949e;font-size:0.85rem;align-items:center;gap:0.4rem;">Audio: 
+        <select id="audioSelect" onchange="changeAudioTrack(this.value)" style="background:rgba(13,17,23,0.8);color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 8px;font-size:0.85rem;cursor:pointer;">
         </select>
       </label>
       <label style="color:#8b949e;font-size:0.85rem;display:flex;align-items:center;gap:0.4rem;">Subtitles: 
@@ -2463,42 +2462,35 @@ function clearSubtitleTracks() {
   var tracks = vPlayer.querySelectorAll('track');
   tracks.forEach(function(t){ t.remove(); });
   var subSel = document.getElementById('subSelect');
-  subSel.innerHTML = '<option value="off">Off</option>';
+  if (subSel) subSel.innerHTML = '<option value="off">Off</option>';
+  var audioSel = document.getElementById('audioSelect');
+  var audioLabel = document.getElementById('audioTrackLabel');
+  if (audioSel) audioSel.innerHTML = '';
+  if (audioLabel) audioLabel.style.display = 'none';
 }
 
 function fetchServerSubtitles(enc) {
   fetch('/api/subtitles?path=' + enc)
     .then(function(r){ return r.json(); })
     .then(function(data){
-      var subSel = document.getElementById('subSelect');
       var vPlayer = document.getElementById('mediaVideoPlayer');
       var items = (data && data.items) ? data.items : [];
       var subFiles = items.filter(function(it){ return it.type === 'file'; });
 
       if (subFiles.length > 0) {
         subFiles.forEach(function(item, idx){
-          var opt = document.createElement('option');
-          opt.value = item.path;
-          opt.textContent = item.label;
-          subSel.appendChild(opt);
-          
           var track = document.createElement('track');
           track.kind = 'subtitles';
           track.label = item.label;
           track.src = '/subtitle?path=' + item.path;
           if (idx === 0) {
             track.default = true;
-            opt.selected = true;
           }
           vPlayer.appendChild(track);
         });
 
         setTimeout(function() {
-          if (vPlayer.textTracks && vPlayer.textTracks.length > 0) {
-            for (var i = 0; i < vPlayer.textTracks.length; i++) {
-              vPlayer.textTracks[i].mode = (i === 0) ? 'showing' : 'disabled';
-            }
-          }
+          syncMediaTracksUI();
         }, 500);
 
         toast('Found ' + subFiles.length + ' subtitle track(s) — Auto-enabled', true);
@@ -2508,24 +2500,16 @@ function fetchServerSubtitles(enc) {
 }
 
 function changeSubtitleTrack(val) {
-  var subSel = document.getElementById('subSelect');
-  var selectedLabel = '';
-  if (val !== 'off' && subSel.selectedIndex >= 0) {
-    selectedLabel = subSel.options[subSel.selectedIndex].textContent;
-  }
-  
   var vPlayer = document.getElementById('mediaVideoPlayer');
   var tracks = vPlayer.textTracks;
   if (!tracks) return;
   for (var i = 0; i < tracks.length; i++) {
     if (val === 'off') {
       tracks[i].mode = 'disabled';
+    } else if (i.toString() === val) {
+      tracks[i].mode = 'showing';
     } else {
-      if (tracks[i].label === selectedLabel) {
-        tracks[i].mode = 'showing';
-      } else {
-        tracks[i].mode = 'disabled';
-      }
+      tracks[i].mode = 'hidden'; // Keep hidden so they can still be active or load if needed
     }
   }
 }
@@ -2551,18 +2535,16 @@ function handleLocalSubtitle(e) {
     track.default = true;
     vPlayer.appendChild(track);
 
-    var subSel = document.getElementById('subSelect');
-    var opt = document.createElement('option');
-    opt.value = blobUrl;
-    opt.textContent = 'Local: ' + file.name;
-    opt.selected = true;
-    subSel.appendChild(opt);
-
-    for (var i = 0; i < vPlayer.textTracks.length; i++) {
-      vPlayer.textTracks[i].mode = 'disabled';
-    }
-    vPlayer.textTracks[vPlayer.textTracks.length - 1].mode = 'showing';
-    toast('Loaded subtitle: ' + file.name, true);
+    setTimeout(function() {
+      for (var i = 0; i < vPlayer.textTracks.length; i++) {
+        vPlayer.textTracks[i].mode = 'disabled';
+      }
+      if (vPlayer.textTracks.length > 0) {
+        vPlayer.textTracks[vPlayer.textTracks.length - 1].mode = 'showing';
+      }
+      syncMediaTracksUI();
+      toast('Loaded subtitle: ' + file.name, true);
+    }, 100);
   };
   reader.readAsText(file);
 }
@@ -2666,6 +2648,67 @@ function initVideoControls() {
       if (volBar) volBar.value = vPlayer.volume;
     }
   };
+
+  vPlayer.onloadedmetadata = function() {
+    syncMediaTracksUI();
+  };
+}
+
+function syncMediaTracksUI() {
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  if (!vPlayer) return;
+
+  var audioLabel = document.getElementById('audioTrackLabel');
+  var audioSel = document.getElementById('audioSelect');
+  if (vPlayer.audioTracks && vPlayer.audioTracks.length > 1) {
+    if (audioLabel) audioLabel.style.display = 'flex';
+    if (audioSel) {
+      audioSel.innerHTML = '';
+      for (var i = 0; i < vPlayer.audioTracks.length; i++) {
+        var track = vPlayer.audioTracks[i];
+        var opt = document.createElement('option');
+        opt.value = i.toString();
+        opt.textContent = (track.label || ('Audio ' + (i + 1))) + (track.language ? ' (' + track.language + ')' : '');
+        if (track.enabled) opt.selected = true;
+        audioSel.appendChild(opt);
+      }
+    }
+  } else if (audioLabel) {
+    audioLabel.style.display = 'none';
+  }
+
+  var subSel = document.getElementById('subSelect');
+  if (vPlayer.textTracks && vPlayer.textTracks.length > 0) {
+    var currentVal = subSel.value;
+    subSel.innerHTML = '<option value="off">Off</option>';
+    var isShowing = false;
+    for (var j = 0; j < vPlayer.textTracks.length; j++) {
+      var t = vPlayer.textTracks[j];
+      var o = document.createElement('option');
+      o.value = j.toString();
+      o.textContent = (t.label || ('Subtitle ' + (j + 1))) + (t.language ? ' (' + t.language + ')' : '');
+      if (t.mode === 'showing' || currentVal === j.toString()) {
+        o.selected = true;
+        t.mode = 'showing';
+        isShowing = true;
+      } else {
+        t.mode = 'hidden';
+      }
+      subSel.appendChild(o);
+    }
+    if (!isShowing) {
+        subSel.value = "off";
+    }
+  }
+}
+
+function changeAudioTrack(val) {
+  var vPlayer = document.getElementById('mediaVideoPlayer');
+  if (vPlayer && vPlayer.audioTracks) {
+    for (var i = 0; i < vPlayer.audioTracks.length; i++) {
+      vPlayer.audioTracks[i].enabled = (i.toString() === val);
+    }
+  }
 }
 
 function formatTimeSec(sec) {
@@ -2895,20 +2938,16 @@ function selectServerSubtitleFile(encPath, name) {
   track.default = true;
   vPlayer.appendChild(track);
 
-  var subSel = document.getElementById('subSelect');
-  var opt = document.createElement('option');
-  opt.value = subUrl;
-  opt.textContent = 'Server: ' + name;
-  opt.selected = true;
-  subSel.appendChild(opt);
-
-  for (var i = 0; i < vPlayer.textTracks.length; i++) {
-    vPlayer.textTracks[i].mode = 'disabled';
-  }
-  if (vPlayer.textTracks.length > 0) {
-    vPlayer.textTracks[vPlayer.textTracks.length - 1].mode = 'showing';
-  }
-  toast('Loaded server subtitle: ' + name, true);
+  setTimeout(function() {
+    for (var i = 0; i < vPlayer.textTracks.length; i++) {
+      vPlayer.textTracks[i].mode = 'disabled';
+    }
+    if (vPlayer.textTracks.length > 0) {
+      vPlayer.textTracks[vPlayer.textTracks.length - 1].mode = 'showing';
+    }
+    syncMediaTracksUI();
+    toast('Loaded server subtitle: ' + name, true);
+  }, 100);
 }
 
 document.addEventListener('keydown', function(e) {
