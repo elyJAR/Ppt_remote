@@ -557,22 +557,46 @@ class WebFileServer(
         val sb = StringBuilder()
         sb.append("WEBVTT\n\n")
         val lines = srt.replace("\r\n", "\n").replace('\r', '\n').split('\n')
+        
+        val isAss = lines.any { it.trim().startsWith("[Script Info]") || it.trim().startsWith("Dialogue:") }
+        
         for (line in lines) {
             val trimmed = line.trim()
-            if (trimmed.startsWith("Dialogue:")) {
-                val parts = trimmed.substringAfter("Dialogue:").split(",", limit = 10)
-                if (parts.size >= 10) {
-                    val start = parts[1].trim()
-                    val end = parts[2].trim()
-                    val text = parts[9].replace(Regex("\\{.*?\\}"), "").trim()
-                    val vttStart = if (start.length == 9) "0$start" else start
-                    val vttEnd = if (end.length == 9) "0$end" else end
-                    sb.append("${vttStart.replace('.', ':')} --> ${vttEnd.replace('.', ':')}\n$text\n\n")
-                    continue
+            
+            if (isAss) {
+                if (trimmed.startsWith("Dialogue:")) {
+                    val parts = trimmed.substringAfter("Dialogue:").split(",", limit = 10)
+                    if (parts.size >= 10) {
+                        val start = parts[1].trim()
+                        val end = parts[2].trim()
+                        var text = parts[9].replace(Regex("\\{.*?\\}"), "").trim()
+                        text = text.replace("\\N", "\n").replace("\\n", "\n")
+                        
+                        val formatTime = { t: String ->
+                            val tParts = t.split(":")
+                            if (tParts.size == 3) {
+                                val h = tParts[0].padStart(2, '0')
+                                val m = tParts[1].padStart(2, '0')
+                                val sCs = tParts[2].split(".")
+                                val s = sCs[0].padStart(2, '0')
+                                val ms = if (sCs.size > 1) sCs[1].padEnd(3, '0').take(3) else "000"
+                                "$h:$m:$s.$ms"
+                            } else t
+                        }
+                        
+                        sb.append("${formatTime(start)} --> ${formatTime(end)}\n$text\n\n")
+                    }
+                }
+            } else {
+                if (trimmed.contains("-->")) {
+                    val converted = trimmed.replace(Regex("(\\d{1,2}:\\d{2}:\\d{2}),(\\d{2,3})"), "$1.$2")
+                    sb.append(converted).append("\n")
+                } else {
+                    val cleanLine = line.replace(Regex("<font.*?>", RegexOption.IGNORE_CASE), "")
+                                        .replace(Regex("</font>", RegexOption.IGNORE_CASE), "")
+                    sb.append(cleanLine).append("\n")
                 }
             }
-            val converted = line.replace(Regex("(\\d{2}:\\d{2}:\\d{2}),(\\d{3})"), "$1.$2")
-            sb.append(converted).append("\n")
         }
         return sb.toString()
     }
@@ -1348,6 +1372,8 @@ td a.folder-link:hover{color:#79c0ff;text-decoration:underline}
   padding: 1.5rem;
   width: 90%;
   max-width: 860px;
+  max-height: 95vh;
+  overflow-y: auto;
   box-shadow: 0 24px 60px rgba(0,0,0,0.6);
   animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   display: flex;

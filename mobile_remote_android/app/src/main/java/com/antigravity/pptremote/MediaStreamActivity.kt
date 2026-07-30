@@ -62,6 +62,31 @@ class MediaStreamActivity : ComponentActivity() {
             onBackPressedDispatcher.onBackPressed()
             return true
         }
+        
+        if (::webView.isInitialized) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                    webView.evaluateJavascript("var v=document.getElementById('mediaVideoPlayer'); if(v) { if(v.paused) v.play(); else v.pause(); }", null)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                    webView.evaluateJavascript("var v=document.getElementById('mediaVideoPlayer'); if(v) v.currentTime -= 5;", null)
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                    webView.evaluateJavascript("var v=document.getElementById('mediaVideoPlayer'); if(v) v.currentTime += 5;", null)
+                    return true
+                }
+                KeyEvent.KEYCODE_F -> {
+                    webView.evaluateJavascript("var v=document.getElementById('mediaVideoPlayer'); if(v) { if(v.requestFullscreen) { if(!document.fullscreenElement) v.requestFullscreen(); else document.exitFullscreen(); } else if(v.webkitRequestFullscreen) { if(!document.webkitFullscreenElement) v.webkitRequestFullscreen(); else document.webkitExitFullscreen(); } }", null)
+                    return true
+                }
+                KeyEvent.KEYCODE_M -> {
+                    webView.evaluateJavascript("var v=document.getElementById('mediaVideoPlayer'); if(v) v.muted = !v.muted;", null)
+                    return true
+                }
+            }
+        }
         return super.onKeyDown(keyCode, event)
     }
 
@@ -223,6 +248,7 @@ class MediaStreamActivity : ComponentActivity() {
                 customView = view
                 customViewCallback = callback
                 originalOrientation = requestedOrientation
+                requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 
                 topBarContainer.visibility = View.GONE
                 webView.visibility = View.GONE
